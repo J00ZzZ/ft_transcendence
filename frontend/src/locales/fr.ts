@@ -592,6 +592,8 @@ export const fr = {
     rollDiceBtn: 'LANCER LE DÉ',
     reconLogsTitle: '// JOURNAUX DE RECO',
     noReconLogged: 'AUCUNE TÉLÉMÉTRIE ENREGISTRÉE',
+    viewBoardBtn: 'VOIR LE PLATEAU',
+    viewResultsBtn: 'VOIR LES RÉSULTATS',
   },
   results: {
     victory: 'VICTOIRE !',

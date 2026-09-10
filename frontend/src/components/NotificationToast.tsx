@@ -288,14 +288,15 @@ function Toast({
     bottom: 28 + index * 150,
     zIndex: 99999,
     width: 430,
-    background: 'rgba(10, 4, 24, 0.97)',
-    border: '2px solid var(--accent-pink, #ff007f)',
-    boxShadow: '0 0 24px rgba(255, 0, 127, 0.4), 0 20px 48px rgba(0, 0, 0, 0.95)',
-    borderRadius: 4,
+    maxWidth: 'calc(100vw - 56px)',
+    background: 'var(--bg-card)',
+    border: 'var(--card-border-style)',
+    boxShadow: 'var(--box-shadow)',
+    borderRadius: 8,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    backdropFilter: 'blur(12px)',
+    backdropFilter: 'blur(16px)',
     transform: visible ? 'translateX(0)' : 'translateX(120%)',
     opacity: visible ? 1 : 0,
     transition: 'transform 0.35s cubic-bezier(.22,1,.36,1), opacity 0.35s ease',
@@ -303,16 +304,15 @@ function Toast({
   }
 
   return (
-    <div style={toastStyle}>
+    <div className="retro-window theme-popover-menu" style={toastStyle}>
       {/* Toast Titlebar Header */}
       <div
+        className="window-header"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '10px 16px',
-          background: 'rgba(255, 0, 127, 0.22)',
-          borderBottom: '1.5px solid rgba(255, 0, 127, 0.4)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -321,8 +321,8 @@ function Toast({
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: '#ff007f',
-              boxShadow: '0 0 8px #ff007f',
+              background: 'var(--accent-pink, #ff007f)',
+              boxShadow: '0 0 8px var(--accent-pink, #ff007f)',
               animation: 'pulse 1s infinite',
             }}
           />

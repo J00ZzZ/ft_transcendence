@@ -284,6 +284,54 @@ async function main() {
 
   console.log(`  ✅ Seeded incoming friend requests, active friendships, and restricted lists!`);
 
+  // ── Seed Notifications ───────────────────────────────────────────────────
+  await prisma.notification.deleteMany({});
+  for (const target of targetsForRequests) {
+    await prisma.notification.createMany({
+      data: [
+        {
+          id: randomUUID(),
+          userId: target.id,
+          type: 'friend_request',
+          payload: { fromUsername: 'RetroRider' },
+          read: false,
+          createdAt: new Date(now - 12 * MINUTE),
+        },
+        {
+          id: randomUUID(),
+          userId: target.id,
+          type: 'game_invite',
+          payload: {
+            fromUsername: 'Viper_X',
+            gameId: randomUUID(),
+            token: 'test-token',
+            color: 'RED',
+            inviteCode: 'VPR42',
+          },
+          read: false,
+          createdAt: new Date(now - 35 * MINUTE),
+        },
+        {
+          id: randomUUID(),
+          userId: target.id,
+          type: 'friend_accepted',
+          payload: { fromUsername: 'NeonKnight' },
+          read: true,
+          createdAt: new Date(now - 4 * HOUR),
+        },
+        {
+          id: randomUUID(),
+          userId: target.id,
+          type: 'achievement',
+          payload: { achievement: 'FIRST_BLOOD' },
+          read: true,
+          createdAt: new Date(now - 1 * 24 * HOUR),
+        },
+      ],
+    });
+  }
+  console.log('  ✅ Seeded rich notification logs (match invites, friend requests, achievements)!');
+
   // ── Sample Matches ────────────────────────────────────────────────────────
   if (createdUsers.length >= 4) {
     await prisma.game.create({
@@ -305,7 +353,7 @@ async function main() {
     });
   }
 
-  console.log('✅ Seeding complete with full active roster across all Snack Rank Tiers!');
+  console.log('✅ Seeding complete with full active roster across all Snack Rank Tiers and notifications!');
 }
 
 main()

@@ -299,6 +299,7 @@ export function RetroNavbar({
                 avatarStyle={user?.avatarStyle}
                 hasAvatarPhoto={user?.hasAvatarPhoto ?? false}
                 size={30}
+                cacheBuster={avatarBuster}
                 fallbackStyle={{
                   width: 30,
                   height: 30,

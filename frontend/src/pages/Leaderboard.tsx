@@ -182,6 +182,7 @@ export function Leaderboard() {
               {/* Inside-Window Podium Showcase (Fixed above the scrollable table) */}
               {data && data.entries.length > 0 && (
                 <div
+                  className="retro-window"
                   style={{
                     display: 'grid',
                     gridTemplateColumns:
@@ -194,9 +195,12 @@ export function Leaderboard() {
                     gap: 18,
                     alignItems: 'end',
                     padding: '18px 20px',
-                    borderRadius: 10,
-                    background: 'rgba(10, 3, 24, 0.65)',
-                    border: '1px solid rgba(0, 240, 255, 0.25)',
+                    borderRadius: 12,
+                    background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                    backdropFilter: 'blur(32px) saturate(220%)',
+                    WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
                     flexShrink: 0,
                   }}
                 >
@@ -206,8 +210,8 @@ export function Leaderboard() {
                     return (
                       <div
                         style={{
-                          background: 'rgba(25, 10, 56, 0.85)',
-                          border: '1.5px solid rgba(0, 240, 255, 0.45)',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(0, 240, 255, 0.35)',
                           borderRadius: 8,
                           boxShadow: '0 0 18px rgba(0, 240, 255, 0.22)',
                           padding: '20px 22px',
@@ -364,8 +368,8 @@ export function Leaderboard() {
                     return (
                       <div
                         style={{
-                          background: 'rgba(25, 10, 56, 0.85)',
-                          border: '1.5px solid rgba(255, 0, 127, 0.45)',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(0, 240, 255, 0.35)',
                           borderRadius: 8,
                           boxShadow: '0 0 18px rgba(255, 0, 127, 0.22)',
                           padding: '20px 22px',
@@ -435,12 +439,15 @@ export function Leaderboard() {
 
               {/* Ladder Table Container (ONLY THIS SECTION SCROLLS) */}
               <div
+                className="retro-window"
                 style={{
-                  border: '1.5px solid rgba(0, 240, 255, 0.3)',
-                  borderRadius: 6,
-                  background: 'rgba(5, 2, 18, 0.9)',
+                  background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                  backdropFilter: 'blur(32px) saturate(220%)',
+                  WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                  border: '1px solid rgba(0, 240, 255, 0.35)',
+                  boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
+                  borderRadius: 12,
                   overflow: 'hidden',
-                  boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.5)',
                   flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
@@ -454,14 +461,14 @@ export function Leaderboard() {
                     gridTemplateColumns: '1.8fr 2.2fr 1.1fr 1.1fr 1fr',
                     gap: 20,
                     padding: '14px 28px',
-                    background: 'rgba(25, 10, 56, 0.98)',
-                    borderBottom: '1.5px solid rgba(0, 240, 255, 0.3)',
                     fontSize: '0.82rem',
                     fontWeight: 900,
-                    color: 'var(--accent-cyan)',
+                    color: 'var(--text-main)',
                     fontFamily: 'var(--font-display)',
                     textTransform: 'uppercase',
                     letterSpacing: '1.2px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                     flexShrink: 0,
                     zIndex: 3,
                   }}

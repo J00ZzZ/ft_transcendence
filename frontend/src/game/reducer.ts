@@ -28,7 +28,7 @@ export type GameViewState = {
   lastRolls: Partial<Record<PlayerColor, number>>
 }
 
-export function initialView(myColor: PlayerColor): GameViewState {
+export function initialView(myColor: PlayerColor, initialStatus: GameState['status'] = 'waiting'): GameViewState {
   return {
     pieces: [],
     players: [],
@@ -37,7 +37,7 @@ export function initialView(myColor: PlayerColor): GameViewState {
     diceValue: null,
     legalMoves: [],
     winner: null,
-    status: 'waiting',
+    status: initialStatus,
     clash: null,
     clashResult: null,
     myColor,

@@ -90,7 +90,18 @@ function Screen() {
   )
 }
 
+function GlobalNotifications() {
+  const { toasts, dismissToast } = useNotifications()
+  return <NotificationToasts toasts={toasts} onDismiss={dismissToast} />
+}
+
 export default function App() {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('retro_theme') || 'synthwave'
+    document.documentElement.setAttribute('data-theme', savedTheme)
+    document.body.setAttribute('data-theme', savedTheme)
+  }, [])
+
   return (
     <AppProvider>
       <NotificationsProvider>

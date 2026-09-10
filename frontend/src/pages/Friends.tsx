@@ -426,13 +426,16 @@ export function Friends() {
                   LEFT COLUMN: Allied Operatives / Restricted Pilots List
                  ════════════════════════════════════════════════════════════════ */}
               <div
+                className="retro-window"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  background: 'rgba(12, 3, 30, 0.85)',
-                  border: '1.5px solid rgba(0, 240, 255, 0.28)',
-                  boxShadow: '0 0 16px rgba(0, 240, 255, 0.08), inset 0 0 20px rgba(0, 0, 0, 0.6)',
-                  borderRadius: 8,
+                  background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                  backdropFilter: 'blur(32px) saturate(220%)',
+                  WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                  border: '1px solid rgba(0, 240, 255, 0.35)',
+                  boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
+                  borderRadius: 12,
                   overflow: 'hidden',
                   minHeight: 0,
                 }}
@@ -440,9 +443,9 @@ export function Friends() {
                 {/* Tab Switcher Header */}
                 <div
                   style={{
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                     padding: '10px 14px',
-                    background: 'linear-gradient(90deg, rgba(28, 8, 62, 0.95), rgba(16, 4, 38, 0.95))',
-                    borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -546,34 +549,10 @@ export function Friends() {
                         return (
                           <div
                             key={f.id}
+                            className="retro-friend-card"
                             onClick={() => {
                               retroAudio.playUiBeep(640, 0.04)
                               navigate(`/profile?u=${f.username}`)
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '11px 16px',
-                              borderRadius: 6,
-                              background: 'rgba(18, 6, 42, 0.82)',
-                              border: `1.5px solid ${f.status === 'online' || f.status === 'playing' ? 'rgba(0, 240, 255, 0.28)' : 'rgba(255, 255, 255, 0.1)'}`,
-                              boxShadow: f.status === 'online' || f.status === 'playing' ? '0 0 10px rgba(0, 240, 255, 0.08)' : 'none',
-                              transition: 'all 0.18s ease',
-                              gap: 12,
-                              cursor: 'pointer',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(28, 10, 64, 0.95)'
-                              e.currentTarget.style.borderColor = 'var(--accent-cyan)'
-                              e.currentTarget.style.boxShadow = '0 0 14px rgba(0, 240, 255, 0.25)'
-                              e.currentTarget.style.transform = 'translateX(3px)'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(18, 6, 42, 0.82)'
-                              e.currentTarget.style.borderColor = f.status === 'online' || f.status === 'playing' ? 'rgba(0, 240, 255, 0.28)' : 'rgba(255, 255, 255, 0.1)'
-                              e.currentTarget.style.boxShadow = f.status === 'online' || f.status === 'playing' ? '0 0 10px rgba(0, 240, 255, 0.08)' : 'none'
-                              e.currentTarget.style.transform = 'translateX(0)'
                             }}
                             title={`Click to view ${f.username}'s Pilot Profile`}
                           >
@@ -803,11 +782,14 @@ export function Friends() {
               >
                 {/* Top Right Card: ADD FRIEND */}
                 <div
+                  className="retro-window"
                   style={{
-                    background: 'rgba(14, 4, 34, 0.92)',
-                    border: '1.5px solid var(--accent-cyan)',
-                    boxShadow: '0 0 16px rgba(0, 240, 255, 0.15)',
-                    borderRadius: 8,
+                    background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                    backdropFilter: 'blur(32px) saturate(220%)',
+                    WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
+                    borderRadius: 12,
                     padding: '16px 18px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -879,12 +861,15 @@ export function Friends() {
 
                 {/* Bottom Right Card: Dedicated FRIEND REQUESTS Card */}
                 <div
+                  className="retro-window"
                   style={{
                     flex: 1,
-                    background: requests.length > 0 ? 'linear-gradient(180deg, rgba(28, 8, 54, 0.95) 0%, rgba(14, 4, 32, 0.98) 100%)' : 'rgba(12, 4, 28, 0.85)',
-                    border: requests.length > 0 ? '1.5px solid var(--accent-pink)' : '1.5px solid rgba(255, 255, 255, 0.15)',
-                    boxShadow: requests.length > 0 ? '0 0 20px rgba(255, 0, 127, 0.25)' : 'none',
-                    borderRadius: 8,
+                    background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                    backdropFilter: 'blur(32px) saturate(220%)',
+                    WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
+                    borderRadius: 12,
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
@@ -894,9 +879,9 @@ export function Friends() {
                   {/* Card Header */}
                   <div
                     style={{
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                       padding: '10px 14px',
-                      background: requests.length > 0 ? 'rgba(255, 0, 127, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                      borderBottom: requests.length > 0 ? '1px solid rgba(255, 0, 127, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -909,14 +894,14 @@ export function Friends() {
                           width: 8,
                           height: 8,
                           borderRadius: '50%',
-                          background: requests.length > 0 ? '#ff007f' : 'var(--text-muted)',
-                          boxShadow: requests.length > 0 ? '0 0 8px #ff007f' : 'none',
+                          background: requests.length > 0 ? 'var(--accent-pink)' : 'var(--text-muted)',
+                          boxShadow: requests.length > 0 ? '0 0 8px var(--accent-pink)' : 'none',
                         }}
                       />
                       <span
                         style={{
                           fontSize: '0.78rem',
-                          color: requests.length > 0 ? '#ff007f' : '#ffffff',
+                          color: 'var(--text-main)',
                           fontFamily: 'var(--font-display)',
                           fontWeight: 900,
                           letterSpacing: '1px',
@@ -979,15 +964,9 @@ export function Friends() {
                       requests.map((r) => (
                         <div
                           key={r.id}
+                          className="retro-friend-card"
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
                             padding: '9px 12px',
-                            background: 'rgba(18, 6, 42, 0.88)',
-                            border: '1px solid rgba(255, 0, 127, 0.32)',
-                            boxShadow: '0 0 10px rgba(255, 0, 127, 0.12)',
-                            borderRadius: 6,
                             gap: 10,
                           }}
                         >
@@ -1013,7 +992,7 @@ export function Friends() {
                                 style={{
                                   fontSize: '0.86rem',
                                   fontWeight: 900,
-                                  color: '#ffffff',
+                                  color: 'var(--text-main)',
                                   fontFamily: 'var(--font-display)',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',

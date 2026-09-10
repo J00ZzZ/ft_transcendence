@@ -53,7 +53,7 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
     )
     const finalTimer = setTimeout(() => {
       retroAudio.playUiBeep(880, 0.08, 'sine')
-    }, 720)
+    }, 720) 
     return () => {
       stepTimers.forEach(clearTimeout)
       clearTimeout(finalTimer)

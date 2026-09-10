@@ -593,6 +593,8 @@ export const en = {
     rollDiceBtn: 'ROLL DICE',
     reconLogsTitle: '// RECON LOGS',
     noReconLogged: 'NO TELEMETRY LOGGED',
+    viewBoardBtn: 'VIEW BOARD',
+    viewResultsBtn: 'VIEW RESULTS',
   },
   results: {
     victory: 'VICTORY!',

@@ -133,11 +133,12 @@ export class MatchCreatorService {
 		const isPvP = mode === 'pvp';
 		const player1Color = SLOT_COLORS[0];
 
+		const effectivePlayerCount = mode === 'pve' ? (1 + botCount) : playerCount;
 		const updates: Record<string, string> = {
 			id: gameId,
 			status: isPvP ? 'WAITING' : 'ACTIVE',
 			gameType: mode.toUpperCase(),
-			playerCount: playerCount.toString(),
+			playerCount: effectivePlayerCount.toString(),
 			player1_id: userId,
 			player1_color: player1Color,
 			clashEnabled: clashEnabled.toString(),
@@ -210,7 +211,7 @@ export class MatchCreatorService {
 		// to sessionStorage for refresh/reconnect and branches on activeMatch.mode
 		// (hotseat eager multi-join, rejoin auth). Without them, a browser refresh
 		// silently loses the mode and hotseat/PvE rejoin as a generic PvP seat.
-		const result: any = { gameId, token, engineUrl: ENGINE_WS_URL, color: player1Color, mode, playerCount };
+		const result: any = { gameId, token, engineUrl: ENGINE_WS_URL, color: player1Color, mode, playerCount: effectivePlayerCount };
 		if (isPvP) {
 			result.inviteCode = updates.inviteCode;
 		}

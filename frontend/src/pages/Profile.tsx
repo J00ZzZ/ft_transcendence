@@ -128,7 +128,7 @@ const ACHIEVEMENTS_DEF = [
 export function Profile() {
   const { t } = useTranslation()
   const { query } = useRoute()
-  const { user } = useApp()
+  const { user, refreshAvatar, refreshUser } = useApp()
   const username = query.get('u') || user?.username
   const isOwnProfile = user?.username === username
 
@@ -206,6 +206,8 @@ export function Profile() {
       } else {
         retroAudio.playUiBeep(880, 0.06)
         setAvatarBuster(Date.now())
+        refreshAvatar()
+        refreshUser()
       }
     } catch (e) {
       setUploadError(t('profile.uploadErrorGeneric'))
@@ -223,6 +225,8 @@ export function Profile() {
       if (res.ok) {
         retroAudio.playUiBeep(440, 0.06)
         setAvatarBuster(Date.now())
+        refreshAvatar()
+        refreshUser()
       }
     } catch (e) {
       console.error(e)
@@ -414,10 +418,11 @@ export function Profile() {
                     1. STEAM PROFILE HERO HEADER (Avatar + Identity + ELO Citadel)
                    ═══════════════════════════════════════════════════════════════ */}
                 <div
+                  className="retro-window"
                   style={{
-                    background: 'linear-gradient(180deg, rgba(26, 10, 58, 0.95) 0%, rgba(12, 4, 30, 0.98) 100%)',
-                    border: '1.5px solid rgba(0, 240, 255, 0.35)',
-                    boxShadow: '0 0 24px rgba(0, 240, 255, 0.15)',
+                    background: 'var(--bg-card)',
+                    border: 'var(--card-border-style)',
+                    boxShadow: 'var(--box-shadow)',
                     borderRadius: 8,
                     padding: '18px 24px',
                     display: 'grid',
@@ -840,10 +845,14 @@ export function Profile() {
                       LEFT MAIN SHOWCASE (Tabbed Match History / Achievements)
                      ─────────────────────────────────────────────────────────── */}
                   <div
+                    className="retro-window"
                     style={{
-                      background: 'rgba(14, 5, 36, 0.92)',
-                      border: '1.5px solid rgba(0, 240, 255, 0.28)',
-                      borderRadius: 8,
+                      background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                      backdropFilter: 'blur(32px) saturate(220%)',
+                      WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                      border: '1px solid rgba(0, 240, 255, 0.35)',
+                      boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
+                      borderRadius: 12,
                       overflow: 'hidden',
                       display: 'flex',
                       flexDirection: 'column',
@@ -854,9 +863,9 @@ export function Profile() {
                     {/* Tab Header Buttons */}
                     <div
                       style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                         padding: '8px 14px',
-                        background: 'rgba(25, 8, 55, 0.95)',
-                        borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -1153,10 +1162,14 @@ export function Profile() {
                   >
                     {/* Sidebar Box 1: Allied Operatives Showcase */}
                     <div
+                      className="retro-window"
                       style={{
-                        background: 'rgba(14, 5, 36, 0.92)',
-                        border: '1.5px solid rgba(0, 240, 255, 0.28)',
-                        borderRadius: 8,
+                        background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
+                        backdropFilter: 'blur(32px) saturate(220%)',
+                        WebkitBackdropFilter: 'blur(32px) saturate(220%)',
+                        border: '1px solid rgba(0, 240, 255, 0.35)',
+                        boxShadow: '0 28px 70px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 20px rgba(255, 0, 127, 0.08)',
+                        borderRadius: 12,
                         overflow: 'hidden',
                         display: 'flex',
                         flexDirection: 'column',
@@ -1166,16 +1179,16 @@ export function Profile() {
                     >
                       <div
                         style={{
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                           padding: '10px 14px',
-                          background: 'rgba(25, 8, 55, 0.95)',
-                          borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           flexShrink: 0,
                         }}
                       >
-                        <span style={{ fontSize: '0.82rem', fontWeight: 900, fontFamily: 'var(--font-display)', color: '#ffffff' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 900, fontFamily: 'var(--font-display)', color: 'var(--text-main)' }}>
                           {t('profile.friendsBoxTitle', { count: friendsData?.length ?? 0 })}
                         </span>
                         <button
@@ -1218,31 +1231,10 @@ export function Profile() {
                             return (
                               <div
                                 key={f.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 14px',
-                                  borderRadius: 6,
-                                  background: 'rgba(10, 3, 26, 0.85)',
-                                  border: '1.5px solid rgba(0, 240, 255, 0.25)',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.18s ease',
-                                  gap: 12,
-                                }}
+                                className="retro-friend-card"
                                 onClick={() => {
                                   retroAudio.playUiBeep(640, 0.04)
                                   navigate(`/profile?u=${f.username}`)
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = 'rgba(0, 240, 255, 0.16)'
-                                  e.currentTarget.style.borderColor = 'var(--accent-cyan)'
-                                  e.currentTarget.style.transform = 'translateX(2px)'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'rgba(10, 3, 26, 0.85)'
-                                  e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.25)'
-                                  e.currentTarget.style.transform = 'translateX(0)'
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>

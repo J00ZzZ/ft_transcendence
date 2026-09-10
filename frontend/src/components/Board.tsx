@@ -164,14 +164,11 @@ function Yard({
   const label = t(`board.${ck}Bay`)
   return (
     <div
+      className="retro-yard-box"
       style={{
         gridRow: `${r + 1} / span 6`,
         gridColumn: `${c + 1} / span 6`,
         padding: '6% 8%',
-        background: 'rgba(10, 2, 28, 0.95)',
-        border: '1.5px solid #2121ff',
-        borderRadius: 8,
-        boxShadow: '0 0 14px rgba(33, 33, 255, 0.45), inset 0 0 10px rgba(0, 240, 255, 0.15)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -199,15 +196,13 @@ function Yard({
           // {label}
         </span>
         <span
+          className="retro-goal-chip"
           style={{
             fontSize: '0.62rem',
             fontFamily: 'var(--font-mono)',
             fontWeight: 'bold',
-            color: goalCount > 0 ? '#00ff88' : '#ffffff',
-            background: 'rgba(5, 5, 20, 0.9)',
             border: `1px solid ${col.base}`,
             padding: '1px 6px',
-            borderRadius: 3,
             boxShadow: `0 0 6px ${col.base}66`,
           }}
         >
@@ -215,12 +210,11 @@ function Yard({
         </span>
       </div>
       <div
+        className="retro-yard-inner"
         style={{
           width: '100%',
           height: '82%',
-          background: 'rgba(10, 2, 28, 0.95)',
           border: `1.5px solid ${col.base}`,
-          borderRadius: 8,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gridTemplateRows: '1fr 1fr',
@@ -309,7 +303,8 @@ export function Board({ pieces = [], players = [], legalMoves, onPieceClick, ani
       if (r >= 6 && r <= 8 && c >= 6 && c <= 8) continue // center handled separately
       const key = `${r},${c}`
       const startCol = STARTS[key]
-      const bg = startCol ? COL[startCol].base : laneColor(r, c) || CELL_BG
+      const isPlain = !startCol && !laneColor(r, c)
+      const bg = startCol ? COL[startCol].base : laneColor(r, c) || (isPlain ? undefined : CELL_BG)
       const style: CSSProperties = {
         gridRow: r + 1,
         gridColumn: c + 1,
@@ -361,7 +356,7 @@ export function Board({ pieces = [], players = [], legalMoves, onPieceClick, ani
         )
       }
       cells.push(
-        <div key={`p${key}`} style={style}>
+        <div key={key} className={isPlain ? 'retro-track-cell-default' : undefined} style={style}>
           {inner}
         </div>,
       )
@@ -513,20 +508,21 @@ export function Board({ pieces = [], players = [], legalMoves, onPieceClick, ani
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div
+        className="retro-board-chassis"
         style={{
           width: '100%',
+          height: '100%',
+          maxWidth: '100%',
+          maxHeight: '100%',
           aspectRatio: '1',
           display: 'grid',
           gridTemplateColumns: 'repeat(15,1fr)',
           gridTemplateRows: 'repeat(15,1fr)',
           gap: 1,
           padding: '2.5%',
-          borderRadius: 10,
-          background: 'rgba(15, 6, 38, 0.95)',
-          border: '2px solid #2121ff',
-          boxShadow: '0 0 25px rgba(33, 33, 255, 0.6), inset 0 0 20px rgba(0, 240, 255, 0.25)',
+          boxSizing: 'border-box',
         }}
       >
         <Yard r={0} c={0} ck="red" basePieces={basePieces('red')} goalCount={goalCount('red')} legalPieceIds={legalPieceIds} onPieceClick={onPieceClick} />
@@ -534,12 +530,11 @@ export function Board({ pieces = [], players = [], legalMoves, onPieceClick, ani
         <Yard r={9} c={9} ck="yellow" basePieces={basePieces('yellow')} goalCount={goalCount('yellow')} legalPieceIds={legalPieceIds} onPieceClick={onPieceClick} />
         <Yard r={9} c={0} ck="blue" basePieces={basePieces('blue')} goalCount={goalCount('blue')} legalPieceIds={legalPieceIds} onPieceClick={onPieceClick} />
         <div
+          className="retro-center-triangles"
           style={{
             gridRow: '7 / span 3',
             gridColumn: '7 / span 3',
             background: `conic-gradient(from 45deg, ${COL.yellow.base} 0 90deg, ${COL.blue.base} 90deg 180deg, ${COL.red.base} 180deg 270deg, ${COL.green.base} 270deg 360deg)`,
-            border: '2px solid #2121ff',
-            boxShadow: '0 0 18px rgba(33, 33, 255, 0.6), inset 0 0 12px rgba(0,0,0,.7)',
           }}
         />
         {cells}

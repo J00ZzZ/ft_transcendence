@@ -54,15 +54,7 @@ export class SocketHandlers {
 
         let state = await this.store.loadGameState(effectiveGameId);
         if (!state) {
-          const creationMatchData = await this.store.getMatchData(effectiveGameId);
-          const playerCount = parseInt(creationMatchData?.playerCount || '4', 10);
-          // Prefer the persisted seatColors (exact ordered seats, including
-          // skipped colors in hotseat, e.g. blue + green + yellow with no red).
-          // Falls back to the dense slot fill for older rooms / direct engine use.
-          const seatColors = creationMatchData?.seatColors
-            ? (creationMatchData.seatColors.split(',') as PlayerColor[])
-            : SLOT_COLORS.slice(0, playerCount);
-          await this.store.createGame(effectiveGameId, true, seatColors);
+          await this.store.createGame(effectiveGameId, true, SLOT_COLORS);
           state = await this.store.loadGameState(effectiveGameId);
         }
 
@@ -187,10 +179,26 @@ export class SocketHandlers {
         // Instantiate bot
         this.getOrCreateBot(gameId, slotColor, this.engine, this.store);
       }
+
+      // PvE auto-start: human joined and all bot opponents are registered,
+      // so mark all participants ready and start the game immediately (no waiting room).
+      const activePlayers = state.players.filter(p => p.status === 'active');
+      for (const p of activePlayers) {
+        if (!state.readyPlayers.includes(p.color)) {
+          state.readyPlayers.push(p.color);
+        }
+      }
+
+      if (state.status === 'waiting') {
+        state.currentTurn = firstActiveColor(state) ?? state.currentTurn;
+        state.status = 'active';
+        await this.store.saveGameState(gameId, state);
+        this.engine.emitEvent({ type: 'game_started', gameId });
+      }
+      return;
     }
 
-    // Every seat that has actually joined (human, local hotseat seat, or bot
-    // just registered above) is auto-ready — there's nobody real left to wait on.
+    // Every seat that has actually joined (human, local hotseat seat) is auto-ready
     for (const p of state.players) {
       if (p.status === 'active' && !state.readyPlayers.includes(p.color)) {
         state.readyPlayers.push(p.color);
@@ -202,7 +210,7 @@ export class SocketHandlers {
     // Hotseat must wait for every local seat to have joined (they join one at
     // a time, via separate join_game calls on the same socket) before
     // starting — otherwise it'd fire after just the first seat.
-    const expectedSeats = matchData.gameType === 'HOTSEAT' ? parseInt(matchData.playerCount || '2', 10) : 0;
+    const expectedSeats = parseInt(matchData.playerCount || '2', 10);
     const activePlayers = state.players.filter(p => p.status === 'active');
     const allJoined = activePlayers.length >= expectedSeats;
     const allReady = activePlayers.length > 0 &&
@@ -225,7 +233,10 @@ export class SocketHandlers {
 
     (async () => {
       try {
-        if (socket.data.playerColor) {
+        const matchData = await this.store.getMatchData(gameId);
+        const isHotseat = matchData?.gameType === 'HOTSEAT';
+
+        if (socket.data.playerColor && !isHotseat) {
           const state = await this.store.loadGameState(gameId);
           if (state?.status === 'active' && state.currentTurn !== socket.data.playerColor) {
             socket.emit('error', 'Not your turn');
@@ -249,11 +260,15 @@ export class SocketHandlers {
 
     (async () => {
       try {
+        const matchData = await this.store.getMatchData(gameId);
+        const isHotseat = matchData?.gameType === 'HOTSEAT';
+
         const state = await this.store.loadGameState(gameId);
         if (state?.status === 'active') {
-          if (state.currentTurn !== color) return;
+          const expectedColor = isHotseat ? state.currentTurn : color;
+          if (state.currentTurn !== expectedColor) return;
           const piece = state.pieces.find(p => p.id === pieceId);
-          if (!piece || piece.color !== color) return;
+          if (!piece || piece.color !== expectedColor) return;
         }
         await this.engine.movePiece(gameId, pieceId);
       } catch (error) {

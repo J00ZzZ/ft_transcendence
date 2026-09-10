@@ -114,7 +114,7 @@ export function NotificationBell({
   unreadCount,
   onMarkRead,
   onMarkAllRead,
-  placement = 'bottom-right',
+  placement = 'right',
   fullWidth = false,
   compact = false,
   containerStyle,
@@ -124,7 +124,7 @@ export function NotificationBell({
   unreadCount: number
   onMarkRead: (id: string) => void
   onMarkAllRead: () => void
-  placement?: 'bottom-right' | 'right'
+  placement?: 'bottom-right' | 'right' | 'top-right'
   fullWidth?: boolean
   /** Icon-only trigger (no text pill) — used by RetroNavbar's collapsed sidebar rail. */
   compact?: boolean
@@ -232,8 +232,6 @@ export function NotificationBell({
       onMarkAllRead()
     }
   }
-
-  const isRight = placement === 'right'
 
   const bellContainerStyle: CSSProperties = {
     position: 'relative',
@@ -415,13 +413,12 @@ export function NotificationBell({
       <div ref={dropdownRef} style={dropdownStyle}>
         {/* Window Header */}
         <div
+          className="window-header"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '10px 14px',
-            background: 'rgba(0, 240, 255, 0.12)',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.3)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -429,7 +426,7 @@ export function NotificationBell({
               style={{
                 fontFamily: 'var(--font-heading, monospace)',
                 fontSize: '0.78rem',
-                color: 'var(--accent-cyan, #00f0ff)',
+                color: 'var(--text-main, #ffffff)',
                 letterSpacing: 1,
                 fontWeight: 'bold',
               }}
@@ -498,15 +495,15 @@ export function NotificationBell({
                     gap: 10,
                     padding: '12px 14px',
                     cursor: 'pointer',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                    background: n.read ? 'transparent' : 'rgba(0, 240, 255, 0.08)',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: n.read ? 'transparent' : 'var(--bg-secondary)',
                     transition: 'background 0.15s ease',
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.15)')
+                    (e.currentTarget.style.background = 'var(--bg-card)')
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(0, 240, 255, 0.08)')
+                    (e.currentTarget.style.background = n.read ? 'transparent' : 'var(--bg-secondary)')
                   }
                 >
                   {/* Unread diamond indicator */}
@@ -547,7 +544,7 @@ export function NotificationBell({
                       style={{
                         fontSize: '0.78rem',
                         fontWeight: n.read ? 'normal' : 'bold',
-                        color: n.read ? 'var(--text-muted, #aaa)' : '#ffffff',
+                        color: n.read ? 'var(--text-muted)' : 'var(--text-main)',
                         lineHeight: 1.35,
                         fontFamily: 'var(--font-mono, monospace)',
                       }}

@@ -141,14 +141,13 @@ export function Home() {
 		if (savedCrt === 'false') {
 			setCrtEnabled(false)
 		}
-	}, [])
 
-	const toggleCrt = () => {
-		const next = !crtEnabled
-		setCrtEnabled(next)
-		localStorage.setItem('retro_crt', next ? 'true' : 'false')
-		retroAudio.playUiBeep(440, 0.05)
-	}
+		return () => {
+			window.removeEventListener('retro_theme_changed', handleThemeChange)
+			window.removeEventListener('storage', handleThemeChange)
+			observer.disconnect()
+		}
+	}, [])
 
 	// ------------------------------------------------------------------------
 	// 4. CYBER COMM // FRIEND LIST & AUDIO
@@ -318,13 +317,11 @@ export function Home() {
 				],
 				sparks: ['#00f0ff', '#ff007f'],
 				pawns: [
-					{ label: 'RED', color: '#ff0055', x: 85, y: 350 },
-					{ label: 'GREEN', color: '#00ff88', x: 230, y: 360 },
-					{ label: 'YELLOW', color: '#ffe600', x: 490, y: 360 },
-					{ label: 'BLUE', color: '#00f0ff', x: 635, y: 350 },
+					{ label: 'RED', color: '#ff0055', x: 85, y: 370 },
+					{ label: 'GREEN', color: '#00ff88', x: 230, y: 380 },
+					{ label: 'YELLOW', color: '#ffe600', x: 490, y: 380 },
+					{ label: 'BLUE', color: '#00f0ff', x: 635, y: 370 },
 				],
-				marquee: '[ TRANSCENDENCE // CYBER LUDO ]',
-				marqueeColor: '#00f0ff',
 			},
 			win95: {
 				bgTop: '#000000',
@@ -348,13 +345,11 @@ export function Home() {
 				],
 				sparks: ['#ffffff', '#00ffff'],
 				pawns: [
-					{ label: 'P1-RED', color: '#ff2222', x: 85, y: 350 },
-					{ label: 'P2-GRN', color: '#00cc33', x: 230, y: 360 },
-					{ label: 'P3-YLW', color: '#ffee00', x: 490, y: 360 },
-					{ label: 'P4-BLU', color: '#2255ff', x: 635, y: 350 },
+					{ label: 'P1-RED', color: '#ff2222', x: 85, y: 370 },
+					{ label: 'P2-GRN', color: '#00cc33', x: 230, y: 380 },
+					{ label: 'P3-YLW', color: '#ffee00', x: 490, y: 380 },
+					{ label: 'P4-BLU', color: '#2255ff', x: 635, y: 370 },
 				],
-				marquee: '[ DIRECTX 3D // CYBER LUDO 95 ]',
-				marqueeColor: '#00ffff',
 			},
 			terminal: {
 				bgTop: '#000800',
@@ -378,13 +373,11 @@ export function Home() {
 				],
 				sparks: ['#00ff66', '#33ff88'],
 				pawns: [
-					{ label: 'NODE:RED', color: '#00ff66', x: 85, y: 350 },
-					{ label: 'NODE:GRN', color: '#33ff88', x: 230, y: 360 },
-					{ label: 'NODE:YLW', color: '#00ff66', x: 490, y: 360 },
-					{ label: 'NODE:BLU', color: '#33ff88', x: 635, y: 350 },
+					{ label: 'NODE:RED', color: '#00ff66', x: 85, y: 370 },
+					{ label: 'NODE:GRN', color: '#33ff88', x: 230, y: 380 },
+					{ label: 'NODE:YLW', color: '#00ff66', x: 490, y: 380 },
+					{ label: 'NODE:BLU', color: '#33ff88', x: 635, y: 370 },
 				],
-				marquee: '> SYS_EXEC: TRANSCENDENCE_LUDO_CORE.SH',
-				marqueeColor: '#00ff66',
 			},
 		}
 
@@ -393,14 +386,14 @@ export function Home() {
 		// Background stars
 		const stars = Array.from({ length: 65 }, () => ({
 			x: Math.random() * 720,
-			y: Math.random() * 260,
+			y: Math.random() * 270,
 			size: Math.random() * 1.8 + 0.5,
 			speed: Math.random() * 0.3 + 0.1,
 			alpha: Math.random() * 0.7 + 0.3,
 		}))
 
-		// 3D Cube vertices (centered at origin, side length = 108)
-		const cubeSize = 54
+		// 3D Cube vertices (centered at origin, side length = 112)
+		const cubeSize = 56
 		const rawVertices = [
 			[-cubeSize, -cubeSize, -cubeSize],
 			[cubeSize, -cubeSize, -cubeSize],
@@ -442,23 +435,23 @@ export function Home() {
 
 			// 2. Distant Sun (only for themes with sun)
 			if (currentCfg.hasSun !== false) {
-				const sunY = 250
-				const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, 90)
+				const sunY = 210
+				const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, 95)
 				sunGrad.addColorStop(0, currentCfg.sunC1)
 				sunGrad.addColorStop(0.5, currentCfg.sunC2)
 				sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
 				ctx.fillStyle = sunGrad
 				ctx.beginPath()
-				ctx.arc(360, sunY, 90, Math.PI, 0, false)
+				ctx.arc(360, sunY, 95, Math.PI, 0, false)
 				ctx.fill()
 
 				// Sun horizon scanlines
 				ctx.strokeStyle = currentCfg.sunScanline
 				ctx.lineWidth = 2
-				for (let sy = sunY - 60; sy < sunY; sy += 8) {
+				for (let sy = sunY - 65; sy < sunY; sy += 8) {
 					ctx.beginPath()
-					ctx.moveTo(265, sy)
-					ctx.lineTo(455, sy)
+					ctx.moveTo(260, sy)
+					ctx.lineTo(460, sy)
 					ctx.stroke()
 				}
 			}
@@ -466,7 +459,7 @@ export function Home() {
 			// 3. Floating Stars
 			stars.forEach((st) => {
 				st.y += st.speed
-				if (st.y > 260) st.y = 0
+				if (st.y > 210) st.y = 0
 				ctx.fillStyle = `rgba(${currentCfg.starRgb}, ${st.alpha * (0.8 + 0.2 * Math.sin(time * 3 + st.x))})`
 				ctx.beginPath()
 				ctx.arc(st.x, st.y, st.size, 0, Math.PI * 2)
@@ -474,14 +467,14 @@ export function Home() {
 			})
 
 			// 4. Horizon Perspective Grid
-			const horizonY = 260
+			const horizonY = 210
 			ctx.save()
 			ctx.strokeStyle = currentCfg.gridColor
 			ctx.lineWidth = 1
 
 			// Horizontal grid lines moving toward camera
-			for (let gy = 0; gy < 140; gy += 14) {
-				const y = horizonY + Math.pow((gy + gridOffset) / 145, 1.8) * 140
+			for (let gy = 0; gy < 210; gy += 18) {
+				const y = horizonY + Math.pow((gy + gridOffset) / 210, 1.8) * 210
 				if (y <= canvas.height) {
 					ctx.beginPath()
 					ctx.moveTo(0, y)
@@ -490,7 +483,7 @@ export function Home() {
 				}
 			}
 
-			// Perspective radiating vertical lines from vanishing point (360, 260)
+			// Perspective radiating vertical lines from vanishing point (360, 210)
 			for (let x = -250; x <= canvas.width + 250; x += 45) {
 				ctx.beginPath()
 				ctx.moveTo(360, horizonY)
@@ -501,8 +494,8 @@ export function Home() {
 
 			// 5. 3D Tumbling Ludo Dice in Center
 			const centerX = 360
-			const centerY = 135 + Math.sin(time * 2.2) * 10
-			const cameraDist = 260
+			const centerY = 210 + Math.sin(time * 2.2) * 8
+			const cameraDist = 280
 
 			// 3D rotation matrix calculation
 			const cosX = Math.cos(rotX), sinX = Math.sin(rotX)
@@ -535,7 +528,7 @@ export function Home() {
 			// Render glowing particle sparks behind dice
 			for (let i = 0; i < 8; i++) {
 				const sparkAngle = time * 3 + (i * Math.PI) / 4
-				const sparkR = 74 + Math.sin(time * 4 + i) * 15
+				const sparkR = 76 + Math.sin(time * 4 + i) * 15
 				const sx = centerX + Math.cos(sparkAngle) * sparkR
 				const sy = centerY + Math.sin(sparkAngle * 1.3) * (sparkR * 0.5)
 				const sparkCol = currentCfg.sparks[i % currentCfg.sparks.length]
@@ -543,7 +536,7 @@ export function Home() {
 				ctx.shadowColor = sparkCol
 				ctx.shadowBlur = 9
 				ctx.beginPath()
-				ctx.arc(sx, sy, 2.4, 0, Math.PI * 2)
+				ctx.arc(sx, sy, 2.5, 0, Math.PI * 2)
 				ctx.fill()
 				ctx.shadowBlur = 0
 			}
@@ -592,6 +585,7 @@ export function Home() {
 				pips.forEach(([u, v]: any) => {
 					const su = u + 0.5
 					const sv = v + 0.5
+
 					const topX = p0.px + (p1.px - p0.px) * su
 					const topY = p0.py + (p1.py - p0.py) * su
 					const botX = p3.px + (p2.px - p3.px) * su
@@ -635,17 +629,6 @@ export function Home() {
 				ctx.fillText(p.label, p.x, p.y - 13 + pulse)
 				ctx.restore()
 			})
-
-			// 7. Marquee Title on Top of Screen
-			ctx.save()
-			ctx.font = '12px "Press Start 2P", monospace'
-			ctx.textAlign = 'center'
-			ctx.fillStyle = currentCfg.marqueeColor
-			ctx.shadowColor = currentCfg.marqueeColor
-			ctx.shadowBlur = 11
-			ctx.fillText(currentCfg.marquee, 360, 28)
-			ctx.shadowBlur = 0
-			ctx.restore()
 
 			animId = requestAnimationFrame(loop)
 		}
@@ -775,6 +758,26 @@ export function Home() {
 											</span>
 										</div>
 
+							<div
+								className="window-body"
+								style={{
+									padding: 0,
+									display: 'flex',
+									flexDirection: 'column',
+									flex: 1,
+									minHeight: 0,
+									overflow: 'hidden',
+								}}
+							>
+								<div
+									style={{
+										padding: '10px 12px',
+										display: 'flex',
+										flexDirection: 'column',
+										gap: 8,
+										flex: 1,
+										overflowY: 'auto',
+										minHeight: 0,
 										{/* Hyperdrive Warp Flash on Launch */}
 										{isWarpingToLobby && (
 											<div
