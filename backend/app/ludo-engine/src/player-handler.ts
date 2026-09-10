@@ -236,9 +236,55 @@ export async function handlePlayerReady(
 }
 
 /**
- * Permanently exit a player (forfeit).
- * Sets all pieces to -1, marks player as exited.
+ * Resign — concede a live match.
  */
+export async function handlePlayerResign(
+  store: RedisGameStore,
+  emit: (event: GameEvent) => void,
+  gameId: string,
+  color: PlayerColor,
+): Promise<void> {
+  const state = await store.loadGameState(gameId);
+  if (!state) return;
+  if (state.status !== 'active') return; // already over, or still in the lobby
+
+  const player = state.players.find((p) => p.color === color);
+  if (!player || player.status === 'resigned' || player.status === 'exited') return;
+
+  player.status = 'resigned';
+  player.isFinished = true;
+  player.finishedAt = new Date().toISOString();
+  player.isConnected = false;
+  state.disconnectedPlayers = state.disconnectedPlayers.filter((d) => d.color !== color);
+  if (state.clash) delete state.clash;
+
+  // Who is still playing? Bots count — conceding to a bot is still a loss.
+  const stillPlaying = state.players.filter(
+    (p) => p.status === 'active' && !p.isFinished,
+  );
+
+  if (stillPlaying.length <= 1) {
+    state.status = 'finished';
+    state.winner = stillPlaying[0]?.color ?? state.winner;
+    state.resultDetail = 'resignation';
+    await store.saveGameState(gameId, state);
+    emit({ type: 'player_resigned', gameId, color });
+    if (state.winner) {
+      emit({
+        type: 'game_ended',
+        gameId,
+        winner: state.winner,
+        resultDetail: 'resignation',
+      });
+    }
+    return;
+  }
+
+  if (state.currentTurn === color) advanceTurnInState(state);
+  await store.saveGameState(gameId, state);
+  emit({ type: 'player_resigned', gameId, color });
+}
+
 export async function handlePlayerExit(
   store: RedisGameStore,
   emit: (event: GameEvent) => void,
@@ -254,7 +300,7 @@ export async function handlePlayerExit(
   for (const piece of state.pieces.filter(p => p.color === color)) {
     piece.step = -1;
   }
-  
+
   const player = state.players.find(p => p.color === color);
   if (player) {
     player.status = 'exited';
@@ -265,7 +311,7 @@ export async function handlePlayerExit(
   if (state.currentTurn === color && state.status === 'active') {
     advanceTurnInState(state);
   }
-  
+
 	// Clear any pending clash state on exit
 	if (state.clash) {
 		delete state.clash;

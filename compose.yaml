@@ -10,16 +10,16 @@ services:
       dockerfile: Dockerfile
     container_name: db
     restart: unless-stopped
+    env_file: .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-db_bossman}
       POSTGRES_DB: ${POSTGRES_DB:-transcendence}
     volumes:
-      - secrets_data:/secrets:ro
       - db_data:/var/lib/postgresql/data
     ports:
       # Loopback-only: in LAN mode a bare "5432:5432" would expose Postgres
       # to every device on the WiFi. Still reachable from the host for psql.
-      - 5432:5432
+      - 127.0.0.1:5432:5432
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-db_bossman} -d postgres"]
       interval: 5s
@@ -34,20 +34,20 @@ services:
       dockerfile: Dockerfile
     container_name: redis
     restart: unless-stopped
+    env_file: .env
     networks:
       - transcendence_network
     volumes:
-      - secrets_data:/secrets:ro
       - redis_data:/data
     expose:
-      - "6379"
+      - "6479"
     ports:
       # Loopback-only: lets `npm run db:seed` and other scripts reach Redis
       # from the host. Not for LAN/production exposure.
-      - 127.0.0.1:6379:6379
+      - 127.0.0.1:6479:6479
 
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -p 6479 -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -58,20 +58,21 @@ services:
       dockerfile: Dockerfile
     container_name: backend
     restart: unless-stopped
+    env_file: .env
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      SECRETS_DIR: /secrets
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: 6479
+      # Overrides .env's host-reachable DATABASE_URL with the container form
+      # (hostname "db" instead of "localhost") — see backend/prisma.config.ts.
+      DATABASE_URL: ${CONTAINER_DATABASE_URL}
       # Set by `make tunnel` only — switches AuthModule/AuthController onto the
       # ngrok OAuth apps and frontend origin instead of the localhost ones.
       TUNNEL_MODE: ${TUNNEL_MODE:-false}
-    volumes:
-      - secrets_data:/secrets:ro
     ports:
       # Loopback-only: clients always reach the backend through nginx's
       # /api/ proxy, never directly. Published purely for host-side debugging.
-      - 3000:3000
+      - 127.0.0.1:3000:3000
     depends_on:
       db:
         condition: service_healthy
@@ -91,20 +92,23 @@ services:
             - dist
             - generated
 
-  # Web UI over the `db` service's data. Reuses the backend image (same
-  # entrypoint assembles DATABASE_URL from secrets/db_credentials.txt,
-  # host "db") so no separate build/config is needed.
+  # Web UI over the `db` service's data. Reuses the backend image so no
+  # separate build/config is needed.
   studio:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: studio
     restart: unless-stopped
-    command: ["npx", "prisma", "studio", "--port", "5555", "--browser", "none"]
+    # Skip docker-entrypoint.sh: it re-runs `prisma db push`, which races
+    # against backend's own push on container startup and crash-loops both
+    # containers on a Postgres pg_type unique-constraint collision. Studio
+    # only needs to browse the schema backend already owns/pushes.
+    entrypoint: ["npx"]
+    command: ["prisma", "studio", "--port", "5555", "--browser", "none"]
+    env_file: .env
     environment:
-      SECRETS_DIR: /secrets
-    volumes:
-      - ./secrets:/secrets:ro
+      DATABASE_URL: ${CONTAINER_DATABASE_URL}
     ports:
       # Loopback-only: this is a raw DB browser/editor, never expose it beyond the host.
       - 127.0.0.1:5555:5555
@@ -122,17 +126,20 @@ services:
     restart: unless-stopped
     networks:
       - transcendence_network
-    volumes:
-      - secrets_data:/secrets:ro
+    env_file: .env
     depends_on:
       redis:
         condition: service_healthy
+    ports:
+      # Loopback-only, same reasoning as backend's: a host-run `npm run dev`
+      # (vite.config.ts's default, non-containerized proxy target) needs this
+      # reachable at localhost:3001 — clients in prod/nginx still go through
+      # the container network via `expose`, this is purely for host-side dev.
+      - 127.0.0.1:3001:3001
     expose:
       - "3001"
     environment:
-      SECRETS_DIR: /secrets
       REDIS_HOST: redis
-      REDIS_PORT: 6379
       ENGINE_PORT: 3001
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); })\""]
@@ -230,12 +237,3 @@ volumes:
   db_data:
   redis_data:
   spa_dist:
-  # Not a bind mount — Docker Desktop's macOS virtiofs share deadlocks
-  # (EDEADLK) on reads through a live bind mount of ./secrets, sporadically
-  # and non-transiently (observed stuck >30s on retry). `docker cp` bypasses
-  # that path entirely, so `make seed-secrets` seeds this real Docker volume
-  # from the host once per run instead. `external: true` because Make (not
-  # compose) owns its lifecycle — compose must never try to create it itself
-  # with an empty/no-op volume.
-  secrets_data:
-    external: true

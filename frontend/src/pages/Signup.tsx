@@ -6,6 +6,7 @@ import { navigate } from '../router'
 import { useApp } from '../store'
 import { passwordError } from '../validatePassword'
 import '../styles/retrowave.css'
+import { RETRO_AUTH_BTN, RETRO_AUTH_BTN_OUTLINE, RETRO_AUTH_DIVIDER, RETRO_AUTH_DIVIDER_LINE, RETRO_AUTH_ERROR, RETRO_AUTH_INPUT, RETRO_AUTH_LABEL, RETRO_AUTH_LINK, RETRO_AUTH_MUTED, RETRO_AUTH_SUBTITLE, RETRO_AUTH_TITLE } from '../styles/tw'
 
 export function Signup() {
   const { t } = useTranslation()
@@ -44,17 +45,17 @@ export function Signup() {
     return (
       <RetroAuthLayout tag={t('auth.oneMoreStep')}>
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="retro-auth-title" style={{ fontSize: 24 }}>
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 24 }}>
             {t('auth.checkInboxTitle')}
           </div>
-          <div className="retro-auth-muted" style={{ lineHeight: 1.5, fontSize: '14px' }}>
+          <div className={RETRO_AUTH_MUTED} style={{ lineHeight: 1.5, fontSize: '14px' }}>
             {t('auth.verificationSentPrefix')}{' '}
             <b style={{ color: '#00f0ff' }}>{email}</b>.{' '}
             {t('auth.verificationSentSuffix')}
           </div>
-          <div className="retro-auth-muted" style={{ fontSize: '13px' }}>
+          <div className={RETRO_AUTH_MUTED} style={{ fontSize: '13px' }}>
             {t('auth.doneVerifying')}{' '}
-            <a onClick={() => navigate('/login')} className="retro-auth-link">
+            <a onClick={() => navigate('/login')} className={RETRO_AUTH_LINK}>
               {t('auth.signInLink')}
             </a>
           </div>
@@ -70,25 +71,25 @@ export function Signup() {
         style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}
       >
         <div>
-          <div className="retro-auth-title" style={{ fontSize: 24 }}>
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 24 }}>
             {t('auth.createSeatTitle')}
           </div>
-          <div className="retro-auth-subtitle">
+          <div className={RETRO_AUTH_SUBTITLE}>
             {t('auth.claimSeatDesc')}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className="retro-auth-label">{t('auth.usernameLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.usernameLabel')}</div>
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder={t('auth.usernamePlaceholder')}
             autoComplete="username"
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className="retro-auth-label">{t('auth.emailLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.emailLabel')}</div>
           <input
             type="email"
             value={email}
@@ -96,38 +97,38 @@ export function Signup() {
             placeholder={t('auth.emailPlaceholderSignup')}
             autoComplete="email"
             required
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div className="retro-auth-label">{t('auth.passwordLabel')}</div>
+            <div className={RETRO_AUTH_LABEL}>{t('auth.passwordLabel')}</div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t('auth.passwordPlaceholderSignup')}
               autoComplete="new-password"
-              className="retro-auth-input"
+              className={RETRO_AUTH_INPUT}
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div className="retro-auth-label">{t('auth.confirmLabel')}</div>
+            <div className={RETRO_AUTH_LABEL}>{t('auth.confirmLabel')}</div>
             <input
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="••••••••"
               autoComplete="new-password"
-              className="retro-auth-input"
+              className={RETRO_AUTH_INPUT}
             />
           </div>
         </div>
         {error && (
-          <div className="retro-auth-error">{error}</div>
+          <div className={RETRO_AUTH_ERROR}>{error}</div>
         )}
         <label
-          className="retro-auth-muted"
+          className={RETRO_AUTH_MUTED}
           style={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -139,15 +140,15 @@ export function Signup() {
           <NeonCheck offsetTop />
           {t('auth.agreeTerms')}
         </label>
-        <button type="submit" disabled={submitting} className="retro-auth-btn">
+        <button type="submit" disabled={submitting} className={RETRO_AUTH_BTN}>
           {submitting ? t('auth.creatingBtn') : t('auth.createAccountBtn')}
         </button>
 
         {/* OR divider */}
-        <div className="retro-auth-divider">
-          <span />
+        <div className={RETRO_AUTH_DIVIDER}>
+          <span className={RETRO_AUTH_DIVIDER_LINE} />
           {t('auth.orSignUpWith')}
-          <span />
+          <span className={RETRO_AUTH_DIVIDER_LINE} />
         </div>
 
         {/* OAuth buttons */}
@@ -161,7 +162,7 @@ export function Signup() {
               key={p.name}
               type="button"
               onClick={() => { window.location.href = p.path }}
-              className="retro-auth-btn-outline"
+              className={RETRO_AUTH_BTN_OUTLINE}
             >
               <img src={p.icon} alt={p.name} style={{ width: 18, height: 18, objectFit: 'contain' }} />
               {p.name}
@@ -169,9 +170,9 @@ export function Signup() {
           ))}
         </div>
 
-        <div className="retro-auth-muted" style={{ textAlign: 'center' }}>
+        <div className={RETRO_AUTH_MUTED} style={{ textAlign: 'center' }}>
           {t('auth.alreadyHaveSeat')}{' '}
-          <a onClick={() => navigate('/login')} className="retro-auth-link">
+          <a onClick={() => navigate('/login')} className={RETRO_AUTH_LINK}>
             {t('auth.signInLink')}
           </a>
         </div>

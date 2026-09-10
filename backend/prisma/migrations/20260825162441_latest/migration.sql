@@ -5,9 +5,6 @@ CREATE SCHEMA IF NOT EXISTS "public";
 CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
 
 -- CreateEnum
-CREATE TYPE "UserStatus" AS ENUM ('online', 'playing', 'offline');
-
--- CreateEnum
 CREATE TYPE "PlayerColor" AS ENUM ('RED', 'GREEN', 'YELLOW', 'BLUE');
 
 -- CreateEnum
@@ -20,6 +17,7 @@ CREATE TYPE "GameType" AS ENUM ('PVP', 'PVE');
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
+    "displayName" TEXT NOT NULL,
     "email" TEXT,
     "password_hash" TEXT,
     "emailVerified" TIMESTAMP(3),
@@ -35,9 +33,19 @@ CREATE TABLE "User" (
     "avatarStyle" TEXT NOT NULL DEFAULT 'bottts',
     "avatarPhoto" BYTEA,
     "avatarPhotoContentType" TEXT,
-    "status" "UserStatus" NOT NULL DEFAULT 'offline',
     "disconnectCount" INTEGER NOT NULL DEFAULT 0,
     "reconnectCount" INTEGER NOT NULL DEFAULT 0,
+    "pveGameStreak" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Achievement" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
     "achFirstBlood" BOOLEAN NOT NULL DEFAULT false,
     "achOnFire" BOOLEAN NOT NULL DEFAULT false,
     "achDiceMaster" BOOLEAN NOT NULL DEFAULT false,
@@ -49,14 +57,10 @@ CREATE TABLE "User" (
     "achWorldChampion" BOOLEAN NOT NULL DEFAULT false,
     "achLoveTheMachine" BOOLEAN NOT NULL DEFAULT false,
     "achft_Transcendence" BOOLEAN NOT NULL DEFAULT false,
-    "achUnstoppable" BOOLEAN NOT NULL DEFAULT false,
-    "achCleanSweep" BOOLEAN NOT NULL DEFAULT false,
-    "achLastLaugh" BOOLEAN NOT NULL DEFAULT false,
     "achSpeedDemon" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "achUnstoppable" BOOLEAN NOT NULL DEFAULT false,
 
-    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Achievement_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -134,7 +138,13 @@ CREATE TABLE "Notification" (
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "User_displayName_key" ON "User"("displayName");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Achievement_userId_key" ON "Achievement"("userId");
 
 -- CreateIndex
 CREATE INDEX "Account_userId_idx" ON "Account"("userId");
@@ -162,6 +172,9 @@ CREATE UNIQUE INDEX "LeaderboardSnapshot_mode_userId_key" ON "LeaderboardSnapsho
 
 -- CreateIndex
 CREATE INDEX "Notification_userId_read_idx" ON "Notification"("userId", "read");
+
+-- AddForeignKey
+ALTER TABLE "Achievement" ADD CONSTRAINT "Achievement_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -50,6 +50,13 @@ export class EventPublisher {
         }));
         break;
 
+      case 'player_resigned':
+        this.store.publish(gameId, JSON.stringify({
+          type: 'player_resigned',
+          color: event.color,
+        }));
+        break;
+
       case 'game_started':
         this.store.publish(gameId, JSON.stringify({
           type: 'game_started',

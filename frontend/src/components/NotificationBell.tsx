@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Notification } from '../hooks/useNotifications'
@@ -6,6 +7,7 @@ import { navigate } from '../router'
 import { useApp } from '../store'
 import type { PlayerColor } from '../game/types'
 import { retroAudio } from '../utils/audio'
+import { RETRO_BTN, THEME_TRIGGER_BTN_BASE } from '../styles/tw'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,22 @@ function getNotificationTypeBadge(type: string): { tagKey: string; defaultTag: s
       return { tagKey: 'notifications.linkEstablishedTag', defaultTag: '[FRIEND_ACK]', color: 'var(--accent-yellow, #ffe600)' }
     case 'achievement':
       return { tagKey: 'notifications.achievementTag', defaultTag: '[ACHIEVEMENT]', color: '#00ff88' }
+    case 'match_finished':
+      return { tagKey: 'notifications.matchEndTag', defaultTag: '[MATCH_COMPLETE]', color: '#00ff88' }
+    case 'match_cancelled':
+      return { tagKey: 'notifications.matchCancelledTag', defaultTag: '[MATCH_ABORTED]', color: 'var(--accent-yellow, #ffe600)' }
+    case 'friend_removed':
+      return { tagKey: 'notifications.friendRemovedTag', defaultTag: '[LINK_SEVERED]', color: 'var(--accent-pink, #ff007f)' }
+    case 'friend_declined':
+      return { tagKey: 'notifications.friendDeclinedTag', defaultTag: '[LINK_REJECTED]', color: 'var(--accent-yellow, #ffe600)' }
+    case 'friend_online':
+      return { tagKey: 'notifications.friendOnlineTag', defaultTag: '[PILOT_ONLINE]', color: '#00ff88' }
+    case 'friend_offline':
+      return { tagKey: 'notifications.friendOfflineTag', defaultTag: '[PILOT_OFFLINE]', color: 'var(--accent-yellow, #ffe600)' }
+    case 'profile_updated':
+      return { tagKey: 'notifications.profileUpdatedTag', defaultTag: '[PROFILE_UPDATED]', color: 'var(--accent-cyan, #00f0ff)' }
+    case 'display_name_changed':
+      return { tagKey: 'notifications.displayNameChangedTag', defaultTag: '[CALLSIGN_CHANGED]', color: 'var(--accent-cyan, #00f0ff)' }
     default:
       return { tagKey: 'notifications.sysBroadcastTag', defaultTag: '[SYS_MSG]', color: 'var(--accent-cyan, #00f0ff)' }
   }
@@ -45,6 +63,35 @@ function renderNotificationBody(n: Notification, t: (key: string, options?: any)
       const name = nameKey ? t(nameKey) : ''
       return name ? <span>{name}!</span> : <span>{t('notifications.achievementUnlocked')}</span>
     }
+    case 'friend_removed':
+      return <span>{t('notifications.friendRemovedText', { username: from })}</span>
+    case 'friend_declined':
+      return <span>{t('notifications.friendDeclinedText', { username: from })}</span>
+    case 'friend_online':
+      return <span>{t('notifications.friendOnlineText', { displayName: payload?.displayName || from })}</span>
+    case 'friend_offline':
+      return <span>{t('notifications.friendOfflineText', { displayName: payload?.displayName || from })}</span>
+    case 'match_cancelled':
+      return payload?.reason === 'resign'
+        ? <span>{t('notifications.matchResignedText', { username: from })}</span>
+        : <span>{t('notifications.matchCancelledText', { username: from })}</span>
+    case 'match_finished': {
+      const rank = payload?.rank
+      const winner = payload?.winnerUsername ? String(payload.winnerUsername) : 'A rival'
+      return rank === 1
+        ? <span>{t('notifications.matchEndWonText')}</span>
+        : <span>{t('notifications.matchEndLostText', { winner })}</span>
+    }
+    case 'profile_updated': {
+      const items = Array.isArray(payload?.items) ? (payload.items as string[]) : []
+      const labels = items.map((i) => t(`notifications.profileItem${i.charAt(0).toUpperCase()}${i.slice(1)}`)).join(', ')
+      return <span>{t('notifications.profileUpdatedText', { item: labels || '—' })}</span>
+    }
+    case 'display_name_changed': {
+      const oldName = payload?.oldDisplayName ? String(payload.oldDisplayName) : from
+      const newName = payload?.displayName ? String(payload.displayName) : 'UNKNOWN'
+      return <span>{t('notifications.displayNameChangedText', { displayName: oldName, newDisplayName: newName })}</span>
+    }
     default:
       return <span>{t('notifications.systemTransmissionText')}</span>
   }
@@ -69,6 +116,7 @@ export function NotificationBell({
   onMarkAllRead,
   placement = 'right',
   fullWidth = false,
+  compact = false,
   containerStyle,
   buttonStyle,
 }: {
@@ -78,27 +126,62 @@ export function NotificationBell({
   onMarkAllRead: () => void
   placement?: 'bottom-right' | 'right' | 'top-right'
   fullWidth?: boolean
+  /** Icon-only trigger (no text pill) — used by RetroNavbar's collapsed sidebar rail. */
+  compact?: boolean
   containerStyle?: CSSProperties
   buttonStyle?: CSSProperties
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const { setActiveMatch } = useApp()
 
   const list = Array.isArray(notifications) ? notifications : []
   const count = typeof unreadCount === 'number' ? unreadCount : list.filter((n) => !n?.read).length
 
-  // Close dropdown when clicking outside.
+  // Close dropdown when clicking outside (either the trigger or the
+  // portaled dropdown itself, which no longer lives inside `ref`).
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      if (dropdownRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  // The dropdown is portaled to <body> so it always renders above every
+  // other element on the page, regardless of which stacking context the
+  // bell happens to be nested in (e.g. a `position: sticky` sidebar creates
+  // its own stacking context, which traps even a very high z-index inside
+  // it — no in-place z-index value could ever escape that). Since it's no
+  // longer positioned relative to the trigger via CSS, its coordinates are
+  // computed from the trigger's live bounding box instead.
+  const [coords, setCoords] = useState<{ top: number; left: number; right: number; bottom: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const updateCoords = () => {
+      const rect = ref.current?.getBoundingClientRect()
+      if (!rect) return
+      setCoords({
+        top: rect.bottom,
+        bottom: window.innerHeight - rect.bottom,
+        left: rect.right,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    updateCoords()
+    window.addEventListener('scroll', updateCoords, true)
+    window.addEventListener('resize', updateCoords)
+    return () => {
+      window.removeEventListener('scroll', updateCoords, true)
+      window.removeEventListener('resize', updateCoords)
+    }
   }, [open])
 
   const toggleOpen = () => {
@@ -155,45 +238,102 @@ export function NotificationBell({
     userSelect: 'none',
     display: fullWidth ? 'flex' : 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     width: fullWidth ? '100%' : 'auto',
     height: fullWidth ? 44 : 38,
     ...containerStyle,
   }
 
-  const isRight = placement === 'right' || fullWidth
-
-  const dropdownStyle: CSSProperties = {
-    position: 'absolute',
-    left: isRight ? 'calc(100% + 14px)' : 'auto',
-    right: isRight ? 'auto' : 0,
-    bottom: isRight ? 0 : 'auto',
-    top: isRight ? 'auto' : 'calc(100% + 8px)',
-    width: 380,
-    maxWidth: 'calc(100vw - 320px)',
-    maxHeight: 480,
-    background: 'var(--bg-card)',
-    border: 'var(--card-border-style)',
-    boxShadow: 'var(--box-shadow)',
-    borderRadius: 8,
-    zIndex: 10005,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    backdropFilter: 'blur(32px) saturate(220%)',
-    opacity: open ? 1 : 0,
-    transform: open
-      ? (isRight ? 'translateX(0)' : 'translateY(0)')
-      : (isRight ? 'translateX(-12px)' : 'translateY(10px)'),
-    pointerEvents: open ? 'auto' : 'none',
-    transition: 'opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-  }
+  const dropdownStyle: CSSProperties = isRight
+    ? {
+        position: 'fixed',
+        left: coords ? coords.left + 14 : -9999,
+        bottom: coords ? coords.bottom : -9999,
+        top: 'auto',
+        right: 'auto',
+        width: 350,
+        maxHeight: 460,
+        background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.96), rgba(10, 2, 28, 0.98))',
+        border: '1.5px solid var(--accent-cyan, #00f0ff)',
+        boxShadow: '0 0 25px rgba(0, 240, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.95)',
+        borderRadius: 14,
+        // Portaled to <body> (see useLayoutEffect above), so this z-index
+        // only has to beat other <body>-level layers (modals at 10002).
+        zIndex: 100000,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backdropFilter: 'blur(32px) saturate(220%)',
+        opacity: open ? 1 : 0,
+        transform: open ? 'translateX(0)' : 'translateX(-8px)',
+        pointerEvents: open ? 'auto' : 'none',
+        transition: 'opacity 0.2s ease, transform 0.2s ease',
+      }
+    : {
+        position: 'fixed',
+        top: coords ? coords.top + 8 : -9999,
+        right: coords ? coords.right : -9999,
+        width: 380,
+        maxHeight: 460,
+        background: 'rgba(10, 4, 24, 0.96)',
+        border: '1.5px solid var(--accent-cyan, #00f0ff)',
+        boxShadow: '0 0 25px rgba(0, 240, 255, 0.25), 0 16px 40px rgba(0, 0, 0, 0.9)',
+        borderRadius: 4,
+        // Portaled to <body> (see useLayoutEffect above) so this always
+        // renders above every other element, regardless of which stacking
+        // context (e.g. a sticky sidebar) the bell trigger itself lives in.
+        zIndex: 100000,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backdropFilter: 'blur(10px)',
+        opacity: open ? 1 : 0,
+        transform: open ? 'translateY(0)' : 'translateY(-8px)',
+        pointerEvents: open ? 'auto' : 'none',
+        transition: 'opacity 0.2s ease, transform 0.2s ease',
+      }
 
   return (
     <div ref={ref} style={bellContainerStyle}>
       {/* Old-School Tactical Receiver Button */}
-      {fullWidth ? (
+      {fullWidth && compact ? (
         <button
-          className={`retro-btn theme-trigger-btn ${open ? 'active' : ''}`}
+          className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${open ? 'active' : ''}`}
+          onClick={toggleOpen}
+          title={t('notifications.title')}
+          style={{
+            width: '100%',
+            height: 44,
+            justifyContent: 'center',
+            padding: 0,
+            borderRadius: 10,
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(0, 240, 255, 0.3)',
+            color: 'var(--text-main)',
+            ...buttonStyle,
+          }}
+        >
+          <span style={{ fontSize: '1.1rem', position: 'relative' }}>
+            🔔
+            {count > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -6,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#ff007f',
+                  boxShadow: '0 0 6px #ff007f',
+                }}
+              />
+            )}
+          </span>
+        </button>
+      ) : fullWidth ? (
+        <button
+          className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${open ? 'active' : ''}`}
           onClick={toggleOpen}
           title={t('notifications.title')}
           style={{
@@ -236,7 +376,7 @@ export function NotificationBell({
         </button>
       ) : (
         <button
-          className={`retro-btn theme-trigger-btn ${open ? 'active' : ''}`}
+          className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${open ? 'active' : ''}`}
           onClick={toggleOpen}
           title={t('notifications.title')}
           style={{
@@ -262,19 +402,16 @@ export function NotificationBell({
             }}
           />
 
-          <span className="theme-btn-text" style={{ fontSize: '0.62rem' }}>
+          <span className="text-[0.62rem] tracking-[0.5px] leading-none whitespace-nowrap" style={{ fontSize: '0.62rem' }}>
             {t('notifications.title')}{count > 0 ? ` [${count < 10 ? `0${count}` : count}]` : ''}
           </span>
         </button>
       )}
 
-      {/* Dropdown Panel - Hardware Terminal Window */}
-      <div
-        className="retro-window theme-popover-menu"
-        style={dropdownStyle}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Terminal Window Header Bar */}
+      {/* Retro Dropdown Window Frame — portaled to <body>, see useLayoutEffect above */}
+      {createPortal(
+      <div ref={dropdownRef} style={dropdownStyle}>
+        {/* Window Header */}
         <div
           className="window-header"
           style={{
@@ -420,7 +557,9 @@ export function NotificationBell({
             })
           )}
         </div>
-      </div>
+      </div>,
+      document.body,
+      )}
     </div>
   )
 }

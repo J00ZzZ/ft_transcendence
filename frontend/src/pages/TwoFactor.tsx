@@ -5,6 +5,7 @@ import { RetroAuthLayout } from '../components/RetroAuthLayout'
 import { navigate, useRoute } from '../router'
 import { useApp } from '../store'
 import '../styles/retrowave.css'
+import { RETRO_AUTH_BTN, RETRO_AUTH_ERROR, RETRO_AUTH_INPUT, RETRO_AUTH_LABEL, RETRO_AUTH_LINK, RETRO_AUTH_MUTED, RETRO_AUTH_SUBTITLE, RETRO_AUTH_TITLE } from '../styles/tw'
 
 /**
  * Second login factor. Reached two ways, both carrying ?token=<pendingToken>:
@@ -38,15 +39,15 @@ export function TwoFactor() {
         style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
       >
         <div>
-          <div className="retro-auth-title" style={{ fontSize: 32 }}>
-            TWO-FACTOR AUTH
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 32 }}>
+            {t('authExtra.twoFactorAuthTitle')}
           </div>
-          <div className="retro-auth-subtitle">
+          <div className={RETRO_AUTH_SUBTITLE}>
             {t('auth.codeSentDesc')}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="retro-auth-label">{t('auth.loginCodeLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.loginCodeLabel')}</div>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -54,7 +55,7 @@ export function TwoFactor() {
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
             style={{
               letterSpacing: 10,
               fontSize: 26,
@@ -67,18 +68,18 @@ export function TwoFactor() {
           />
         </div>
         {error && (
-          <div className="retro-auth-error">{error}</div>
+          <div className={RETRO_AUTH_ERROR}>{error}</div>
         )}
         <button
           type="submit"
           disabled={submitting || code.length !== 6}
-          className="retro-auth-btn"
+          className={RETRO_AUTH_BTN}
         >
-          {submitting ? t('auth.checkingBtn') : 'VERIFY & ENTER ARENA'}
+          {submitting ? t('auth.checkingBtn') : t('authExtra.verifyEnterArenaBtn')}
         </button>
-        <div className="retro-auth-muted" style={{ textAlign: 'center' }}>
+        <div className={RETRO_AUTH_MUTED} style={{ textAlign: 'center' }}>
           {t('auth.codeExpired')}{' '}
-          <a onClick={() => navigate('/login')} className="retro-auth-link">
+          <a onClick={() => navigate('/login')} className={RETRO_AUTH_LINK}>
             {t('auth.logInAgainLink')}
           </a>{' '}
           {t('auth.toGetNewOne')}

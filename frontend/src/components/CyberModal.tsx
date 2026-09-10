@@ -1,6 +1,31 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { retroAudio } from '../utils/audio'
+import {
+	CYBER_MODAL_OVERLAY,
+	CYBER_MODAL_BOX,
+	CYBER_MODAL_BODY,
+	CYBER_MODAL_BODY_BACKDROP,
+	CYBER_MODAL_BACKDROP_PLATE,
+	CYBER_MODAL_CONTENT,
+	CYBER_MODAL_VERSION,
+	CYBER_MODAL_H2,
+	CYBER_MODAL_H2_SPAN,
+	CYBER_MODAL_BODY_TEXT,
+	CYBER_MODAL_ACTIONS,
+	CYBER_MODAL_GLITCH,
+	CYBER_BTN_BASE,
+	CYBER_BTN_PINK,
+	CYBER_BTN_YELLOW,
+	CYBER_BTN_DANGER,
+	CYBER_BTN_BACKDROP,
+	CYBER_BTN_BACKDROP_GLITCH,
+	CYBER_BTN_CORNER,
+	CYBER_BTN_KBD,
+	CYBER_BTN_LABEL,
+	CYBER_BTN_GLITCH_LAYER,
+	CYBER_BTN_LETTERS,
+} from '../styles/tw'
 
 interface CyberButtonProps {
   label: string
@@ -27,11 +52,11 @@ export function CyberButton({
 }: CyberButtonProps) {
   const variantClass =
     variant === 'pink'
-      ? 'cyber-btn-pink'
+      ? CYBER_BTN_PINK
       : variant === 'yellow'
-      ? 'cyber-btn-yellow'
+      ? CYBER_BTN_YELLOW
       : variant === 'danger'
-      ? 'cyber-btn-danger'
+      ? CYBER_BTN_DANGER
       : ''
 
   const letters = typeof label === 'string' ? label.split('') : []
@@ -39,26 +64,26 @@ export function CyberButton({
   return (
     <button
       type={type}
-      className={`cyber-btn ${variantClass} ${className}`}
+      className={`${CYBER_BTN_BASE} ${variantClass} ${className}`}
       onClick={onClick}
       disabled={disabled}
       autoFocus={autoFocus}
       style={style}
     >
-      <span className="backdrop">
-        <span className="corner" />
+      <span className={CYBER_BTN_BACKDROP}>
+        <span className={CYBER_BTN_CORNER} />
       </span>
-      {shortcut && <kbd>{shortcut}</kbd>}
-      <span className="cyber-label">{label}</span>
+      {shortcut && <kbd className={CYBER_BTN_KBD}>{shortcut}</kbd>}
+      <span className={CYBER_BTN_LABEL}>{label}</span>
 
       {/* Cyber Glitch Layer on Hover */}
       {letters.length > 0 && (
-        <div className="glitch-btn-layer" aria-hidden="true">
-          <span className="backdrop">
-            <span className="corner" />
+        <div className={CYBER_BTN_GLITCH_LAYER} aria-hidden="true">
+          <span className={CYBER_BTN_BACKDROP_GLITCH}>
+            <span className={CYBER_BTN_CORNER} />
           </span>
-          {shortcut && <kbd>{shortcut}</kbd>}
-          <span className="letters">
+          {shortcut && <kbd className={CYBER_BTN_KBD}>{shortcut}</kbd>}
+          <span className={CYBER_BTN_LETTERS}>
             {letters.map((char, index) => (
               <span key={index}>{char === ' ' ? '\u00A0' : char}</span>
             ))}
@@ -141,6 +166,26 @@ export function CyberModal({
     }
   }, [isOpen])
 
+  const handleCancel = useCallback(() => {
+    retroAudio.playCyberReject()
+    setIsOpenActive(false)
+    setTimeout(() => {
+      onCancel()
+    }, 280)
+  }, [onCancel])
+
+  const handleProceed = useCallback(() => {
+    retroAudio.playCyberAccept()
+    if (!closeOnProceed) {
+      onProceed()
+      return
+    }
+    setIsOpenActive(false)
+    setTimeout(() => {
+      onProceed()
+    }, 280)
+  }, [closeOnProceed, onProceed])
+
   useEffect(() => {
     if (!isOpenActive) return
 
@@ -156,67 +201,49 @@ export function CyberModal({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpenActive])
-
-  const handleCancel = () => {
-    retroAudio.playCyberReject()
-    setIsOpenActive(false)
-    setTimeout(() => {
-      onCancel()
-    }, 280)
-  }
-
-  const handleProceed = () => {
-    retroAudio.playCyberAccept()
-    if (!closeOnProceed) {
-      onProceed()
-      return
-    }
-    setIsOpenActive(false)
-    setTimeout(() => {
-      onProceed()
-    }, 280)
-  }
+  }, [isOpenActive, handleCancel, handleProceed])
 
   if (!mounted) return null
 
   return (
     <div
-      className={`cyber-modal-overlay ${isOpenActive ? 'active' : ''}`}
+      className={CYBER_MODAL_OVERLAY}
+      data-modal-state={isOpenActive ? 'open' : 'closed'}
+      data-glitching={isGlitching ? 'true' : 'false'}
       onClick={handleCancel}
     >
       <div
-        className={`cyber-modal-box ${isOpenActive ? 'is-open' : ''} ${isGlitching ? 'glitching' : ''}`}
+        className={CYBER_MODAL_BOX}
         onClick={(e) => e.stopPropagation()}
       >
-        <section className="modal__body">
+        <section className={CYBER_MODAL_BODY}>
           {/* Animated Sliding Backdrop Plate */}
-          <div className="body__backdrop">
-            <div className="backdrop-plate" />
+          <div className={CYBER_MODAL_BODY_BACKDROP}>
+            <div className={CYBER_MODAL_BACKDROP_PLATE} />
           </div>
 
-          <div className="body__content">
-            <span className="version">{versionTag}</span>
-            <h2>
-              <span>{title}</span>
+          <div className={CYBER_MODAL_CONTENT}>
+            <span className={CYBER_MODAL_VERSION}>{versionTag}</span>
+            <h2 className={CYBER_MODAL_H2}>
+              <span className={CYBER_MODAL_H2_SPAN}>{title}</span>
             </h2>
-            <div className="body__text">
+            <div className={CYBER_MODAL_BODY_TEXT}>
               {typeof message === 'string' ? <p>{message}</p> : message}
               {subMessage && <p>{subMessage}</p>}
             </div>
 
             {/* Glitch Keyframe Overlay */}
-            <div className="modal__glitch" aria-hidden="true">
-              <h2>
-                <span>{title}</span>
+            <div className={CYBER_MODAL_GLITCH} aria-hidden="true">
+              <h2 className={CYBER_MODAL_H2}>
+                <span className={CYBER_MODAL_H2_SPAN}>{title}</span>
               </h2>
-              <div className="body__text">
+              <div className={CYBER_MODAL_BODY_TEXT}>
                 {typeof message === 'string' ? <p>{message}</p> : message}
                 {subMessage && <p>{subMessage}</p>}
               </div>
             </div>
 
-            <div className="modal__actions">
+            <div className={CYBER_MODAL_ACTIONS}>
               <CyberButton
                 label={cancelLabel}
                 shortcut={cancelShortcut}

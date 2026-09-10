@@ -11,8 +11,6 @@
 // many times and trip over the refresh-token rotation (each rotation
 // invalidates the previous refresh token).
 
-let refreshing: Promise<boolean> | null = null
-
 // ngrok's free tier answers a fresh client's first request with an HTML
 // "you are about to visit…" interstitial instead of proxying it through,
 // unless this header is present. Harmless off ngrok — nginx/localhost just
@@ -24,11 +22,35 @@ function withNgrokHeader(init?: RequestInit): RequestInit {
   return { ...init, headers }
 }
 
-function refreshOnce(): Promise<boolean> {
+// 'ok'       — new access token minted, retry the original call
+// 'expired'  — the refresh token itself is dead; the user really is signed out
+// 'blocked'  — rate limited / server error / offline. Says NOTHING about
+//              whether the session is valid, so callers must not treat it as a
+//              logout; it is surfaced as the refresh response's own status.
+type RefreshResult =
+  | { outcome: 'ok' }
+  | { outcome: 'expired' }
+  // `status` and `retryAfter` are carried from the refresh response so callers
+  // can report it accurately without issuing another request at the limiter
+  // that just turned us away.
+  | { outcome: 'blocked'; status: number; retryAfter: string | null }
+
+let refreshing: Promise<RefreshResult> | null = null
+
+// Exported so callers (store.tsx's proactive refresh timer) can mint a new
+// access token *before* it expires, instead of only reacting to a 401 —
+// that reactive path still works, but every 401 it triggers gets logged to
+// the browser console by the network stack itself, outside app control.
+// Shares the same single-flight promise as the reactive path in apiFetch.
+export function refreshOnce(): Promise<RefreshResult> {
   if (!refreshing) {
     refreshing = fetch('/api/auth/refresh', withNgrokHeader({ method: 'POST' }))
-      .then((r) => r.ok)
-      .catch(() => false)
+      .then((r): RefreshResult => {
+        if (r.ok) return { outcome: 'ok' }
+        if (r.status === 401 || r.status === 403) return { outcome: 'expired' }
+        return { outcome: 'blocked', status: r.status, retryAfter: r.headers.get('Retry-After') }
+      })
+      .catch((): RefreshResult => ({ outcome: 'blocked', status: 503, retryAfter: null }))
       .finally(() => {
         refreshing = null
       })
@@ -38,9 +60,13 @@ function refreshOnce(): Promise<boolean> {
 
 /**
  * Like fetch(), but for authenticated endpoints. On a 401 it attempts a single
- * silent token refresh and retries once. If the refresh fails (refresh token
- * expired/revoked), the original 401 is returned so the caller can treat the
- * user as logged out.
+ * silent token refresh and retries once.
+ *
+ * If the refresh token itself is expired/revoked, the original 401 is returned
+ * so the caller can treat the user as logged out. If the refresh could not be
+ * *attempted* properly — rate limited, server error, offline — the refresh
+ * response is returned instead, so a caller checking for 401 doesn't mistake
+ * "try again shortly" for "you are signed out".
  *
  * Note: the request is retried by re-issuing `init` as-is, so keep bodies as
  * plain values (strings/objects), not one-shot streams.
@@ -50,9 +76,17 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   const res = await fetch(input, finalInit)
   if (res.status !== 401) return res
 
-  const refreshed = await refreshOnce()
-  if (!refreshed) return res // session really is over — hand back the 401
-  return fetch(input, finalInit)
+  const result = await refreshOnce()
+  if (result.outcome === 'ok') return fetch(input, finalInit)
+  if (result.outcome === 'expired') return res // session really is over — hand back the 401
+
+  // 'blocked': report the refresh's own status (429/5xx) rather than the
+  // misleading 401 from the original call. Synthesised locally — re-probing
+  // would mean another request at the limiter that just rejected us.
+  return new Response(null, {
+    status: result.status,
+    headers: result.retryAfter ? { 'Retry-After': result.retryAfter } : undefined,
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +110,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const getApi = <T>(path: string) => request<T>(path)
 export const postApi = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body != null ? JSON.stringify(body) : undefined })
-export const deleteApi = <T>(path: string) => request<T>(path, { method: 'DELETE' })
+export const deleteApi = <T>(path: string, body?: unknown) =>
+  request<T>(path, { method: 'DELETE', body: body != null ? JSON.stringify(body) : undefined })
 export const patchApi = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })

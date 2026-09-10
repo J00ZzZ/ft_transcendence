@@ -5,6 +5,7 @@ import { RetroAuthLayout } from '../components/RetroAuthLayout'
 import { navigate, useRoute } from '../router'
 import { useApp } from '../store'
 import '../styles/retrowave.css'
+import { RETRO_AUTH_BTN, RETRO_AUTH_BTN_OUTLINE, RETRO_AUTH_DIVIDER, RETRO_AUTH_DIVIDER_LINE, RETRO_AUTH_ERROR, RETRO_AUTH_INPUT, RETRO_AUTH_LABEL, RETRO_AUTH_LINK, RETRO_AUTH_MUTED, RETRO_AUTH_SUBTITLE, RETRO_AUTH_SUCCESS, RETRO_AUTH_TITLE } from '../styles/tw'
 
 export function Login() {
   const { t } = useTranslation()
@@ -20,6 +21,8 @@ export function Login() {
     'no-verified-email': t('auth.errorNoVerifiedEmail'),
     'invalid-verification-link': t('auth.errorInvalidVerificationLink'),
     'email-in-use': t('auth.errorEmailInUseOAuth'),
+    'access_denied': t('auth.errorAccessDenied'),
+    'oauth_failed': t('auth.errorOAuthFailed'),
     'add-email-2fa': t('auth.errorAddEmail2FA'),
   }
 
@@ -47,49 +50,49 @@ export function Login() {
         style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
       >
         <div>
-          <div className="retro-auth-title">
+          <div className={RETRO_AUTH_TITLE}>
             RETROLUDO
           </div>
-          <div className="retro-auth-subtitle">
-            ROLL ROLL ROLL ROLL
+          <div className={RETRO_AUTH_SUBTITLE}>
+            {t('authExtra.brandTagline')}
           </div>
         </div>
         {justVerified && (
-          <div className="retro-auth-success">
+          <div className={RETRO_AUTH_SUCCESS}>
             {t('auth.emailVerifiedNotice')}
           </div>
         )}
         {justReset && (
-          <div className="retro-auth-success">
+          <div className={RETRO_AUTH_SUCCESS}>
             {t('auth.passwordUpdatedNotice')}
           </div>
         )}
         {queryError && (
-          <div className="retro-auth-error">{queryError}</div>
+          <div className={RETRO_AUTH_ERROR}>{queryError}</div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div className="retro-auth-label">{t('auth.identifierLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.identifierLabel')}</div>
           <input
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder={t('auth.identifierPlaceholder')}
             autoComplete="username"
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div className="retro-auth-label">{t('auth.passwordLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.passwordLabel')}</div>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete="current-password"
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         {error && (
-          <div className="retro-auth-error">{error}</div>
+          <div className={RETRO_AUTH_ERROR}>{error}</div>
         )}
         <div
           style={{
@@ -99,19 +102,19 @@ export function Login() {
             fontSize: '13px',
           }}
         >
-          <a onClick={() => navigate('/forgot-password')} className="retro-auth-link" style={{ fontSize: '12.5px' }}>
+          <a onClick={() => navigate('/forgot-password')} className={RETRO_AUTH_LINK} style={{ fontSize: '12.5px' }}>
             {t('auth.forgotPasswordLink')}
           </a>
         </div>
-        <button type="submit" disabled={submitting} className="retro-auth-btn">
-          {submitting ? t('auth.enteringBtn') : 'SIGN IN'}
+        <button type="submit" disabled={submitting} className={RETRO_AUTH_BTN}>
+          {submitting ? t('auth.enteringBtn') : t('auth.signInBtn')}
         </button>
 
         {/* OR divider */}
-        <div className="retro-auth-divider">
-          <span />
+        <div className={RETRO_AUTH_DIVIDER}>
+          <span className={RETRO_AUTH_DIVIDER_LINE} />
           {t('auth.orContinueWith')}
-          <span />
+          <span className={RETRO_AUTH_DIVIDER_LINE} />
         </div>
 
         {/* OAuth buttons */}
@@ -125,7 +128,7 @@ export function Login() {
               key={p.name}
               type="button"
               onClick={() => { window.location.href = p.path }}
-              className="retro-auth-btn-outline"
+              className={RETRO_AUTH_BTN_OUTLINE}
             >
               <img src={p.icon} alt={p.name} style={{ width: 18, height: 18, objectFit: 'contain' }} />
               {p.name}
@@ -133,9 +136,9 @@ export function Login() {
           ))}
         </div>
 
-        <div className="retro-auth-muted" style={{ textAlign: 'center' }}>
+        <div className={RETRO_AUTH_MUTED} style={{ textAlign: 'center' }}>
           {t('auth.newToTable')}{' '}
-          <a onClick={() => navigate('/signup')} className="retro-auth-link">
+          <a onClick={() => navigate('/signup')} className={RETRO_AUTH_LINK}>
             {t('auth.createAccountLink')}
           </a>
         </div>

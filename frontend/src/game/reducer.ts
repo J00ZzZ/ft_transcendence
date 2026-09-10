@@ -51,10 +51,28 @@ export function applyEvent(state: GameViewState, event: { type: string } & Recor
     case 'game_joined':
     case 'state_update': {
       const s = event as unknown as GameState & { type: string }
+      let players = s.players ?? state.players
+      if (s.status === 'waiting' || (!s.status && state.status === 'waiting')) {
+        // In waiting room, each user can only occupy ONE active seat.
+        // If a user changed seats, clear older duplicate entries.
+        const seen = new Set<string>()
+        const reversed = [...players].reverse()
+        players = reversed
+          .map((p) => {
+            if (p.status === 'active' && p.username) {
+              if (seen.has(p.username)) {
+                return { ...p, username: '', displayName: '', status: 'inactive' as const }
+              }
+              seen.add(p.username)
+            }
+            return p
+          })
+          .reverse()
+      }
       return {
         ...state,
         pieces: s.pieces ?? state.pieces,
-        players: s.players ?? state.players,
+        players,
         currentTurn: s.currentTurn ?? state.currentTurn,
         turnPhase: s.turnPhase ?? state.turnPhase,
         status: s.status ?? state.status,
@@ -66,14 +84,13 @@ export function applyEvent(state: GameViewState, event: { type: string } & Recor
     }
     case 'lobby_update': {
       const payload = (event.players as Array<{ username: string; color: PlayerColor; ready: boolean }>) ?? []
-      // The engine only includes non-inactive seats in this payload (see
-      // emitLobbyUpdate in engine.ts), so presence here means the seat has
-      // joined. Without marking it active, a player who joined before
-      // another one never sees that seat's status flip, so their local
-      // activeCount stays stuck below 2 and their Ready button never enables.
+      // The engine only includes active seats in this payload.
+      // Any seat omitted from the payload is empty and must be reset to inactive.
       const players = state.players.map((p) => {
         const seat = payload.find((e) => e.color === p.color)
-        return seat ? { ...p, username: seat.username, status: 'active' as const } : p
+        return seat
+          ? { ...p, username: seat.username, displayName: seat.username, status: 'active' as const }
+          : { ...p, username: '', displayName: '', status: 'inactive' as const }
       })
       return {
         ...state,

@@ -1,14 +1,17 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleDestroy, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import Redis from 'ioredis';
 import { PrismaService } from '../prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtPayload } from './jwt-payload';
 import { MailService } from './mail.service';
 import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
 import { secret } from '../secrets';
+import { NotificationService } from '../notification/notification.service';
 
 const SALT_ROUNDS = 10;
 // Also where the SPA lives; /api on the same origin reaches the backend
@@ -38,14 +41,29 @@ type LoginResult =
     };
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleDestroy {
+  private readonly redis: Redis;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly twoFactor: TwoFactorService,
     private readonly session: SessionService,
-  ) {}
+    private readonly notifications: NotificationService,
+  ) {
+    // Small Redis client for account-deletion cleanup (same idiom as
+    // FriendsService / MatchPlayerService).
+    const host = process.env.REDIS_HOST || 'redis';
+    const port = parseInt(process.env.REDIS_PORT || '6479', 10);
+    const password = secret('REDIS_PASSWORD');
+    this.redis = new Redis({ host, port, password, retryStrategy: (t) => Math.min(t * 50, 2000) });
+    this.redis.on('error', (error) => console.error('Auth Redis error:', (error as Error).message));
+  }
+
+  onModuleDestroy() {
+    this.redis.quit();
+  }
 
   async register(dto: RegisterDto, baseUrl: string = BASE_URL) {
     const existing = await this.prisma.db.user.findUnique({ where: { username: dto.username } });
@@ -69,6 +87,7 @@ export class AuthService {
         displayName: dto.username,
         email,
         password_hash: passwordHash,
+        achievement: { create: { id: crypto.randomUUID() } },
       },
     });
 
@@ -110,10 +129,6 @@ export class AuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.password_hash);
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid username, email, or password');
-    }
-
-    if (!user.emailVerified) {
-      throw new ForbiddenException('Email not verified — open the link we sent you first');
     }
 
     // 2FA off → password alone is enough; issue the session immediately.
@@ -162,6 +177,13 @@ export class AuthService {
     });
     // drop every existing session after a password reset
     await this.session.revokeAll(userId);
+
+    // Announce the password reset to the user (persisted — lands in the bell
+    // on their next sign-in, since this flow revokes all open sessions).
+    await this.notifications
+      .notify(userId, 'profile_updated', { items: ['password'] })
+      .catch(() => {});
+
     return { message: 'Password updated — you can log in with it now.' };
   }
 
@@ -247,6 +269,8 @@ export class AuthService {
         displayName: user.displayName,
         email: user.email,
         hasPassword: !!user.password_hash,
+        avatarStyle: user.avatarStyle,
+        hasAvatarPhoto: user.avatarPhotoContentType !== null,
         providers: accounts.map((a) => a.provider),
       },
     };
@@ -312,6 +336,8 @@ export class AuthService {
     const data: Record<string, unknown> = {};
     let emailChanged = false;
     let newEmail: string | undefined;
+    // Items actually changed in this request — feeds the profile_updated toast.
+    const changedItems: string[] = [];
 
     if (dto.displayName !== undefined && dto.displayName !== user.displayName) {
       const taken = await this.prisma.db.user.findUnique({
@@ -343,6 +369,7 @@ export class AuthService {
     // OAuth: remove a linked sign-in method (lockout-guarded).
     if (dto.oauthToRemove !== undefined) {
       await this.removeOAuthMethod(userId, dto.oauthToRemove);
+      changedItems.push('oauthRemove');
     }
 
     // OAuth: adding a method needs the browser round-trip — mint a 10m
@@ -365,6 +392,32 @@ export class AuthService {
     if (emailChanged && newEmail) {
       const token = await this.twoFactor.createVerifyToken(userId);
       await this.mail.sendVerification(newEmail, `${BASE_URL}/api/auth/verify-email?token=${token}`);
+    }
+
+    // ── Profile-change notifications ─────────────────────────────────────────
+    // 1) Self-confirmation (persisted): "You have updated your profile: …"
+    if (data.displayName !== undefined) changedItems.push('displayName');
+    if (emailChanged) changedItems.push('email');
+    if (dto.twoFactorEnabled !== undefined && dto.twoFactorEnabled !== user.twoFactorEnabled) {
+      changedItems.push('twoFactor');
+    }
+    if (changedItems.length > 0) {
+      await this.notifications
+        .notify(userId, 'profile_updated', { items: changedItems })
+        .catch(() => {});
+    }
+
+    // 2) Global announcement (transient toast, all online users):
+    //    "(Old DisplayName) has changed their Displayname to (New DisplayName)"
+    if (data.displayName !== undefined) {
+      await this.notifications
+        .broadcast('display_name_changed', {
+          fromUserId: userId,
+          fromUsername: user.username,
+          oldDisplayName: user.displayName,
+          displayName: dto.displayName,
+        })
+        .catch(() => {});
     }
 
     const accounts = await this.prisma.db.account.findMany({
@@ -409,7 +462,91 @@ export class AuthService {
 
     // Log the user out everywhere — other devices must re-auth with the new password.
     await this.session.revokeAllExcept(userId, currentRefreshToken);
+
+    await this.notifications
+      .notify(userId, 'profile_updated', { items: ['password'] })
+      .catch(() => {});
+
     return { message: 'Password updated — other devices were signed out.' };
+  }
+
+  /**
+   * Permanently delete the authenticated user's account.
+   *
+   * Guard rails:
+   *  - `confirm` must be true.
+   *  - A password is ALWAYS required at deletion time. Accounts without one
+   *    (OAuth-only) must set a first password via changePassword first — that
+   *    gives the deletion a real credential to verify against.
+   *
+   * Order matters — DB delete is LAST: everything before it is best-effort
+   * cleanup, so if any step fails the account is untouched. The DB delete is
+   * the single point of no return.
+   */
+  async deleteAccount(userId: string, dto: DeleteAccountDto) {
+    if (!dto.confirm) throw new BadRequestException('You must confirm account deletion');
+
+    const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (!user.password_hash) {
+      throw new ForbiddenException('Set a password before deleting your account');
+    }
+    const matches = await bcrypt.compare(dto.currentPassword ?? '', user.password_hash);
+    if (!matches) throw new UnauthorizedException('Current password is incorrect');
+
+    // 1. Abort live matches the user is seated in, so a deleted user_id can
+    //    never FK-fail processGameEnd and void the opponents' results.
+    await this.abortUserMatches(userId);
+
+    // 2. Drop ephemeral Redis state (presence, invites, leaderboard entries).
+    await this.clearUserRedisState(userId);
+
+    // 3. Revoke every refresh session — all devices are logged out.
+    await this.session.revokeAll(userId);
+
+    // 4. DB: LeaderboardSnapshot has no FK to User, so delete it explicitly;
+    //    user.delete() cascades Account/Achievement/GameParticipant/Friendship/
+    //    Notification (all onDelete: Cascade in the schema).
+    await this.prisma.db.$transaction([
+      this.prisma.db.leaderboardSnapshot.deleteMany({ where: { userId } }),
+      this.prisma.db.user.delete({ where: { id: userId } }),
+    ]);
+
+    return { message: 'Account permanently deleted' };
+  }
+
+  /** Mark every WAITING/ACTIVE match the user is seated in as ABORTED (1h TTL). */
+  private async abortUserMatches(userId: string): Promise<void> {
+    try {
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'match:*', 'COUNT', 100);
+        cursor = nextCursor;
+        for (const key of keys) {
+          const data = await this.redis.hgetall(key);
+          const seated = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].includes(userId);
+          if (seated && (data.status === 'WAITING' || data.status === 'ACTIVE')) {
+            await this.redis.hset(key, 'status', 'ABORTED');
+            await this.redis.expire(key, 3600);
+          }
+        }
+      } while (cursor !== '0');
+    } catch (error) {
+      console.error('abortUserMatches error:', (error as Error).message);
+    }
+  }
+
+  /** Remove the user's ephemeral Redis state (presence, invites, leaderboard). */
+  private async clearUserRedisState(userId: string): Promise<void> {
+    try {
+      await this.redis.del(`presence:${userId}`, `invite:${userId}`);
+      for (const mode of ['global', 'ranked', 'casual', 'bot']) {
+        await this.redis.zrem(`leaderboard:${mode}`, userId);
+      }
+    } catch (error) {
+      console.error('clearUserRedisState error:', (error as Error).message);
+    }
   }
 
   /**
@@ -463,6 +600,12 @@ export class AuthService {
             providerAccountId: input.providerAccountId,
           },
         });
+
+        // Announce the newly linked sign-in method to the user.
+        await this.notifications
+          .notify(linkUserId, 'profile_updated', { items: ['oauthAdd'] })
+          .catch(() => {});
+
         return linked;
       }
       // The "add method" user no longer exists — e.g. this browser's session
@@ -499,6 +642,7 @@ export class AuthService {
         displayName,
         email,
         emailVerified: email ? new Date() : null,
+        achievement: { create: { id: crypto.randomUUID() } },
       },
     });
 
@@ -528,7 +672,21 @@ export class AuthService {
    * userId when the token is ours and matches `provider`, else undefined (a
    * missing/foreign state is treated as a normal login, never a link).
    */
-  resolveOAuthLink(state: string | string[] | undefined, provider: string): string | undefined {
+  resolveOAuthLinkForRequest(req: any, provider: string): string | undefined {
+    const linkUserId = this.resolveOAuthLink(req?.query?.state, provider);
+    if (!linkUserId) return undefined;
+    const sessionUser = this.verifyAccessToken(
+      typeof req?.cookies?.['token'] === 'string' ? req.cookies['token'] : undefined,
+    );
+    return sessionUser === linkUserId ? linkUserId : undefined;
+  }
+
+  /**
+   * Signature check only — says nothing about WHO is presenting the state.
+   * Private on purpose: callers must go through resolveOAuthLinkForRequest,
+   * which also proves the presenter is the user named in it.
+   */
+  private resolveOAuthLink(state: string | string[] | undefined, provider: string): string | undefined {
     if (typeof state !== 'string' || !state) return undefined;
     try {
       const payload = this.jwt.verify(state) as { sub?: string; p?: string; purpose?: string };

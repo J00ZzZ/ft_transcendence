@@ -3,8 +3,8 @@
 
 generator client {
   engineType = "binary"
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
 }
 
 datasource db {
@@ -17,12 +17,6 @@ enum FriendshipStatus {
   pending
   accepted
   blocked
-}
-
-enum UserStatus {
-  online
-  playing
-  offline
 }
 
 enum PlayerColor {
@@ -45,29 +39,47 @@ enum GameType {
 // ─── User ────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String       @id
-  username      String       @unique
-  displayName   String       @unique
-  email         String?      @unique
-  password_hash String?      // null for OAuth-only users
-  emailVerified DateTime?
+  id               String    @id
+  username         String    @unique
+  displayName      String    @unique
+  email            String?   @unique
+  password_hash    String? // null for OAuth-only users
+  emailVerified    DateTime?
   twoFactorEnabled Boolean   @default(false)
-  rating        Int          @default(0)
-  highestRating Int          @default(0)
-  wins          Int          @default(0)
-  losses        Int          @default(0)
-  winStreak     Int          @default(0)
-  bestWinStreak Int          @default(0)
-  botWins       Int          @default(0)
-  humanWins     Int          @default(0)
-  avatarStyle   String        @default("bottts")
-  avatarPhoto   Bytes?
-  avatarPhotoContentType String?
-  status        UserStatus   @default(offline)
-  disconnectCount Int        @default(0)
-  reconnectCount  Int        @default(0)
 
-  // Achievement booleans
+  accounts      Account[]
+  notifications Notification[]
+  achievement   Achievement?
+
+  gameParticipants    GameParticipant[]
+  sentFriendships     Friendship[]      @relation("SentFriendships")
+  receivedFriendships Friendship[]      @relation("ReceivedFriendships")
+
+  rating                 Int        @default(0)
+  highestRating          Int        @default(0)
+  wins                   Int        @default(0)
+  losses                 Int        @default(0)
+  winStreak              Int        @default(0)
+  bestWinStreak          Int        @default(0)
+  botWins                Int        @default(0)
+  humanWins              Int        @default(0)
+  avatarStyle            String     @default("bottts")
+  avatarPhoto            Bytes?
+  avatarPhotoContentType String?
+  disconnectCount        Int        @default(0)
+  reconnectCount         Int        @default(0)
+  pveGameStreak          Int        @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Achievement (per-user stats and achievement flags) ──────────────────────
+
+model Achievement {
+  id     String @id
+  userId String @unique
+
   achFirstBlood        Boolean @default(false)
   achOnFire            Boolean @default(false)
   achDiceMaster        Boolean @default(false)
@@ -81,27 +93,14 @@ model User {
   achft_Transcendence  Boolean @default(false)
   achSpeedDemon        Boolean @default(false)
   achUnstoppable       Boolean @default(false)
-  achSteadyDefender    Boolean @default(false)
-  achMercilessAttacker Boolean @default(false)
 
-  // PvE game streak (any outcome) — drives achLoveTheMachine
-  pveGameStreak        Int      @default(0)
-
-  accounts Account[]
-  notifications       Notification[]
-
-  gameParticipants GameParticipant[]
-  sentFriendships     Friendship[] @relation("SentFriendships")
-  receivedFriendships Friendship[] @relation("ReceivedFriendships")
-
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ─── Account (OAuth providers; only for users who sign in via a provider) ────
 
 model Account {
-  id                String  @id
+  id                String @id
   userId            String
   provider          String
   providerAccountId String
@@ -115,12 +114,12 @@ model Account {
 // ─── Game (historical results only — matchmaking lives in Redis) ─────────────
 
 model Game {
-  id              String       @id
-  startedAt       DateTime
-  endedAt         DateTime
-  status          GameStatus   @default(COMPLETED)
-  gameType        GameType     @default(PVP)
-  inviteCode      String?      @unique
+  id         String     @id
+  startedAt  DateTime
+  endedAt    DateTime
+  status     GameStatus @default(COMPLETED)
+  gameType   GameType   @default(PVP)
+  inviteCode String?    @unique
 
   participants GameParticipant[]
 }
@@ -130,14 +129,12 @@ model GameParticipant {
   game_id         String
   user_id         String
   color           PlayerColor
-  rank            Int         // 1st, 2nd, 3rd, 4th place
+  rank            Int // 1st, 2nd, 3rd, 4th place
   piecesCaptured  Int         @default(0)
-  piecesInGoal    Int         @default(0)  // 0-4
-  clashDefends    Int         @default(0)  // clash-mode: times defended a clash
-  clashAttacksWon Int         @default(0)  // clash-mode: times won a clash as attacker
+  piecesInGoal    Int         @default(0) // 0-4
 
-  game  Game  @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([game_id, user_id])
   @@unique([game_id, color])
@@ -146,11 +143,11 @@ model GameParticipant {
 // ─── Friendship ──────────────────────────────────────────────────────────────
 
 model Friendship {
-  id        String          @id
+  id        String           @id
   userId    String
   friendId  String
   status    FriendshipStatus @default(pending)
-  createdAt DateTime        @default(now())
+  createdAt DateTime         @default(now())
 
   user   User @relation("SentFriendships", fields: [userId], references: [id], onDelete: Cascade)
   friend User @relation("ReceivedFriendships", fields: [friendId], references: [id], onDelete: Cascade)
@@ -164,7 +161,7 @@ model Friendship {
 
 model LeaderboardSnapshot {
   id        String   @id
-  mode      String   // "global" | "ranked" | "casual" | "bot"
+  mode      String // "global" | "ranked" | "casual" | "bot"
   userId    String
   username  String
   rating    Int
@@ -183,8 +180,8 @@ model LeaderboardSnapshot {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  type      String   // 'friend_request' | 'friend_accepted' | 'game_invite' | 'achievement'
-  payload   Json     // flexible per-type data (e.g. { fromUsername, gameId, ... })
+  type      String // 'friend_request' | 'friend_accepted' | 'game_invite' | 'achievement'
+  payload   Json // flexible per-type data (e.g. { fromUsername, gameId, ... })
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 

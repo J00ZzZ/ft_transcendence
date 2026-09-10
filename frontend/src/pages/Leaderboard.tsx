@@ -8,6 +8,22 @@ import { retroAudio } from '../utils/audio'
 import { getRankTier } from '../utils/ranks'
 import { RankBadge } from '../components/RankBadge'
 import '../styles/retrowave.css'
+import {
+	CRT_SCREEN,
+	GRID_BACKGROUND,
+	SYNTHWAVE_SUN,
+	PERSPECTIVE_GRID,
+	GRID_HORIZON,
+	HERO_SECTION,
+	HERO_TITLE,
+	RETRO_WINDOW,
+	WINDOW_HEADER,
+	WINDOW_CONTROLS,
+	WINDOW_BTN_MIN,
+	WINDOW_BTN_MAX,
+	WINDOW_BODY,
+	APEX_CHAMPION_CARD,
+} from '../styles/tw'
 
 type LeaderboardEntry = {
   rank: number
@@ -19,6 +35,7 @@ type LeaderboardEntry = {
   losses: number
   winRate: number
   avatarStyle?: any
+  hasAvatarPhoto?: boolean
 }
 
 type LeaderboardResponse = {
@@ -86,55 +103,41 @@ export function Leaderboard() {
   return (
     <>
       {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className="grid-background">
-        <div className="synthwave-sun" />
-        <div className="grid-horizon" />
-        <div className="perspective-grid" />
-        <div className="win95-starfield" />
-        <div className="terminal-vector-core" />
+      <div className={GRID_BACKGROUND}>
+        <div className={SYNTHWAVE_SUN} />
+        <div className={GRID_HORIZON} />
+        <div className={PERSPECTIVE_GRID} />
       </div>
 
       {/* CRT Monitor Overlay FX Container */}
       <div
-        className={`crt-screen ${crtEnabled ? 'crt-curved' : ''}`}
+        className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`}
         id="crtScreen"
-        style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       >
-        <div
-          className="crt-scanlines"
-          id="crtOverlay"
-          style={{ display: crtEnabled ? 'block' : 'none' }}
-        />
-        <div className="crt-flicker" />
 
-        {/* Global Floating Navigation Dock (Left Side, Centered along Y Axis) */}
-        <RetroNavbar
-          activeRoute="/leaderboard"
-          crtEnabled={crtEnabled}
-          toggleCrt={toggleCrt}
-        />
+        {/* Dynamic Full-Width Seated Sidebar & Content Layout Container */}
+        <div className="w-full min-h-screen px-6 py-8 flex flex-row items-start justify-center gap-7 relative z-10 box-border">
+          {/* Left-Seated Navigation Dock */}
+          <aside className="shrink-0 w-[88px] xl:w-[270px] sticky top-8" style={{ margin: 0, padding: 0 }}>
+            <RetroNavbar
+              activeRoute="/leaderboard"
+              crtEnabled={crtEnabled}
+              toggleCrt={toggleCrt}
+            />
+          </aside>
 
-        {/* Main Content Wrapper (Fixed full viewport, positioned beside the left dock) */}
-        <div
-          className="app-wrapper"
-          style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-
-          {/* Hero Title (Clean, original font & color, taller Y-axis) */}
-          <header className="hero-section" style={{ padding: '16px 0 18px', marginBottom: 12, flexShrink: 0 }}>
-            <h1 className="hero-title" style={{ fontSize: '1.45rem', margin: 0, letterSpacing: '1.5px' }}>
+          {/* Main Content Flow */}
+          <div className="flex-1 w-full min-w-0 sticky top-8" style={{ margin: 0, padding: 0 }}>
+            {/* Hero Title (Clean, original font & color, taller Y-axis) */}
+            <header className={HERO_SECTION} style={{ marginTop: 0, padding: '16px 0 18px', marginBottom: 12, flexShrink: 0 }}>
+            <h1 className={HERO_TITLE} style={{ fontSize: '1.45rem', margin: 0, letterSpacing: '1.5px' }}>
               {t('leaderboard.globalRankingHero')}
             </h1>
           </header>
 
           {/* Unified Leaderboard Window Container (Slightly shorter in Y-axis to balance page) */}
           <section
-            className="retro-window"
+            className={RETRO_WINDOW}
             style={{
               width: '100%',
               flex: 1,
@@ -145,7 +148,7 @@ export function Leaderboard() {
             }}
           >
             <div
-              className="window-header"
+              className={WINDOW_HEADER}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -158,14 +161,14 @@ export function Leaderboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
                 <span>{t('leaderboard.leaderboardHeader', { count: data?.total ?? 0 })}</span>
               </div>
-              <div className="window-controls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="window-btn min" />
-                <span className="window-btn max" />
+              <div className={WINDOW_CONTROLS} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className={WINDOW_BTN_MIN} />
+                <span className={WINDOW_BTN_MAX} />
               </div>
             </div>
 
             <div
-              className="window-body"
+              className={WINDOW_BODY}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -230,6 +233,7 @@ export function Leaderboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                           <UserAvatar
                             username={top2.username}
+                            hasAvatarPhoto={top2.hasAvatarPhoto}
                             size={52}
                             fallbackStyle={{
                               width: 52,
@@ -278,7 +282,7 @@ export function Leaderboard() {
                     const tier1 = getRankTier(top1.rating, 1)
                     return (
                       <div
-                        className="apex-champion-floating-card"
+                        className={APEX_CHAMPION_CARD}
                         style={{
                           background: 'linear-gradient(180deg, rgba(48, 12, 38, 0.95), rgba(20, 5, 28, 0.98))',
                           border: '2px solid #ff1744',
@@ -313,6 +317,7 @@ export function Leaderboard() {
                           >
                             <UserAvatar
                               username={top1.username}
+                              hasAvatarPhoto={top1.hasAvatarPhoto}
                               size={62}
                               fallbackStyle={{
                                 width: 62,
@@ -386,6 +391,7 @@ export function Leaderboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                           <UserAvatar
                             username={top3.username}
+                            hasAvatarPhoto={top3.hasAvatarPhoto}
                             size={52}
                             fallbackStyle={{
                               width: 52,
@@ -452,7 +458,7 @@ export function Leaderboard() {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '270px 1.4fr 170px 170px 150px',
+                    gridTemplateColumns: '1.8fr 2.2fr 1.1fr 1.1fr 1fr',
                     gap: 20,
                     padding: '14px 28px',
                     fontSize: '0.82rem',
@@ -503,7 +509,7 @@ export function Leaderboard() {
                           key={entry.rank}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '270px 1.4fr 170px 170px 150px',
+                            gridTemplateColumns: '1.8fr 2.2fr 1.1fr 1.1fr 1fr',
                             gap: 20,
                             padding: isRankOne ? '20px 28px' : isTopThree ? '16px 28px' : '14px 28px',
                             borderBottom: isRankOne
@@ -562,6 +568,7 @@ export function Leaderboard() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: isRankOne ? 16 : 14 }}>
                             <UserAvatar
                               username={entry.username}
+                              hasAvatarPhoto={entry.hasAvatarPhoto}
                               size={isRankOne ? 50 : isTopThree ? 40 : 36}
                               fallbackStyle={{
                                 width: isRankOne ? 50 : isTopThree ? 40 : 36,
@@ -634,6 +641,7 @@ export function Leaderboard() {
           </section>
         </div>
       </div>
-    </>
-  )
+    </div>
+  </>
+)
 }

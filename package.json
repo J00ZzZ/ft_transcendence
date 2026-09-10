@@ -1,5 +1,13 @@
 {
+  "scripts": {
+    "test": "playwright test",
+    "test:baseline": "playwright test --grep-invert @defect",
+    "test:defects": "playwright test --grep @defect",
+    "test:socket": "playwright test socket-authority.spec.ts"
+  },
   "devDependencies": {
-    "prisma": "^7.9.1"
+    "@playwright/test": "^1.62.1",
+    "prisma": "^7.9.1",
+    "socket.io-client": "^4.8.3"
   }
 }

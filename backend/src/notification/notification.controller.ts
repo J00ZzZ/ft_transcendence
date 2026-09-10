@@ -46,9 +46,12 @@ export class NotificationController {
         id: notification.id,
       })),
       // When the HTTP connection closes (tab closed, navigation, network),
-      // the Observable completes and the service cleans up the Subject.
+      // NestJS unsubscribes from this Observable. The service's subscribe()
+      // wraps its Subject in its own finalize() that completes it, which fires
+      // the service's cleanup handler → removeClient(). This empty callback is
+      // kept only to mark where the stream teardown begins.
       finalize(() => {
-        // The Subject's complete/error handler in the service handles cleanup.
+        // Cleanup happens in NotificationService.subscribe()'s finalize.
       }),
     );
   }

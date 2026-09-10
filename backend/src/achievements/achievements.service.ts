@@ -9,6 +9,7 @@ import {
   GameParticipantLike,
   GameLike,
 } from './achievements.registry';
+import { isBotUserId } from '../common/bot';
 
 @Injectable()
 export class AchievementsService {
@@ -36,7 +37,7 @@ export class AchievementsService {
         // them for ratings/counters, so they must not be evaluated for
         // achievements either — otherwise bot rows could accumulate wins and
         // fire phantom notifications for bot user IDs.
-        if (p.user_id.startsWith('bot-')) continue;
+        if (isBotUserId(p.user_id)) continue;
         await this.evaluateForUser(p.user_id, game, true);
       }
     } catch (err) {
@@ -58,7 +59,7 @@ export class AchievementsService {
     game?: any,
     announce = true,
   ): Promise<{ unlocked: string[] }> {
-    const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.db.user.findUnique({ where: { id: userId }, include: { achievement: true } });
     if (!user) return { unlocked: [] };
 
     const unlocked: string[] = [];
@@ -69,7 +70,7 @@ export class AchievementsService {
     // Evaluate lifetime rules (registry-driven), then per-game rules.
     for (const rule of ACHIEVEMENT_RULES) {
       if (rule.type === 'lifetime') {
-        await this.evaluateRule(userId, user, rule, counts, null, announce, unlocked);
+        await this.evaluateRule(userId, user.achievement, rule, counts, null, announce, unlocked);
       }
     }
 
@@ -92,7 +93,7 @@ export class AchievementsService {
         for (const rule of perGameRules) {
           // Skip rules already unlocked during this evaluation pass.
           if (unlocked.includes(rule.key)) continue;
-          await this.evaluateRule(userId, user, rule, counts, g, announce, unlocked);
+          await this.evaluateRule(userId, user.achievement, rule, counts, g, announce, unlocked);
         }
       }
     }
@@ -145,27 +146,38 @@ export class AchievementsService {
 
   /**
    * GET /api/achievements — registry-driven report.
-   * Returns { [achKey]: { unlocked, progress, target } } for all 15 keys.
+   * Returns { [achKey]: { unlocked, progress, target } } for all 13 keys.
    */
-  async getUserAchievements(userId: string) {
-    const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
+  async getUserAchievements(userId: string, targetUsername?: string) {
+    let effectiveUserId = userId;
+    if (targetUsername) {
+      const targetUser = await this.prisma.db.user.findUnique({
+        where: { username: targetUsername },
+        select: { id: true },
+      });
+      if (targetUser) {
+        effectiveUserId = targetUser.id;
+      }
+    }
+
+    const user = await this.prisma.db.user.findUnique({ where: { id: effectiveUserId }, include: { achievement: true } });
     if (!user) return {};
 
-    const counts = await this.computeLifecycleCounts(userId, user);
+    const counts = await this.computeLifecycleCounts(effectiveUserId, user);
     const latestGame = await this.prisma.db.game.findFirst({
-      where: { status: 'COMPLETED', participants: { some: { user_id: userId } } },
+      where: { status: 'COMPLETED', participants: { some: { user_id: effectiveUserId } } },
       orderBy: { endedAt: 'desc' },
       include: { participants: true },
     });
     const myParticipation = latestGame?.participants?.find(
-      (p: any) => p.user_id === userId,
+      (p: any) => p.user_id === effectiveUserId,
     ) as GameParticipantLike | undefined;
 
     const result: Record<string, { unlocked: boolean; progress: number; target: number }> = {};
 
     for (const key of ACHIEVEMENT_KEYS) {
       const rule = ACHIEVEMENT_RULES.find((r) => r.key === key)!;
-      const unlocked = Boolean((user as any)[key]);
+      const unlocked = Boolean((user.achievement as any)?.[key]);
 
       let progress = 0;
       let target = rule.target ?? 0;
@@ -229,12 +241,12 @@ export class AchievementsService {
    */
   private async unlock(userId: string, field: AchKey): Promise<boolean> {
     try {
-      const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
+      const user = await this.prisma.db.user.findUnique({ where: { id: userId }, include: { achievement: true } });
       if (!user) return false;
-      if ((user as any)[field]) return false; // already unlocked — no re-notify
+      if ((user.achievement as any)[field]) return false; // already unlocked — no re-notify
 
-      await this.prisma.db.user.update({
-        where: { id: userId },
+      await this.prisma.db.achievement.update({
+        where: { userId },
         data: { [field]: true },
       });
       this.logger.log(`Achievement unlocked for user ${userId}: ${field}`);

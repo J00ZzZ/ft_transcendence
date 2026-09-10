@@ -34,7 +34,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
         email,
         usernameSeed: profile.username ?? `github_${profile.id}`,
       },
-      this.authService.resolveOAuthLink(req?.query?.state, 'github'),
+      this.authService.resolveOAuthLinkForRequest(req, 'github'),
     );
   }
 }

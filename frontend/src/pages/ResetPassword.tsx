@@ -6,6 +6,7 @@ import { navigate, useRoute } from '../router'
 import { useApp } from '../store'
 import { passwordError } from '../validatePassword'
 import '../styles/retrowave.css'
+import { RETRO_AUTH_BTN, RETRO_AUTH_ERROR, RETRO_AUTH_INPUT, RETRO_AUTH_LABEL, RETRO_AUTH_LINK, RETRO_AUTH_MUTED, RETRO_AUTH_SUBTITLE, RETRO_AUTH_TITLE } from '../styles/tw'
 
 /**
  * Step two of password reset. Reached from the emailed link, which carries
@@ -27,14 +28,14 @@ export function ResetPassword() {
     return (
       <RetroAuthLayout tag={t('auth.linkProblemTag')}>
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="retro-auth-title" style={{ fontSize: 24 }}>
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 24 }}>
             {t('auth.invalidLinkTitle')}
           </div>
-          <div className="retro-auth-muted" style={{ lineHeight: 1.5, fontSize: '14px' }}>
+          <div className={RETRO_AUTH_MUTED} style={{ lineHeight: 1.5, fontSize: '14px' }}>
             {t('auth.invalidLinkDesc')}
           </div>
-          <div className="retro-auth-muted" style={{ fontSize: '13px' }}>
-            <a onClick={() => navigate('/forgot-password')} className="retro-auth-link">
+          <div className={RETRO_AUTH_MUTED} style={{ fontSize: '13px' }}>
+            <a onClick={() => navigate('/forgot-password')} className={RETRO_AUTH_LINK}>
               {t('auth.requestNewLinkBtn')}
             </a>
           </div>
@@ -70,15 +71,15 @@ export function ResetPassword() {
         style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
       >
         <div>
-          <div className="retro-auth-title" style={{ fontSize: 24 }}>
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 24 }}>
             {t('auth.newPasswordTitle')}
           </div>
-          <div className="retro-auth-subtitle">
+          <div className={RETRO_AUTH_SUBTITLE}>
             {t('auth.newPasswordDesc')}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div className="retro-auth-label">{t('auth.newPasswordLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.newPasswordLabel')}</div>
           <input
             type="password"
             value={password}
@@ -86,24 +87,24 @@ export function ResetPassword() {
             placeholder={t('auth.passwordPlaceholderSignup')}
             autoComplete="new-password"
             autoFocus
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div className="retro-auth-label">{t('auth.confirmPasswordLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.confirmPasswordLabel')}</div>
           <input
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             placeholder="••••••••"
             autoComplete="new-password"
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         {error && (
-          <div className="retro-auth-error">{error}</div>
+          <div className={RETRO_AUTH_ERROR}>{error}</div>
         )}
-        <button type="submit" disabled={submitting} className="retro-auth-btn">
+        <button type="submit" disabled={submitting} className={RETRO_AUTH_BTN}>
           {submitting ? t('auth.savingBtn') : t('auth.updatePasswordBtn')}
         </button>
       </form>

@@ -3,19 +3,70 @@ import { useTranslation } from 'react-i18next'
 import { getApi } from '../api'
 import { UserAvatar } from '../components/UserAvatar'
 import { RetroNavbar } from '../components/RetroNavbar'
+import { LegalModal, type LegalDocType } from '../components/LegalModal'
+import { useNotifications } from '../hooks/useNotifications'
 import { navigate } from '../router'
 import { useApp } from '../store'
 import { retroAudio } from '../utils/audio'
 import { getRankTier } from '../utils/ranks'
 import { RankBadge } from '../components/RankBadge'
 import '../styles/retrowave.css'
+import {
+	CRT_SCREEN,
+	GRID_BACKGROUND,
+	SYNTHWAVE_SUN,
+	PERSPECTIVE_GRID,
+	GRID_HORIZON,
+	HERO_SECTION,
+	HERO_TITLE,
+	HERO_SUBTITLE,
+	BADGE_BAR,
+	RETRO_BADGE,
+	DASHBOARD_GRID,
+	RETRO_WINDOW,
+	WINDOW_HEADER,
+	WINDOW_CONTROLS,
+	WINDOW_BTN_MIN,
+	WINDOW_BTN_MAX,
+	WINDOW_BODY,
+	RETRO_BTN,
+	ARCADE_CONTAINER,
+	ARCADE_SCREEN_FRAME,
+	ARCADE_START_OVERLAY,
+	ARCADE_START_TITLE,
+	ARCADE_START_SUB,
+	COL_4,
+	COL_8,
+	RETRO_FOOTER,
+	CYBER_CASSETTE_CHASSIS,
+	OLED_SCREEN,
+	OLED_TITLE,
+	OLED_META,
+	CYBER_EQ_DECK,
+	CYBER_EQ_COL,
+	CYBER_TRANSPORT_CLUSTER,
+	CYBER_DECK_KEY,
+	CYBER_DECK_KEY_PLAY,
+	CYBER_DECK_KEY_PLAY_ACTIVE,
+	CYBER_KEY_ICON,
+	CYBER_KEY_LABEL,
+	CYBER_KEY_SUB,
+	CYBER_VOL_CONSOLE,
+	CYBER_FADER_TRACK_ROW,
+	CYBER_VOL_STEP_BTN,
+	CYBER_VOL_LED_BAR,
+	CYBER_VOL_LED_SEGMENT,
+	LED_LIT_CYAN,
+	LED_LIT_AMBER,
+	LED_LIT_PINK,
+} from '../styles/tw'
 
-type ThemeType = 'synthwave' | 'win95' | 'terminal'
 type Friend = {
 	id: string
 	username: string
 	displayName?: string
 	avatarStyle?: any
+	hasAvatarPhoto?: boolean
 	rating?: number
 	friendsSince?: string
 	status?: 'online' | 'playing' | 'offline'
@@ -29,7 +80,9 @@ const STATUS_STYLE: Record<string, { label: string; color: string; border: strin
 
 export function Home() {
 	const { t } = useTranslation()
-	const { user } = useApp()
+	const { user, theme } = useApp()
+	const [legalModalDoc, setLegalModalDoc] = useState<LegalDocType | null>(null)
+	const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
 
 	// ------------------------------------------------------------------------
 	// 2. LIVE PLAYER CAREER STATS API
@@ -81,34 +134,9 @@ export function Home() {
 	// ------------------------------------------------------------------------
 	// 3. THEME & CRT CONTROLS
 	// ------------------------------------------------------------------------
-	const [theme, setTheme] = useState<ThemeType>('synthwave')
 	const [crtEnabled, setCrtEnabled] = useState(true)
 
 	useEffect(() => {
-		const updateCurrentTheme = (newTheme?: ThemeType) => {
-			const activeTheme = newTheme || (localStorage.getItem('retro_theme') as ThemeType) || 'synthwave'
-			setTheme(activeTheme)
-		}
-
-		updateCurrentTheme()
-
-		const handleThemeChange = (e: Event) => {
-			const customEvent = e as CustomEvent<ThemeType>
-			updateCurrentTheme(customEvent.detail)
-		}
-
-		window.addEventListener('retro_theme_changed', handleThemeChange)
-		window.addEventListener('storage', handleThemeChange)
-
-		// MutationObserver for instant sync whenever data-theme changes on html
-		const observer = new MutationObserver(() => {
-			const attrTheme = document.documentElement.getAttribute('data-theme') as ThemeType
-			if (attrTheme && (attrTheme === 'synthwave' || attrTheme === 'win95' || attrTheme === 'terminal')) {
-				setTheme(attrTheme)
-			}
-		})
-		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-
 		const savedCrt = localStorage.getItem('retro_crt')
 		if (savedCrt === 'false') {
 			setCrtEnabled(false)
@@ -201,6 +229,23 @@ export function Home() {
 		}, 120)
 		return () => clearInterval(iv)
 	}, [isPlayingAudio])
+
+	// ------------------------------------------------------------------------
+	// 4b. HERO BADGE BAR: live site-wide counts (online players, active
+	// matches, open joinable slots)
+	// ------------------------------------------------------------------------
+	const [onlineCount, setOnlineCount] = useState<number | null>(null)
+
+	useEffect(() => {
+		const fetchBadgeCounts = () => {
+			getApi<{ count: number }>('/api/presence/online-count')
+				.then((body) => setOnlineCount(body.count))
+				.catch((e) => console.error(e))
+		}
+		fetchBadgeCounts()
+		const iv = setInterval(fetchBadgeCounts, 15000)
+		return () => clearInterval(iv)
+	}, [])
 
 	// ------------------------------------------------------------------------
 	// 5. HUB ARCADE CABINET: 3D ATTRACT MODE & PRESS START
@@ -601,206 +646,117 @@ export function Home() {
 	return (
 		<>
 			{/* Animated 3D Synthwave Grid & Sun Background */}
-			<div className="grid-background">
-				<div className="synthwave-sun" />
-				<div className="grid-horizon" />
-				<div className="perspective-grid" />
-				<div className="win95-starfield" />
-				<div className="terminal-vector-core" />
+			<div className={GRID_BACKGROUND}>
+				<div className={SYNTHWAVE_SUN} />
+				<div className={GRID_HORIZON} />
+				<div className={PERSPECTIVE_GRID} />
 			</div>
 
 			{/* CRT Monitor Overlay FX Container */}
-			<div className={`crt-screen ${crtEnabled ? 'crt-curved' : ''}`} id="crtScreen">
-				<div
-					className="crt-scanlines"
-					id="crtOverlay"
-					style={{ display: crtEnabled ? 'block' : 'none' }}
-				/>
-				<div className="crt-flicker" />
+			<div className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''} flex flex-col justify-start items-center min-h-screen w-full`} id="crtScreen">
 
-				{/* Main Content Wrapper */}
-				<div className="app-wrapper">
-					{/* Navigation Header */}
-					<RetroNavbar activeRoute="/home" />
+				{/* Dynamic Full-Width Seated Sidebar & Content Layout Container */}
+				<div className="w-full min-h-screen px-6 py-8 flex flex-row items-start justify-center gap-7 relative z-10 box-border">
+					{/* Left-Seated Navigation Dock */}
+					<aside className="shrink-0 w-[88px] xl:w-[270px] sticky top-8" style={{ margin: 0, padding: 0 }}>
+						<RetroNavbar
+							activeRoute="/home"
+							crtEnabled={crtEnabled}
+							toggleCrt={toggleCrt}
+							notifications={notifications}
+							unreadCount={unreadCount}
+							onMarkRead={markRead}
+							onMarkAllRead={markAllRead}
+						/>
+					</aside>
 
-					{/* Hero Header Banner */}
-					<header className="hero-section">
-						<h1 className="hero-title">RETROLUDO '42</h1>
-						<p className="hero-subtitle">
-							{t('home.greeting', { name: displayName.toUpperCase() })} // PACE 24
-						</p>
-					</header>
+					{/* Main Content Flow - Full Size Fit To Page */}
+					<div className="flex-1 w-full min-w-0 sticky top-8" style={{ margin: 0, padding: 0 }}>
+						{/* Hero Header Banner */}
+						<header className={HERO_SECTION} style={{ marginTop: 0, padding: '20px 24px 18px', marginBottom: 24 }}>
+							<h1 className={HERO_TITLE} style={{ marginBottom: 6 }}>RETROLUDO '42</h1>
+							<p className={HERO_SUBTITLE}>
+								{t('home.greeting', { name: displayName.toUpperCase() })} // PACE 24
+							</p>
 
-					{/* Main Interactive Dashboard Grid */}
-					<main className="dashboard-grid">
-						{/* Widget 1: 3D Attract Mode Arcade Cabinet & Press Start */}
-						<section
-							className="retro-window col-8"
-							id="arcadeWindow"
-							style={{
-								height: 450,
-								maxHeight: 450,
-								display: 'flex',
-								flexDirection: 'column',
-								boxSizing: 'border-box',
-							}}
-						>
-							<div className="window-header">
-								<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-									<span>{t('homeExtended.arcadeArenaTitle')}</span>
-								</div>
-								<div className="window-controls">
-									<span className="window-btn min" />
-									<span className="window-btn max" />
-								</div>
-							</div>
-							<div
-								className="window-body arcade-container"
-								style={{
-									padding: 0,
-									display: 'flex',
-									flexDirection: 'column',
-									alignItems: 'center',
-									justifyContent: 'center',
-									flex: 1,
-									minHeight: 0,
-									overflow: 'hidden',
-								}}
-							>
-								{/* Arcade Canvas Frame & Interactive Press Start Overlay */}
-								<div
-									className="arcade-screen-frame"
+							<div className={BADGE_BAR} style={{ marginTop: 14, gap: 10 }}>
+								<button
+									className={RETRO_BADGE}
 									style={{
-										height: '100%',
-										width: '100%',
-										display: 'flex',
+										cursor: 'pointer',
+										background: 'var(--bg-secondary)',
+										border: isPlayingAudio ? '1px solid var(--accent-pink)' : '1px dashed var(--accent-cyan)',
+										color: isPlayingAudio ? 'var(--accent-pink)' : 'var(--accent-cyan)',
+										fontFamily: 'var(--font-mono)',
+										outline: 'none',
+									}}
+									onClick={handleToggleAudio}
+									title={t('homeExtended.chiptuneToggleTitle')}
+								>
+									{isPlayingAudio ? t('homeExtended.audioActive') : t('homeExtended.audioStandby')}
+								</button>
+								<span
+									className={RETRO_BADGE}
+									style={{
+										border: '1px solid var(--accent-cyan)',
+										color: 'var(--accent-cyan)',
+										display: 'inline-flex',
 										alignItems: 'center',
-										justifyContent: 'center',
-										...(isWarpingToLobby
-											? {
+										fontFamily: 'var(--font-mono)',
+									}}
+								>
+									{t('homeExtended.onlinePlayers')} {onlineCount ?? '...'}
+								</span>
+							</div>
+						</header>
+
+						{/* Main Interactive Dashboard Grid */}
+						<main className={`${DASHBOARD_GRID} dashboard-grid`}>
+							{/* Widget 1: 3D Attract Mode Arcade Cabinet & Press Start */}
+							<section className={`${RETRO_WINDOW} ${COL_8}`} id="arcadeWindow">
+								<div className={WINDOW_HEADER}>
+									<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+										<span>{t('homeExtended.arcadeArenaTitle')}</span>
+									</div>
+									<div className={WINDOW_CONTROLS}>
+										<span className={WINDOW_BTN_MIN} />
+										<span className={WINDOW_BTN_MAX} />
+									</div>
+								</div>
+								<div className={`${WINDOW_BODY} ${ARCADE_CONTAINER}`}>
+									{/* Arcade Canvas Frame & Interactive Press Start Overlay */}
+									<div
+										className={ARCADE_SCREEN_FRAME}
+										style={
+											isWarpingToLobby
+												? {
 													border: '4px solid #ffffff',
 													boxShadow: '0 0 35px #ffffff, 0 0 50px var(--accent-cyan)',
-											  }
-											: {}),
-									}}
-									onClick={launchToLobby}
-									title="Click or press Spacebar to enter Ludo Lobby"
-								>
-									<canvas
-										id="arcadeCanvas"
-										ref={canvasRef}
-										width={720}
-										height={420}
-										style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill' }}
-									/>
-
-									{/* Interactive Translucent Press Start Banner Overlay */}
-									<div className="arcade-start-overlay">
-										<span className="arcade-start-title">
-											{theme === 'win95'
-												? t('homeExtended.pressStartTitleWin95')
-												: theme === 'terminal'
-												? t('homeExtended.pressStartTitleTerminal')
-												: t('homeExtended.pressStartTitleSynthwave')}
-										</span>
-										<span className="arcade-start-sub">
-											{theme === 'terminal'
-												? t('homeExtended.pressStartSubTerminal')
-												: theme === 'win95'
-												? t('homeExtended.pressStartSubWin95')
-												: t('homeExtended.pressStartSubSynthwave')}
-										</span>
-									</div>
-
-									{/* Hyperdrive Warp Flash on Launch */}
-									{isWarpingToLobby && (
-										<div
-											style={{
-												position: 'absolute',
-												inset: 0,
-												background: 'rgba(255, 255, 255, 0.85)',
-												display: 'flex',
-												alignItems: 'center',
-												justifyContent: 'center',
-												fontFamily: 'var(--font-heading)',
-												fontSize: '1.2rem',
-												color: '#0d0221',
-												animation: 'pulse 0.2s infinite',
-											}}
-										>
-											{t('homeExtended.warpingToArena')}
-										</div>
-									)}
-								</div>
-							</div>
-						</section>
-
-						{/* Widget 2: Friends List */}
-						<section
-							className="retro-window col-4"
-							id="friendsWindow"
-							style={{
-								height: 450,
-								maxHeight: 450,
-								display: 'flex',
-								flexDirection: 'column',
-								boxSizing: 'border-box',
-							}}
-						>
-							<div className="window-header">
-								<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-									<span>{t('friends.title').toUpperCase()} ({friends?.length ?? 0})</span>
-									{pendingRequestsCount > 0 && (
-										<button
-											style={{
-												background: 'var(--accent-pink)',
-												color: '#fff',
-												fontSize: '0.6rem',
-												padding: '2px 6px',
-												borderRadius: 3,
-												fontWeight: 'bold',
-												animation: 'pulse 1.5s infinite',
-												cursor: 'pointer',
-												border: 'none',
-												outline: 'none',
-												fontFamily: 'inherit',
-												display: 'inline-flex',
-												alignItems: 'center',
-												lineHeight: 1,
-											}}
-											onClick={(e) => {
-												e.stopPropagation()
-												retroAudio.playUiBeep(650, 0.05)
-												navigate('/friends')
-											}}
-											title={`${pendingRequestsCount} pending friend request${pendingRequestsCount > 1 ? 's' : ''} - Click to review`}
-										>
-											{pendingRequestsCount} NEW
-										</button>
-									)}
-								</div>
-								<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-									<button
-										className="retro-btn"
-										onClick={() => {
-											retroAudio.playUiBeep(600, 0.05)
-											navigate('/friends')
-										}}
-										style={{
-											padding: '2px 8px',
-											fontSize: '0.65rem',
-											fontFamily: 'var(--font-display)',
-											fontWeight: 900,
-										}}
+												}
+												: undefined
+										}
+										onClick={launchToLobby}
+										title="Click or press Spacebar to enter Ludo Lobby"
 									>
-										{t('homeExtended.manageBtn')}
-									</button>
-									<div className="window-controls">
-										<span className="window-btn min" />
-										<span className="window-btn max" />
-									</div>
-								</div>
-							</div>
+										<canvas id="arcadeCanvas" ref={canvasRef} width={720} height={400} />
+
+										{/* Interactive Translucent Press Start Banner Overlay */}
+										<div className={ARCADE_START_OVERLAY}>
+											<span className={ARCADE_START_TITLE}>
+												{theme === 'win95'
+													? t('homeExtended.pressStartTitleWin95')
+													: theme === 'terminal'
+														? t('homeExtended.pressStartTitleTerminal')
+														: t('homeExtended.pressStartTitleSynthwave')}
+											</span>
+											<span className={ARCADE_START_SUB}>
+												{theme === 'terminal'
+													? t('homeExtended.pressStartSubTerminal')
+													: theme === 'win95'
+														? t('homeExtended.pressStartSubWin95')
+														: t('homeExtended.pressStartSubSynthwave')}
+											</span>
+										</div>
 
 							<div
 								className="window-body"
@@ -822,6 +778,96 @@ export function Home() {
 										flex: 1,
 										overflowY: 'auto',
 										minHeight: 0,
+										{/* Hyperdrive Warp Flash on Launch */}
+										{isWarpingToLobby && (
+											<div
+												style={{
+													position: 'absolute',
+													inset: 0,
+													background: 'rgba(255, 255, 255, 0.85)',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													fontFamily: 'var(--font-heading)',
+													fontSize: '1.2rem',
+													color: '#0d0221',
+													animation: 'pulse 0.2s infinite',
+												}}
+											>
+												{t('homeExtended.warpingToArena')}
+											</div>
+										)}
+									</div>
+								</div>
+							</section>
+
+							{/* Widget 2: Friends List */}
+							<section className={`${RETRO_WINDOW} ${COL_4}`} id="friendsWindow">
+								<div className={WINDOW_HEADER}>
+									<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+										<span>{t('friends.title').toUpperCase()} ({friends?.length ?? 0})</span>
+										{pendingRequestsCount > 0 && (
+											<button
+												style={{
+													background: 'var(--accent-pink)',
+													color: '#fff',
+													fontSize: '0.6rem',
+													padding: '2px 6px',
+													borderRadius: 3,
+													fontWeight: 'bold',
+													animation: 'pulse 1.5s infinite',
+													cursor: 'pointer',
+													border: 'none',
+													outline: 'none',
+													fontFamily: 'inherit',
+													display: 'inline-flex',
+													alignItems: 'center',
+													lineHeight: 1,
+												}}
+												onClick={(e) => {
+													e.stopPropagation()
+													retroAudio.playUiBeep(650, 0.05)
+													navigate('/friends')
+												}}
+												title={`${pendingRequestsCount} pending friend request${pendingRequestsCount > 1 ? 's' : ''} - Click to review`}
+											>
+												{pendingRequestsCount} NEW
+											</button>
+										)}
+									</div>
+									<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+										<button
+											className={RETRO_BTN}
+											onClick={() => {
+												retroAudio.playUiBeep(600, 0.05)
+												navigate('/friends')
+											}}
+											style={{
+												padding: '2px 8px',
+												fontSize: '0.65rem',
+												fontFamily: 'var(--font-display)',
+												fontWeight: 900,
+											}}
+										>
+											{t('homeExtended.manageBtn')}
+										</button>
+										<div className={WINDOW_CONTROLS}>
+											<span className={WINDOW_BTN_MIN} />
+											<span className={WINDOW_BTN_MAX} />
+										</div>
+									</div>
+								</div>
+
+								<div
+									style={{
+										padding: '14px 16px',
+										display: 'flex',
+										flexDirection: 'column',
+										gap: 10,
+										flex: 1,
+										overflowY: 'auto',
+										minHeight: 0,
+										maxHeight: 390,
 									}}
 								>
 									{isFriendsLoading && friends === null ? (
@@ -837,17 +883,35 @@ export function Home() {
 											const fRank = leaderboardMap[f.username]
 											const fTier = getRankTier(f.rating ?? 1200, fRank)
 											const fStatus = STATUS_STYLE[f.status || 'offline'] || STATUS_STYLE.offline
-											const isPace24 =
-												f.username.toLowerCase().includes('harleynghx') ||
-												f.username.toLowerCase().includes('harleyhx')
 
 											return (
 												<div
 													key={f.id}
-													className="retro-friend-card"
+													style={{
+														display: 'flex',
+														alignItems: 'center',
+														justifyContent: 'space-between',
+														padding: '10px 14px',
+														borderRadius: 6,
+														background: 'rgba(10, 3, 26, 0.85)',
+														border: '1.5px solid rgba(0, 240, 255, 0.25)',
+														cursor: 'pointer',
+														transition: 'all 0.18s ease',
+														gap: 12,
+													}}
 													onClick={() => {
 														retroAudio.playUiBeep(640, 0.04)
 														navigate(`/profile?u=${encodeURIComponent(f.username)}`)
+													}}
+													onMouseEnter={(e) => {
+														e.currentTarget.style.background = 'rgba(0, 240, 255, 0.16)'
+														e.currentTarget.style.borderColor = 'var(--accent-cyan)'
+														e.currentTarget.style.transform = 'translateX(2px)'
+													}}
+													onMouseLeave={(e) => {
+														e.currentTarget.style.background = 'rgba(10, 3, 26, 0.85)'
+														e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.25)'
+														e.currentTarget.style.transform = 'translateX(0)'
 													}}
 												>
 													<div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
@@ -863,6 +927,7 @@ export function Home() {
 																<UserAvatar
 																	username={f.username}
 																	avatarStyle={f.avatarStyle}
+																	hasAvatarPhoto={f.hasAvatarPhoto}
 																	size={38}
 																	fallbackStyle={{
 																		width: 38,
@@ -897,7 +962,7 @@ export function Home() {
 																	style={{
 																		fontSize: '0.92rem',
 																		fontWeight: 900,
-																		color: 'var(--text-main)',
+																		color: '#ffffff',
 																		fontFamily: 'var(--font-display)',
 																		whiteSpace: 'nowrap',
 																		overflow: 'hidden',
@@ -905,18 +970,18 @@ export function Home() {
 																		letterSpacing: '0.02em',
 																	}}
 																>
-																	{f.username}
+																	{f.displayName || f.username}
 																</span>
 																<RankBadge tier={fTier} fontSize="9.5px" padding="2px 7px" />
 															</div>
 															<div style={{ fontSize: '0.68rem', color: fStatus.color, fontFamily: 'var(--font-display)', fontWeight: 'bold', marginTop: 2 }}>
-																● {fStatus.label.toUpperCase()} // {t('homeExtended.alliedPilot')}{isPace24 ? ' // PACE 24' : ''}
+																● {fStatus.label.toUpperCase()} // {t('homeExtended.alliedPilot')}
 															</div>
 														</div>
 													</div>
 
 													<div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 4 }}>
-														<span style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
+														<span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
 															{f.rating ?? 1200}
 														</span>
 														<span style={{ fontSize: '0.64rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-display)', fontWeight: 900 }}>
@@ -928,371 +993,402 @@ export function Home() {
 										})
 									)}
 								</div>
-							</div>
-						</section>
+							</section>
 
-						{/* Widget 3: Pilot Profile & Combat Stats */}
-						<section className="retro-window col-8" id="pilotDossierWindow">
-							<div className="window-header">
-								<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-									<span>{t('homeExtended.pilotProfileTitle')}</span>
+							{/* Widget 3: Pilot Profile & Combat Stats */}
+							<section className={`${RETRO_WINDOW} ${COL_8}`} id="pilotDossierWindow">
+								<div className={WINDOW_HEADER}>
+									<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+										<span>{t('homeExtended.pilotProfileTitle')}</span>
+									</div>
+									<div className={WINDOW_CONTROLS}>
+										<span className={WINDOW_BTN_MIN} />
+										<span className={WINDOW_BTN_MAX} />
+									</div>
 								</div>
-								<div className="window-controls">
-									<span className="window-btn min" />
-									<span className="window-btn max" />
-								</div>
-							</div>
-							<div className="window-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-								{/* Top Row: Pilot Profile Identity Header */}
-								<div
-									style={{
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'space-between',
-										padding: '12px 16px',
-										background: 'var(--bg-secondary)',
-										border: '1px solid var(--border-color)',
-										borderRadius: 4,
-										flexWrap: 'wrap',
-										gap: 12,
-									}}
-								>
-									<div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-										<UserAvatar
-											username={username}
-											size={48}
-										/>
-										<div>
-											<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-												<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', color: 'var(--text-main)', letterSpacing: 1 }}>
-													{username.toUpperCase()}
+								<div className={WINDOW_BODY} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+									{/* Top Row: Pilot Profile Identity Header */}
+									<div
+										style={{
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'space-between',
+											padding: '12px 16px',
+											background: 'rgba(0, 0, 0, 0.45)',
+											border: '1px solid var(--accent-cyan)',
+											borderRadius: 4,
+											flexWrap: 'wrap',
+											gap: 12,
+										}}
+									>
+										<div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+											<UserAvatar
+												username={username}
+												avatarStyle={user?.avatarStyle}
+												hasAvatarPhoto={user?.hasAvatarPhoto ?? false}
+												size={48}
+											/>
+											<div>
+												<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+													<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', color: '#ffffff', letterSpacing: 1 }}>
+														{displayName.toUpperCase()}
+													</span>
+													<RankBadge
+														tier={getRankTier(stats?.rating ?? 1200, leaderboardRank)}
+														fontSize="0.75rem"
+														padding="3px 10px"
+													/>
+												</div>
+												<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+													{t('homeExtended.callsign')}: {displayName.toUpperCase()} // {t('homeExtended.rankedCombatant')}
 												</span>
-												<RankBadge
-													tier={getRankTier(stats?.rating ?? 1200, leaderboardRank)}
-													fontSize="0.75rem"
-													padding="3px 10px"
-												/>
 											</div>
-											<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-												{t('homeExtended.callsign')}: {displayName.toUpperCase()} // {t('homeExtended.rankedCombatant')}
+										</div>
+
+										<button
+											className={RETRO_BTN}
+											style={{ padding: '6px 14px', fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 900 }}
+											onClick={() => {
+												retroAudio.playUiBeep(600, 0.05)
+												navigate('/profile')
+											}}
+										>
+											{t('homeExtended.fullProfileBtn')}
+										</button>
+									</div>
+
+									{/* Bottom Row: 4 Retro Stat Metrics */}
+									<div
+										style={{
+											display: 'grid',
+											gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+											gap: 12,
+										}}
+									>
+										{/* Stat 1: Total Battles */}
+										<div
+											style={{
+												padding: '12px 14px',
+												background: 'rgba(25, 10, 56, 0.5)',
+												border: '1px solid rgba(0, 240, 255, 0.3)',
+												borderRadius: 4,
+												display: 'flex',
+												flexDirection: 'column',
+												gap: 4,
+											}}
+										>
+											<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+												{t('homeExtended.totalMatches')}
+											</span>
+											<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-cyan)' }}>
+												{isStatsLoading ? '...' : stats ? stats.totalGames : 0}
 											</span>
 										</div>
-									</div>
 
-									<button
-										className="retro-btn"
-										style={{ padding: '6px 14px', fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 900 }}
-										onClick={() => {
-											retroAudio.playUiBeep(600, 0.05)
-											navigate('/profile')
-										}}
-									>
-										{t('homeExtended.fullProfileBtn')}
-									</button>
-								</div>
+										{/* Stat 2: Victories & Defeats */}
+										<div
+											style={{
+												padding: '12px 14px',
+												background: 'rgba(25, 10, 56, 0.5)',
+												border: '1px solid rgba(255, 0, 127, 0.3)',
+												borderRadius: 4,
+												display: 'flex',
+												flexDirection: 'column',
+												gap: 4,
+											}}
+										>
+											<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+												{t('homeExtended.victoriesDefeats')}
+											</span>
+											<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', color: 'var(--accent-pink)' }}>
+												{isStatsLoading ? '...' : stats ? `${stats.wins}W / ${stats.losses}L` : '0W / 0L'}
+											</span>
+										</div>
 
-								{/* Bottom Row: 4 Retro Stat Metrics */}
-								<div
-									style={{
-										display: 'grid',
-										gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-										gap: 12,
-									}}
-								>
-									{/* Stat 1: Total Battles */}
-									<div
-										style={{
-											padding: '12px 14px',
-											background: 'var(--bg-secondary)',
-											border: '1px solid var(--border-color)',
-											borderRadius: 4,
-											display: 'flex',
-											flexDirection: 'column',
-											gap: 4,
-										}}
-									>
-										<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-											{t('homeExtended.totalMatches')}
-										</span>
-										<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-cyan)' }}>
-											{isStatsLoading ? '...' : stats ? stats.totalGames : 0}
-										</span>
-									</div>
+										{/* Stat 3: Win Rate */}
+										<div
+											style={{
+												padding: '12px 14px',
+												background: 'rgba(25, 10, 56, 0.5)',
+												border: '1px solid rgba(255, 230, 0, 0.3)',
+												borderRadius: 4,
+												display: 'flex',
+												flexDirection: 'column',
+												gap: 4,
+											}}
+										>
+											<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+												{t('homeExtended.winRatio')}
+											</span>
+											<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-yellow)' }}>
+												{isStatsLoading ? '...' : stats && stats.totalGames > 0 ? `${Math.round((stats.wins / stats.totalGames) * 100)}%` : '0%'}
+											</span>
+										</div>
 
-									{/* Stat 2: Victories & Defeats */}
-									<div
-										style={{
-											padding: '12px 14px',
-											background: 'var(--bg-secondary)',
-											border: '1px solid var(--border-color)',
-											borderRadius: 4,
-											display: 'flex',
-											flexDirection: 'column',
-											gap: 4,
-										}}
-									>
-										<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-											{t('homeExtended.victoriesDefeats')}
-										</span>
-										<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', color: 'var(--accent-pink)' }}>
-											{isStatsLoading ? '...' : stats ? `${stats.wins}W / ${stats.losses}L` : '0W / 0L'}
-										</span>
-									</div>
+										{/* Stat 4: Dynamic Tier ELO Rating (Clickable -> Leaderboard) */}
+										{(() => {
+											const currentRating = stats?.rating ?? 1200
+											const tier = getRankTier(currentRating, leaderboardRank)
 
-									{/* Stat 3: Win Rate */}
-									<div
-										style={{
-											padding: '12px 14px',
-											background: 'var(--bg-secondary)',
-											border: '1px solid var(--border-color)',
-											borderRadius: 4,
-											display: 'flex',
-											flexDirection: 'column',
-											gap: 4,
-										}}
-									>
-										<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-											{t('homeExtended.winRatio')}
-										</span>
-										<span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-yellow)' }}>
-											{isStatsLoading ? '...' : stats && stats.totalGames > 0 ? `${Math.round((stats.wins / stats.totalGames) * 100)}%` : '0%'}
-										</span>
-									</div>
-
-									{/* Stat 4: Dynamic Tier ELO Rating (Clickable -> Leaderboard) */}
-									{(() => {
-										const currentRating = stats?.rating ?? 1200
-										const tier = getRankTier(currentRating, leaderboardRank)
-
-										return (
-											<div
-												onClick={() => {
-													retroAudio.playUiBeep(720, 0.05)
-													navigate('/leaderboard')
-												}}
-												title="Click to view Global Leaderboard Ladder"
-												style={{
-													padding: '12px 14px',
-													background: 'rgba(25, 10, 56, 0.5)',
-													border: `1px solid ${tier.border}`,
-													borderRadius: 4,
-													display: 'flex',
-													flexDirection: 'column',
-													gap: 4,
-													cursor: 'pointer',
-													transition: 'all 0.2s ease',
-												}}
-												onMouseEnter={(e) => {
-													e.currentTarget.style.background = tier.bg
-													e.currentTarget.style.borderColor = tier.color
-													e.currentTarget.style.boxShadow = `0 0 14px ${tier.glow}`
-												}}
-												onMouseLeave={(e) => {
-													e.currentTarget.style.background = 'rgba(25, 10, 56, 0.5)'
-													e.currentTarget.style.borderColor = tier.border
-													e.currentTarget.style.boxShadow = 'none'
-												}}
-											>
-												<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-													<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-														{t('homeExtended.eloRating')}
-													</span>
-													<span style={{ fontSize: '0.62rem', color: tier.color, fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
-														{tier.badge}
-													</span>
-												</div>
-												<span
+											return (
+												<div
+													onClick={() => {
+														retroAudio.playUiBeep(720, 0.05)
+														navigate('/leaderboard')
+													}}
+													title="Click to view Global Leaderboard Ladder"
 													style={{
-														fontFamily: 'var(--font-heading)',
-														fontSize: '1.2rem',
-														color: tier.color,
-														textShadow: `0 0 10px ${tier.glow}`,
+														padding: '12px 14px',
+														background: 'rgba(25, 10, 56, 0.5)',
+														border: `1px solid ${tier.border}`,
+														borderRadius: 4,
+														display: 'flex',
+														flexDirection: 'column',
+														gap: 4,
+														cursor: 'pointer',
+														transition: 'all 0.2s ease',
+													}}
+													onMouseEnter={(e) => {
+														e.currentTarget.style.background = tier.bg
+														e.currentTarget.style.borderColor = tier.color
+														e.currentTarget.style.boxShadow = `0 0 14px ${tier.glow}`
+													}}
+													onMouseLeave={(e) => {
+														e.currentTarget.style.background = 'rgba(25, 10, 56, 0.5)'
+														e.currentTarget.style.borderColor = tier.border
+														e.currentTarget.style.boxShadow = 'none'
 													}}
 												>
-													{isStatsLoading ? '...' : currentRating}
-												</span>
-											</div>
-										)
-									})()}
+													<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+														<span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+															{t('homeExtended.eloRating')}
+														</span>
+														<span style={{ fontSize: '0.62rem', color: tier.color, fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+															{tier.badge}
+														</span>
+													</div>
+													<span
+														style={{
+															fontFamily: 'var(--font-heading)',
+															fontSize: '1.2rem',
+															color: tier.color,
+															textShadow: `0 0 10px ${tier.glow}`,
+														}}
+													>
+														{isStatsLoading ? '...' : currentRating}
+													</span>
+												</div>
+											)
+										})()}
+									</div>
 								</div>
-							</div>
-						</section>
+							</section>
 
-						{/* Widget 4: Cyber Sound Deck & Cassette Synthesizer */}
-						<section className="retro-window col-4" id="cyberSoundDeckWindow">
-							<div className="window-header">
-								<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-									<span>◖ CYBERSOUND DECK ◗</span>
-									<span
-										style={{
-											fontSize: '0.62rem',
-											padding: '2px 6px',
-											borderRadius: 3,
-											background: isPlayingAudio ? 'rgba(0, 240, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-											border: isPlayingAudio ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.15)',
-											color: isPlayingAudio ? 'var(--accent-cyan)' : 'var(--text-muted)',
-											fontFamily: 'var(--font-mono)',
-											fontWeight: 'bold',
-											display: 'inline-flex',
-											alignItems: 'center',
-											gap: 4,
-										}}
-									>
+							{/* Widget 4: Cyber Sound Deck & Cassette Synthesizer */}
+							<section className={`${RETRO_WINDOW} ${COL_4}`} id="cyberSoundDeckWindow">
+								<div className={WINDOW_HEADER}>
+									<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+										<span>{t('homeExtended.chiptuneDeckTitle')}</span>
 										<span
 											style={{
-												width: 6,
-												height: 6,
-												borderRadius: '50%',
-												background: isPlayingAudio ? 'var(--accent-cyan)' : 'var(--text-muted)',
-												boxShadow: isPlayingAudio ? '0 0 6px var(--accent-cyan)' : 'none',
+												fontSize: '0.62rem',
+												padding: '2px 6px',
+												borderRadius: 3,
+												background: isPlayingAudio ? 'rgba(0, 240, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+												border: isPlayingAudio ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.15)',
+												color: isPlayingAudio ? 'var(--accent-cyan)' : 'var(--text-muted)',
+												fontFamily: 'var(--font-mono)',
+												fontWeight: 'bold',
+												display: 'inline-flex',
+												alignItems: 'center',
+												gap: 4,
 											}}
-										/>
-										{isPlayingAudio ? 'LIVE STEREO' : 'STANDBY'}
-									</span>
-								</div>
-								<div className="window-controls">
-									<span className="window-btn min" />
-									<span className="window-btn max" />
-								</div>
-							</div>
-							<div
-								className="window-body"
-								style={{
-									display: 'flex',
-									flexDirection: 'column',
-									gap: 8,
-									justifyContent: 'space-between',
-								}}
-							>
-								{/* Cyber Cassette Chassis */}
-								<div className="cyber-cassette-chassis">
-									{/* OLED Track HUD Display */}
-									<div className="oled-screen">
-										<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-											<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--accent-pink)', fontWeight: 'bold' }}>
-												TRACK 0{audioTrackIndex + 1} / 0{retroAudio.tracks.length}
-											</span>
-											<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: isPlayingAudio ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
-												{isPlayingAudio ? '● PLAYING' : '■ IDLE'}
-											</span>
-										</div>
-										<div className="oled-title">
-											{retroAudio.tracks[audioTrackIndex]?.name || "SYNTHWAVE NIGHTS '84"}
-										</div>
-										<div className="oled-meta">
-											<span>{retroAudio.tracks[audioTrackIndex]?.tempo || 120} BPM // A-MIN</span>
-											<span>CHIPTUNE · 44.1kHz</span>
-										</div>
-									</div>
-
-									{/* Multi-Band Stereo Spectrum Equalizer */}
-									<div className="cyber-eq-deck">
-										{eqHeights.map((h, i) => (
-											<div
-												key={i}
-												className="cyber-eq-col"
-												style={{ height: `${h}px` }}
+										>
+											<span
+												style={{
+													width: 6,
+													height: 6,
+													borderRadius: '50%',
+													background: isPlayingAudio ? 'var(--accent-cyan)' : 'var(--text-muted)',
+													boxShadow: isPlayingAudio ? '0 0 6px var(--accent-cyan)' : 'none',
+												}}
 											/>
-										))}
+											{isPlayingAudio ? t('homeExtended.chiptuneLiveStereo') : t('homeExtended.chiptuneStandby')}
+										</span>
+									</div>
+									<div className={WINDOW_CONTROLS}>
+										<span className={WINDOW_BTN_MIN} />
+										<span className={WINDOW_BTN_MAX} />
 									</div>
 								</div>
-
-								{/* Primary Cyber Transport Hardware Cluster */}
-								<div className="cyber-transport-cluster">
-									<button
-										type="button"
-										className="cyber-deck-key"
-										onClick={handlePrevTrack}
-										title="Previous Audio Track"
-									>
-										<span className="cyber-key-icon" style={{ color: 'var(--accent-cyan)' }}>
-											⏮
-										</span>
-										<span className="cyber-key-label">PREV</span>
-										<span className="cyber-key-sub">RW // TRACK</span>
-									</button>
-
-									<button
-										type="button"
-										className={`cyber-deck-key cyber-deck-key-play ${isPlayingAudio ? 'active' : ''}`}
-										onClick={handleToggleAudio}
-										title={isPlayingAudio ? 'Pause Chiptune Audio' : 'Play Chiptune Audio'}
-									>
-										<span className="cyber-key-icon" style={{ color: isPlayingAudio ? '#ffffff' : 'var(--accent-pink)' }}>
-											{isPlayingAudio ? '⏸' : '▶'}
-										</span>
-										<span className="cyber-key-label" style={{ color: '#ffffff', fontSize: '0.64rem' }}>
-											{isPlayingAudio ? 'PAUSE' : 'PLAY SYNTH'}
-										</span>
-										<span className="cyber-key-sub" style={{ color: isPlayingAudio ? 'var(--accent-yellow)' : 'var(--accent-cyan)' }}>
-											{isPlayingAudio ? '● LIVE AUDIO' : '○ STANDBY'}
-										</span>
-									</button>
-
-									<button
-										type="button"
-										className="cyber-deck-key"
-										onClick={handleNextTrack}
-										title="Next Audio Track"
-									>
-										<span className="cyber-key-icon" style={{ color: 'var(--accent-cyan)' }}>
-											⏭
-										</span>
-										<span className="cyber-key-label">NEXT</span>
-										<span className="cyber-key-sub">FF // TRACK</span>
-									</button>
-								</div>
-
-								{/* Cyber Master Volume Console & 10-Segment LED Meter */}
-								<div className="cyber-vol-console">
-									<div className="cyber-fader-track-row">
-										<button
-											type="button"
-											className="cyber-vol-step-btn"
-											onClick={() => handleStepVolume(-10)}
-											title="Decrease Volume (-10%)"
-										>
-											-
-										</button>
-
-										{/* 10 Interactive LED Bar Segments */}
-										<div
-											className="cyber-vol-led-bar"
-											title={`Volume: ${audioVolume}% (Click segment to set)`}
-										>
-											{Array.from({ length: 10 }).map((_, idx) => {
-												const isLit = audioVolume >= (idx + 1) * 10 - 5
-												const colorClass = idx < 5 ? 'lit-cyan' : idx < 8 ? 'lit-amber' : 'lit-pink'
-												return (
-													<div
-														key={idx}
-														className={`cyber-vol-led-segment ${isLit ? colorClass : ''}`}
-														onClick={() => handleLedSegmentClick(idx)}
-													/>
-												)
-											})}
+								<div
+									className={WINDOW_BODY}
+									style={{
+										display: 'flex',
+										flexDirection: 'column',
+										gap: 8,
+										justifyContent: 'space-between',
+									}}
+								>
+									{/* Cyber Cassette Chassis */}
+									<div className={CYBER_CASSETTE_CHASSIS}>
+										{/* OLED Track HUD Display */}
+										<div className={OLED_SCREEN}>
+											<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+												<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--accent-pink)', fontWeight: 'bold' }}>
+													{t('homeExtended.chiptuneTrackLabel')} 0{audioTrackIndex + 1} / 0{retroAudio.tracks.length}
+												</span>
+												<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: isPlayingAudio ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
+													{isPlayingAudio ? t('homeExtended.chiptunePlaying') : t('homeExtended.chiptuneIdle')}
+												</span>
+											</div>
+											<div className={OLED_TITLE}>
+												{retroAudio.tracks[audioTrackIndex]?.name || "SYNTHWAVE NIGHTS '84"}
+											</div>
+											<div className={OLED_META}>
+												<span>{retroAudio.tracks[audioTrackIndex]?.tempo || 120} BPM // A-MIN</span>
+												<span>CHIPTUNE · 44.1kHz</span>
+											</div>
 										</div>
 
+										{/* Multi-Band Stereo Spectrum Equalizer */}
+										<div className={CYBER_EQ_DECK}>
+											{eqHeights.map((h, i) => (
+												<div
+													key={i}
+													className={CYBER_EQ_COL}
+													style={{ height: `${h}px` }}
+												/>
+											))}
+										</div>
+									</div>
+
+									{/* Primary Cyber Transport Hardware Cluster */}
+									<div className={CYBER_TRANSPORT_CLUSTER}>
 										<button
 											type="button"
-											className="cyber-vol-step-btn"
-											onClick={() => handleStepVolume(10)}
-											title="Increase Volume (+10%)"
+											className={CYBER_DECK_KEY}
+											onClick={handlePrevTrack}
+											title={t('homeExtended.chiptunePrevTrackTitle')}
 										>
-											+
+											<span className={CYBER_KEY_ICON} style={{ color: 'var(--accent-cyan)' }}>
+												⏮
+											</span>
+											<span className={CYBER_KEY_LABEL}>{t('homeExtended.chiptunePrev')}</span>
+											<span className={CYBER_KEY_SUB}>{t('homeExtended.chiptuneRwTrack')}</span>
+										</button>
+
+										<button
+											type="button"
+											className={`${CYBER_DECK_KEY} ${CYBER_DECK_KEY_PLAY} ${isPlayingAudio ? CYBER_DECK_KEY_PLAY_ACTIVE : ''}`}
+											onClick={handleToggleAudio}
+											title={isPlayingAudio ? t('homeExtended.chiptunePauseAudio') : t('homeExtended.chiptunePlayAudio')}
+										>
+											<span className={CYBER_KEY_ICON} style={{ color: isPlayingAudio ? '#ffffff' : 'var(--accent-pink)' }}>
+												{isPlayingAudio ? '⏸' : '▶'}
+											</span>
+											<span className={CYBER_KEY_LABEL} style={{ color: '#ffffff', fontSize: '0.64rem' }}>
+												{isPlayingAudio ? t('homeExtended.chiptunePause') : t('homeExtended.chiptunePlaySynth')}
+											</span>
+											<span className={CYBER_KEY_SUB} style={{ color: isPlayingAudio ? 'var(--accent-yellow)' : 'var(--accent-cyan)' }}>
+												{isPlayingAudio ? t('homeExtended.chiptuneLiveAudio') : `○ ${t('homeExtended.chiptuneStandby')}`}
+											</span>
+										</button>
+
+										<button
+											type="button"
+											className={CYBER_DECK_KEY}
+											onClick={handleNextTrack}
+											title={t('homeExtended.chiptuneNextTrackTitle')}
+										>
+											<span className={CYBER_KEY_ICON} style={{ color: 'var(--accent-cyan)' }}>
+												⏭
+											</span>
+											<span className={CYBER_KEY_LABEL}>{t('homeExtended.chiptuneNext')}</span>
+											<span className={CYBER_KEY_SUB}>{t('homeExtended.chiptuneFfTrack')}</span>
 										</button>
 									</div>
-								</div>
-							</div>
-						</section>
-					</main>
 
-					{/* Footer */}
-					<footer className="retro-footer">
-						<p>© 1942-2026 RETROLUDO '42 // 42KL // ALL RIGHTS RESERVED // WEB AUDIO & CANV-ARCADE</p>
-					</footer>
+									{/* Cyber Master Volume Console & 10-Segment LED Meter */}
+									<div className={CYBER_VOL_CONSOLE}>
+										<div className={CYBER_FADER_TRACK_ROW}>
+											<button
+												type="button"
+												className={CYBER_VOL_STEP_BTN}
+												onClick={() => handleStepVolume(-10)}
+												title={t('homeExtended.chiptuneDecreaseVolume')}
+											>
+												-
+											</button>
+
+											{/* 10 Interactive LED Bar Segments */}
+											<div
+												className={CYBER_VOL_LED_BAR}
+												title={t('homeExtended.chiptuneVolume', { volume: audioVolume })}
+											>
+												{Array.from({ length: 10 }).map((_, idx) => {
+													const isLit = audioVolume >= (idx + 1) * 10 - 5
+													const colorClass = idx < 5 ? LED_LIT_CYAN : idx < 8 ? LED_LIT_AMBER : LED_LIT_PINK
+													return (
+														<div
+															key={idx}
+															className={`${CYBER_VOL_LED_SEGMENT} ${isLit ? colorClass : ''}`}
+															onClick={() => handleLedSegmentClick(idx)}
+														/>
+													)
+												})}
+											</div>
+
+											<button
+												type="button"
+												className={CYBER_VOL_STEP_BTN}
+												onClick={() => handleStepVolume(10)}
+												title={t('homeExtended.chiptuneIncreaseVolume')}
+											>
+												+
+											</button>
+										</div>
+									</div>
+								</div>
+							</section>
+						</main>
+
+						{/* Footer */}
+						<footer className={RETRO_FOOTER}>
+							<p>© 1942-2026 RETROLUDO '42 // 42KL // ALL RIGHTS RESERVED // WEB AUDIO & CANV-ARCADE</p>
+							<div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', marginTop: 8, fontSize: '0.74rem', fontFamily: 'var(--font-mono)' }}>
+								<button
+									type="button"
+									onClick={() => {
+										retroAudio.playUiBeep(640, 0.05)
+										setLegalModalDoc('privacy')
+									}}
+									style={{ color: 'var(--accent-cyan)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+								>
+									{t('legal.privacyPolicy', 'PRIVACY POLICY')}
+								</button>
+								<span style={{ color: 'var(--text-muted)' }}>//</span>
+								<button
+									type="button"
+									onClick={() => {
+										retroAudio.playUiBeep(640, 0.05)
+										setLegalModalDoc('terms')
+									}}
+									style={{ color: 'var(--accent-cyan)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+								>
+									{t('legal.termsOfService', 'TERMS OF SERVICE')}
+								</button>
+							</div>
+						</footer>
+					</div>
 				</div>
 			</div>
+
+			<LegalModal
+				isOpen={legalModalDoc !== null}
+				initialDoc={legalModalDoc ?? 'privacy'}
+				onClose={() => setLegalModalDoc(null)}
+			/>
 		</>
 	)
 }

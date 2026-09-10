@@ -3,7 +3,35 @@ import { useTranslation } from 'react-i18next'
 import { UserAvatar } from './UserAvatar'
 import { useApp, type LastResult } from '../store'
 import { retroAudio } from '../utils/audio'
+import { localizedBotName } from '../utils/botName'
 import '../styles/retrowave.css'
+import {
+	RETRO_BTN,
+	TICKET_CONTAINER,
+	RESULTS_INVOICE_CONTAINER,
+	INVOICE_SLOT_BOTTOM,
+	SLOT_HOLE_BOTTOM,
+	INVOICE_SLOT_TOP,
+	VENDING_HEADER_BAR,
+	SLOT_HOLE_TOP,
+	TICKET_PAPER_WRAPPER,
+	RESULTS_INVOICE,
+	TICKET_NOTCH_LEFT,
+	TICKET_NOTCH_RIGHT,
+	INVOICE_TITLE,
+	INVOICE_AMOUNT,
+	INVOICE_VALUE,
+	PAYERS_LIST,
+	PAYERS_LI,
+	PAYERS_LI_P,
+	PAYER_IMAGE_CONTAINER,
+	PAY_TAG_BASE,
+	PAY_TAG_WIN,
+	PAY_TAG_RUNNER,
+	PAY_TAG_THIRD,
+	PAY_TAG_FOURTH,
+	PAY_NOW_BTN,
+} from '../styles/tw'
 
 type ResultsModalProps = {
   result: NonNullable<LastResult>
@@ -15,17 +43,17 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
   const { t } = useTranslation()
   const { user } = useApp()
 
-  // Trigger vending machine mechanical stepping feed sounds during 1.85s print animation
+  // Trigger vending machine mechanical stepping feed sounds during 0.72s print animation
   useEffect(() => {
-    const steps = [0, 220, 480, 750, 1050, 1350, 1600]
+    const steps = [0, 80, 180, 290, 410, 540]
     const stepTimers = steps.map((ms, i) =>
       setTimeout(() => {
-        retroAudio.playUiBeep(320 + (i % 3) * 50, 0.035, 'sawtooth')
+        retroAudio.playUiBeep(340 + (i % 3) * 60, 0.025, 'sawtooth')
       }, ms)
     )
     const finalTimer = setTimeout(() => {
       retroAudio.playUiBeep(880, 0.08, 'sine')
-    }, 1850)
+    }, 720) 
     return () => {
       stepTimers.forEach(clearTimeout)
       clearTimeout(finalTimer)
@@ -34,8 +62,8 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
 
   const ranked = [...result.players].sort((a, b) => b.piecesInGoal - a.piecesInGoal)
 
-  // A match is only completed with a real champion if it wasn't abandoned and a player reached the win condition
-  const hasRealWinner = !result.abandoned && result.players.some((p) => p.piecesInGoal >= 4)
+  // A match is only completed with a real champion if it wasn't abandoned and has a winner
+  const hasRealWinner = !result.abandoned && (Boolean(result.winner) || result.players.some((p) => p.piecesInGoal >= 4))
 
   // Find current player's color or fallback to first human/player
   const myPlayer =
@@ -56,7 +84,7 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
   const winnerName = winnerPlayer
     ? winnerPlayer.color === myColor
       ? t('common.you')
-      : winnerPlayer.username
+      : localizedBotName(t, winnerPlayer.username)
     : t(winnerColorName)
 
   const modeLabels: Record<string, string> = {
@@ -82,20 +110,19 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
   const renderRankBadge = (rank: number, isWinner: boolean) => {
     if (!hasRealWinner) return null
     if (isWinner) {
-      return <span className="pay-tag win">{t('results.firstPlace')}</span>
+      return <span className={`${PAY_TAG_BASE} ${PAY_TAG_WIN}`}>{t('results.firstPlace')}</span>
     }
     if (rank === 2) {
-      return <span className="pay-tag runner">{t('results.secondPlace')}</span>
+      return <span className={`${PAY_TAG_BASE} ${PAY_TAG_RUNNER}`}>{t('results.secondPlace')}</span>
     }
     if (rank === 3) {
-      return <span className="pay-tag third">{t('results.thirdPlace')}</span>
+      return <span className={`${PAY_TAG_BASE} ${PAY_TAG_THIRD}`}>{t('results.thirdPlace')}</span>
     }
-    return <span className="pay-tag fourth">{t('results.fourthPlace')}</span>
+    return <span className={`${PAY_TAG_BASE} ${PAY_TAG_FOURTH}`}>{t('results.fourthPlace')}</span>
   }
 
   return (
     <div
-      className="results-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -111,7 +138,6 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
       }}
     >
       <div
-        className="results-modal-content"
         style={{
           position: 'relative',
           width: '100%',
@@ -122,30 +148,30 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
         }}
       >
         {/* Ticket Dispenser Container */}
-        <section className="container ticket-container" style={{ margin: 0, width: '100%' }}>
-          <section className="invoice-container">
+        <section className={TICKET_CONTAINER} style={{ margin: 0, width: '100%' }}>
+          <section className={RESULTS_INVOICE_CONTAINER}>
             {/* Bottom part of slot chassis (BEHIND ticket: z-index 2) */}
-            <div className="invoice-slot-bottom">
-              <div className="slot-hole-bottom"></div>
+            <div className={INVOICE_SLOT_BOTTOM}>
+              <div className={SLOT_HOLE_BOTTOM}></div>
             </div>
 
             {/* Mask Container - Dispenses directly out of slot (z-index 10) */}
-            <div className="ticket-paper-wrapper">
+            <div className={TICKET_PAPER_WRAPPER}>
               {/* Animated Dispensed Invoice Ticket */}
-              <div className="invoice">
-                <span className="ticket-notch-left"></span>
-                <span className="ticket-notch-right"></span>
-                <h2 className="title">{t('results.matchInvoiceTitle')}</h2>
+              <div className={RESULTS_INVOICE}>
+                <span className={TICKET_NOTCH_LEFT}></span>
+                <span className={TICKET_NOTCH_RIGHT}></span>
+                <h2 className={INVOICE_TITLE}>{t('results.matchInvoiceTitle')}</h2>
 
-                <p className="amount">
-                  {t('results.outcomeLabel')} <span className="value">{outcomeTitle}</span>
+                <p className={INVOICE_AMOUNT}>
+                  {t('results.outcomeLabel')} <span className={INVOICE_VALUE}>{outcomeTitle}</span>
                 </p>
-                <p className="amount">
-                  {t('results.modeLabel')} <span className="value">{modeLabel}</span>
+                <p className={INVOICE_AMOUNT}>
+                  {t('results.modeLabel')} <span className={INVOICE_VALUE}>{modeLabel}</span>
                 </p>
                 {hasRealWinner && (
-                  <p className="amount">
-                    {t('results.championLabel')} <span className="value">{winnerName.toUpperCase()}</span>
+                  <p className={INVOICE_AMOUNT}>
+                    {t('results.championLabel')} <span className={INVOICE_VALUE}>{winnerName.toUpperCase()}</span>
                   </p>
                 )}
 
@@ -159,17 +185,24 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
                 />
 
                 {/* Player Roster Breakdown List */}
-                <ul className="payers-list">
+                <ul className={PAYERS_LIST}>
                   {ranked.map((p, index) => {
                     const isWinner = index === 0 && hasRealWinner
                     const isMe = p.color === myColor
-                    const pName = isMe ? t('common.you') : p.username
+                    const pName = isMe ? t('common.you') : localizedBotName(t, p.username)
 
                     return (
-                      <li key={p.color}>
-                        <div className="payer-image-container">
+                      <li key={p.color} className={PAYERS_LI}>
+                        <div className={PAYER_IMAGE_CONTAINER}>
                           <UserAvatar
                             username={p.username}
+                            // Opponents here come from client-side game state
+                            // (LastResult.players), which never carries a photo
+                            // flag — `undefined` reads as "try the network" and
+                            // fires a real 404 for every photo-less opponent.
+                            // Only `user` (the logged-in viewer) has real data,
+                            // via `?? false` for the same reason as below.
+                            hasAvatarPhoto={p.isBot || !isMe ? false : (user?.hasAvatarPhoto ?? false)}
                             size={40}
                             fallbackStyle={{
                               width: 40,
@@ -184,7 +217,7 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
                             }}
                           />
                         </div>
-                        <p>
+                        <p className={PAYERS_LI_P}>
                           <span>
                             {pName} ({p.piecesInGoal}/4)
                           </span>
@@ -198,7 +231,7 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: '1.2em' }}>
                   <button
-                    className="pay-now-btn"
+                    className={PAY_NOW_BTN}
                     onClick={() => {
                       retroAudio.playUiBeep(600, 0.05)
                       onReturnToLobby()
@@ -209,7 +242,7 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
 
                   {onClose && (
                     <button
-                      className="retro-btn"
+                      className={RETRO_BTN}
                       onClick={() => {
                         retroAudio.playUiBeep(520, 0.05)
                         onClose()
@@ -232,9 +265,9 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
             </div>
 
             {/* Top part of slot chassis (IN FRONT OF ticket: z-index 20) */}
-            <div className="invoice-slot-top">
-              <div className="vending-header-bar"></div>
-              <div className="slot-hole-top"></div>
+            <div className={INVOICE_SLOT_TOP}>
+              <div className={VENDING_HEADER_BAR}></div>
+              <div className={SLOT_HOLE_TOP}></div>
             </div>
           </section>
         </section>

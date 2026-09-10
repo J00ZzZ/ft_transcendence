@@ -1,37 +1,12 @@
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { config as loadEnv } from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-function secret(name: string): string | undefined {
-  const dir = process.env.SECRETS_DIR ?? '/secrets';
-  for (const base of [dir, join(process.cwd(), '..', 'secrets')]) {
-    try {
-      const value = readFileSync(join(base, `${name.toLowerCase()}.txt`), 'utf8').trim();
-      if (value) return value;
-    } catch {
-      // ignore
-    }
-  }
-  return process.env[name];
-}
+loadEnv({ path: join(__dirname, '..', '..', '.env') });
 
-function getDatabaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const creds = secret('DB_CREDENTIALS');
-  const pwd = secret('DB_PASSWORD');
-  if (creds && pwd) {
-    const parts = creds.split(':');
-    const user = parts[0] || 'db_bossman';
-    const db = parts[1] || 'transcendence';
-    const host = parts[2] || (process.env.SECRETS_DIR ? 'db' : 'localhost');
-    return `postgresql://${user}:${pwd}@${host}:5432/${db}`;
-  }
-  return secret('DATABASE_URL') || '';
-}
-
-const adapter = new PrismaPg({ connectionString: getDatabaseUrl() });
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL ?? '' });
 const prisma = new PrismaClient({ adapter });
 
 const HOUR = 3600_000;
@@ -56,31 +31,41 @@ async function main() {
   if (harleyhxng) {
     console.log(`\n👑 Seeding Account 1: harleyhxng (Top Apex Rank 1450 ELO)`);
 
+    const harleyhxngStats = {
+      rating: 1450,
+      highestRating: 1480,
+      wins: 12,
+      losses: 3,
+      humanWins: 9,
+      botWins: 3,
+      winStreak: 5,
+      bestWinStreak: 7,
+      disconnectCount: 0,
+      reconnectCount: 0,
+    };
+    const harleyhxngAchievement = {
+      achFirstBlood: true,
+      achOnFire: true,
+      achDiceMaster: true,
+      achTactician: true,
+      achMaster: true,
+      achGrandBotMaster: true,
+      achWorldChampion: true,
+      achLoveTheMachine: true,
+      achUnstoppable: true,
+      achSpeedDemon: true,
+    };
     await prisma.user.update({
       where: { id: harleyhxng.id },
       data: {
         displayName: 'Harley HX',
-        rating: 1450,
-        highestRating: 1480,
-        wins: 12,
-        losses: 3,
-        humanWins: 9,
-        botWins: 3,
-        winStreak: 5,
-        bestWinStreak: 7,
-        status: 'online',
-        disconnectCount: 0,
-        reconnectCount: 0,
-        achFirstBlood: true,
-        achOnFire: true,
-        achDiceMaster: true,
-        achTactician: true,
-        achMaster: true,
-        achGrandBotMaster: true,
-        achWorldChampion: true,
-        achLoveTheMachine: true,
-        achUnstoppable: true,
-        achSpeedDemon: true,
+        ...harleyhxngStats,
+        achievement: {
+          upsert: {
+            create: { id: randomUUID(), ...harleyhxngAchievement },
+            update: harleyhxngAchievement,
+          },
+        },
       },
     });
 
@@ -153,26 +138,36 @@ async function main() {
   if (harleynghxedu) {
     console.log(`\n🛡️ Seeding Account 2: harleynghxedu (Tactical Ace 1190 ELO)`);
 
+    const harleynghxeduStats = {
+      rating: 1190,
+      highestRating: 1240,
+      wins: 4,
+      losses: 3,
+      humanWins: 3,
+      botWins: 1,
+      winStreak: 1,
+      bestWinStreak: 3,
+      disconnectCount: 1,
+      reconnectCount: 1,
+    };
+    const harleynghxeduAchievement = {
+      achFirstBlood: true,
+      achTactician: true,
+      achSpeedDemon: true,
+      achUnstoppable: false,
+      achMaster: false,
+    };
     await prisma.user.update({
       where: { id: harleynghxedu.id },
       data: {
         displayName: 'Harley NGHX',
-        rating: 1190,
-        highestRating: 1240,
-        wins: 4,
-        losses: 3,
-        humanWins: 3,
-        botWins: 1,
-        winStreak: 1,
-        bestWinStreak: 3,
-        status: 'online',
-        disconnectCount: 1,
-        reconnectCount: 1,
-        achFirstBlood: true,
-        achTactician: true,
-        achSpeedDemon: true,
-        achUnstoppable: false,
-        achMaster: false,
+        ...harleynghxeduStats,
+        achievement: {
+          upsert: {
+            create: { id: randomUUID(), ...harleynghxeduAchievement },
+            update: harleynghxeduAchievement,
+          },
+        },
       },
     });
 
@@ -234,7 +229,10 @@ async function main() {
   // Update Global Leaderboard Snapshot
   // ───────────────────────────────────────────────────────────────────────────
   await prisma.leaderboardSnapshot.deleteMany({ where: { mode: 'global' } });
-  const allPilots = await prisma.user.findMany({ orderBy: { rating: 'desc' }, take: 10 });
+  const allPilots = await prisma.user.findMany({
+    orderBy: { rating: 'desc' },
+    take: 10,
+  });
   await prisma.leaderboardSnapshot.createMany({
     data: allPilots.map((p, idx) => ({
       id: randomUUID(),

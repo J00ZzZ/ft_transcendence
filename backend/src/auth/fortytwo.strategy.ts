@@ -25,7 +25,7 @@ export class FortyTwoStrategy extends PassportStrategy(Strategy as any, '42') {
         email,
         usernameSeed: profile.username ?? `ft_${profile.id}`, // 42 intra login
       },
-      this.authService.resolveOAuthLink(req?.query?.state, '42'),
+      this.authService.resolveOAuthLinkForRequest(req, '42'),
     );
   }
 }

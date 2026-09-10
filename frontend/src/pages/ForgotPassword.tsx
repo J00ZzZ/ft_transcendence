@@ -5,6 +5,7 @@ import { RetroAuthLayout } from '../components/RetroAuthLayout'
 import { navigate } from '../router'
 import { useApp } from '../store'
 import '../styles/retrowave.css'
+import { RETRO_AUTH_BTN, RETRO_AUTH_ERROR, RETRO_AUTH_INPUT, RETRO_AUTH_LABEL, RETRO_AUTH_LINK, RETRO_AUTH_MUTED, RETRO_AUTH_SUBTITLE, RETRO_AUTH_TITLE } from '../styles/tw'
 
 /**
  * Step one of password reset: collect an email and ask the backend to send a
@@ -34,16 +35,16 @@ export function ForgotPassword() {
     return (
       <RetroAuthLayout tag={t('auth.checkInboxTag')}>
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="retro-auth-title" style={{ fontSize: 24 }}>
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 24 }}>
             {t('auth.checkInboxTitle')}
           </div>
-          <div className="retro-auth-muted" style={{ lineHeight: 1.5, fontSize: '14px' }}>
+          <div className={RETRO_AUTH_MUTED} style={{ lineHeight: 1.5, fontSize: '14px' }}>
             {t('auth.resetSentPrefix')} <b style={{ color: '#00f0ff' }}>{email}</b>{' '}
             {t('auth.resetSentSuffix')}
           </div>
-          <div className="retro-auth-muted" style={{ fontSize: '13px' }}>
+          <div className={RETRO_AUTH_MUTED} style={{ fontSize: '13px' }}>
             {t('auth.rememberedIt')}{' '}
-            <a onClick={() => navigate('/login')} className="retro-auth-link">
+            <a onClick={() => navigate('/login')} className={RETRO_AUTH_LINK}>
               {t('auth.backToSignIn')}
             </a>
           </div>
@@ -59,15 +60,15 @@ export function ForgotPassword() {
         style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
       >
         <div>
-          <div className="retro-auth-title" style={{ fontSize: 24 }}>
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 24 }}>
             {t('auth.resetYourPasswordTitle')}
           </div>
-          <div className="retro-auth-subtitle">
+          <div className={RETRO_AUTH_SUBTITLE}>
             {t('auth.forgotDesc')}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div className="retro-auth-label">{t('auth.emailLabel')}</div>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.emailLabel')}</div>
           <input
             type="email"
             value={email}
@@ -76,18 +77,18 @@ export function ForgotPassword() {
             autoComplete="email"
             required
             autoFocus
-            className="retro-auth-input"
+            className={RETRO_AUTH_INPUT}
           />
         </div>
         {error && (
-          <div className="retro-auth-error">{error}</div>
+          <div className={RETRO_AUTH_ERROR}>{error}</div>
         )}
-        <button type="submit" disabled={submitting} className="retro-auth-btn">
+        <button type="submit" disabled={submitting} className={RETRO_AUTH_BTN}>
           {submitting ? t('auth.sendingBtn') : t('auth.sendResetLink')}
         </button>
-        <div className="retro-auth-muted" style={{ textAlign: 'center' }}>
+        <div className={RETRO_AUTH_MUTED} style={{ textAlign: 'center' }}>
           {t('auth.rememberedIt')}{' '}
-          <a onClick={() => navigate('/login')} className="retro-auth-link">
+          <a onClick={() => navigate('/login')} className={RETRO_AUTH_LINK}>
             {t('auth.backToSignIn')}
           </a>
         </div>

@@ -29,7 +29,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         email,
         usernameSeed: email?.split('@')[0] ?? `google_${profile.id}`,
       },
-      this.authService.resolveOAuthLink(req?.query?.state, 'google'),
+      this.authService.resolveOAuthLinkForRequest(req, 'google'),
     );
   }
 }

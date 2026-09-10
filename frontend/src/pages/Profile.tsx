@@ -10,12 +10,29 @@ import { retroAudio } from '../utils/audio'
 import { getRankTier } from '../utils/ranks'
 import { RankBadge } from '../components/RankBadge'
 import '../styles/retrowave.css'
+import {
+	CRT_SCREEN,
+	GRID_BACKGROUND,
+	SYNTHWAVE_SUN,
+	PERSPECTIVE_GRID,
+	GRID_HORIZON,
+	HERO_SECTION,
+	HERO_TITLE,
+	RETRO_WINDOW,
+	WINDOW_HEADER,
+	WINDOW_CONTROLS,
+	WINDOW_BTN_MIN,
+	WINDOW_BTN_MAX,
+	WINDOW_BODY,
+	RETRO_BTN,
+} from '../styles/tw'
 
 interface UserProfile {
   id: string
   username: string
   displayName?: string
   avatarStyle: string | null
+  hasAvatarPhoto: boolean
   rating: number
   highestRating: number
   wins: number
@@ -29,6 +46,7 @@ interface UserProfile {
 type Participant = {
   username: string
   avatarStyle: any
+  hasAvatarPhoto?: boolean
   color: number
   rank: number | null
   piecesInGoal: number
@@ -38,10 +56,14 @@ type MatchHistory = {
   games: Array<{
     gameId: string
     status: string
+    gameType: 'PVP' | 'PVE'
     color: number
     rank: number | null
     piecesCaptured: number
     piecesInGoal: number
+    // Rating awarded for this game, from the backend. Never negative — a loss
+    // still earns points for pieces brought home.
+    ratingDelta: number
     startedAt: string
     endedAt: string | null
     participants: Participant[]
@@ -56,6 +78,7 @@ type Friend = {
   username: string
   displayName?: string
   avatarStyle: any
+  hasAvatarPhoto?: boolean
   rating: number
   friendsSince: string
   status: PresenceStatus
@@ -68,9 +91,7 @@ const STATUS_KEYS: Record<PresenceStatus, string> = {
 }
 
 /**
- * The 13 visible achievements. achSteadyDefender + achMercilessAttacker exist
- * backend-side (clash-mode only) but are hidden until the clash system is
- * wired into the UI — see achievement-revamp.md §1/§4.4.
+ * The 13 visible achievements.
  *
  * Requirements match the revamp thresholds (achievement-revamp.md v3):
  *   achFirstBlood     — 1 win (any PVP/PVE)
@@ -238,7 +259,8 @@ export function Profile() {
         if (!cancelled) setGamesData(null)
       })
 
-    fetch('/api/achievements', { credentials: 'include' })
+    const achUrl = username ? `/api/achievements?username=${encodeURIComponent(username)}` : '/api/achievements'
+    fetch(achUrl, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!cancelled && data) setAchievements(data)
@@ -305,47 +327,34 @@ export function Profile() {
   return (
     <>
       {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className="grid-background">
-        <div className="synthwave-sun" />
-        <div className="grid-horizon" />
-        <div className="perspective-grid" />
-        <div className="win95-starfield" />
-        <div className="terminal-vector-core" />
+      <div className={GRID_BACKGROUND}>
+        <div className={SYNTHWAVE_SUN} />
+        <div className={GRID_HORIZON} />
+        <div className={PERSPECTIVE_GRID} />
       </div>
 
       {/* CRT Monitor Overlay FX Container */}
       <div
-        className={`crt-screen ${crtEnabled ? 'crt-curved' : ''}`}
+        className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`}
         id="crtScreen"
-        style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       >
-        <div
-          className="crt-scanlines"
-          id="crtOverlay"
-          style={{ display: crtEnabled ? 'block' : 'none' }}
-        />
-        <div className="crt-flicker" />
 
-        {/* Global Navigation Dock */}
-        <RetroNavbar
-          activeRoute="/profile"
-          crtEnabled={crtEnabled}
-          toggleCrt={toggleCrt}
-        />
+        {/* Dynamic Full-Width Seated Sidebar & Content Layout Container */}
+        <div className="w-full min-h-screen px-6 py-8 flex flex-row items-start justify-center gap-7 relative z-10 box-border">
+          {/* Left-Seated Navigation Dock */}
+          <aside className="shrink-0 w-[88px] xl:w-[270px] sticky top-8" style={{ margin: 0, padding: 0 }}>
+            <RetroNavbar
+              activeRoute="/profile"
+              crtEnabled={crtEnabled}
+              toggleCrt={toggleCrt}
+            />
+          </aside>
 
-        {/* Full-Width App Wrapper Matching Leaderboard */}
-        <div
-          className="app-wrapper"
-          style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Top Hero Banner */}
-          <header className="hero-section" style={{ padding: '16px 0 18px', marginBottom: 12, flexShrink: 0 }}>
-            <h1 className="hero-title" style={{ fontSize: '1.45rem', margin: 0, letterSpacing: '1.5px' }}>
+          {/* Main Content Flow */}
+          <div className="flex-1 w-full min-w-0 sticky top-8" style={{ margin: 0, padding: 0 }}>
+            {/* Top Hero Banner */}
+            <header className={HERO_SECTION} style={{ marginTop: 0, padding: '16px 0 18px', marginBottom: 12, flexShrink: 0 }}>
+            <h1 className={HERO_TITLE} style={{ fontSize: '1.45rem', margin: 0, letterSpacing: '1.5px' }}>
               {t('profile.heroTitle')}
             </h1>
           </header>
@@ -361,7 +370,7 @@ export function Profile() {
           ) : (
             /* Full-Width Unified Retro Window Container */
             <section
-              className="retro-window"
+              className={RETRO_WINDOW}
               style={{
                 width: '100%',
                 flex: 1,
@@ -373,7 +382,7 @@ export function Profile() {
             >
               {/* Window Header */}
               <div
-                className="window-header"
+                className={WINDOW_HEADER}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -386,15 +395,15 @@ export function Profile() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
                   <span>{t('profile.windowHeader', { username: (profile.displayName || profile.username).toUpperCase(), id: profile.id.slice(0, 8).toUpperCase() })}</span>
                 </div>
-                <div className="window-controls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="window-btn min" />
-                  <span className="window-btn max" />
+                <div className={WINDOW_CONTROLS} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className={WINDOW_BTN_MIN} />
+                  <span className={WINDOW_BTN_MAX} />
                 </div>
               </div>
 
               {/* Fixed Viewport Window Body (No Page Scroll) */}
               <div
-                className="window-body"
+                className={WINDOW_BODY}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -454,6 +463,7 @@ export function Profile() {
                       >
                         <UserAvatar
                           username={profile.username}
+                          hasAvatarPhoto={profile.hasAvatarPhoto}
                           avatarStyle={profile.avatarStyle}
                           size={95}
                           fallbackStyle={{
@@ -572,7 +582,7 @@ export function Profile() {
                         {isOwnProfile ? (
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <button
-                              className="retro-btn"
+                              className={RETRO_BTN}
                               onClick={() => fileInputRef.current?.click()}
                               style={{
                                 padding: '3px 9px',
@@ -586,7 +596,7 @@ export function Profile() {
                               {t('profile.editAvatar')}
                             </button>
                             <button
-                              className="retro-btn"
+                              className={RETRO_BTN}
                               onClick={handleRemoveAvatar}
                               style={{
                                 padding: '3px 8px',
@@ -600,7 +610,7 @@ export function Profile() {
                               {t('profile.resetAvatar')}
                             </button>
                             <button
-                              className="retro-btn"
+                              className={RETRO_BTN}
                               onClick={() => setShowEdit(true)}
                               style={{
                                 padding: '3px 9px',
@@ -611,7 +621,7 @@ export function Profile() {
                                 borderRadius: 4,
                               }}
                             >
-                              EDIT PROFILE
+                              {t('profileExtra.editProfileBtn')}
                             </button>
                             {uploadError && (
                               <span style={{ color: '#ff0055', fontSize: '0.66rem', fontFamily: 'var(--font-mono)' }}>
@@ -621,7 +631,7 @@ export function Profile() {
                           </div>
                         ) : (
                           <button
-                            className="retro-btn"
+                            className={RETRO_BTN}
                             onClick={() => {
                               retroAudio.playUiBeep(640, 0.04)
                               navigate('/profile')
@@ -865,7 +875,7 @@ export function Profile() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <button
-                          className="retro-btn"
+                          className={RETRO_BTN}
                           onClick={() => {
                             retroAudio.playUiBeep(520, 0.04)
                             setMainTab('history')
@@ -885,7 +895,7 @@ export function Profile() {
                           {t('profile.flightLogsTab', { count: gamesData?.total ?? 0 })}
                         </button>
                         <button
-                          className="retro-btn"
+                          className={RETRO_BTN}
                           onClick={() => {
                             retroAudio.playUiBeep(520, 0.04)
                             setMainTab('achievements')
@@ -989,7 +999,7 @@ export function Profile() {
                                           lineHeight: 1,
                                         }}
                                       >
-                                        {isWin ? '+10 ELO' : '-5 ELO'}
+                                        {`${g.ratingDelta > 0 ? '+' : ''}${g.ratingDelta} ELO`}
                                       </div>
                                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
                                         {t('profile.goalProgressText', { count: g.piecesInGoal })}
@@ -1182,7 +1192,7 @@ export function Profile() {
                           {t('profile.friendsBoxTitle', { count: friendsData?.length ?? 0 })}
                         </span>
                         <button
-                          className="retro-btn"
+                          className={RETRO_BTN}
                           onClick={() => navigate('/friends')}
                           style={{
                             padding: '3px 9px',
@@ -1239,6 +1249,7 @@ export function Profile() {
                                     >
                                       <UserAvatar
                                         username={f.username}
+                                        hasAvatarPhoto={f.hasAvatarPhoto}
                                         avatarStyle={f.avatarStyle}
                                         size={38}
                                         fallbackStyle={{
@@ -1287,7 +1298,7 @@ export function Profile() {
                                       <RankBadge tier={fTier} fontSize="9.5px" padding="2px 7px" />
                                     </div>
                                     <div style={{ fontSize: '0.68rem', color: fStatus.color, fontFamily: 'var(--font-display)', fontWeight: 'bold', marginTop: 2 }}>
-                                      ● {t(STATUS_KEYS[f.status] ?? STATUS_KEYS.offline).toUpperCase()} // {t('profile.alliedPilotTag')}{f.username.toLowerCase().includes('harleynghx') || f.username.toLowerCase().includes('harleyhx') ? ' // PACE 24' : ''}
+                                      ● {t(STATUS_KEYS[f.status] ?? STATUS_KEYS.offline).toUpperCase()} // {t('profile.alliedPilotTag')}
                                     </div>
                                   </div>
                                 </div>
@@ -1313,6 +1324,7 @@ export function Profile() {
           )}
         </div>
       </div>
+    </div>
 
       {showEdit && (
         <ProfileEditModal

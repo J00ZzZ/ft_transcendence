@@ -121,6 +121,22 @@ export class LudoBot {
    * Returns true if the game is still active after this turn.
    */
   async takeTurn(): Promise<boolean> {
+    try {
+      return await this.takeTurnUnsafe();
+    } catch (err) {
+      // rollDice/movePiece throw when the game state moved on from under us
+      // (resigned, timed out, or ended by the other player) during the gaps
+      // between our own state checks above — most commonly the 1.2s delay
+      // before movePiece. That's a normal race, not a bug: the caller
+      // (triggerBotTurn in socket/server.ts) doesn't await/catch this
+      // promise, so letting it throw here would be an unhandled rejection
+      // that kills the whole engine process, not just this one game.
+      console.error(`[bot] takeTurn aborted for game ${this.gameId} (${this.color}):`, err instanceof Error ? err.message : err);
+      return false;
+    }
+  }
+
+  private async takeTurnUnsafe(): Promise<boolean> {
     // Strict turn validation — mirrors socket-handlers.ts early validation for humans
     const state = await this.store.loadGameState(this.gameId);
     if (!state || state.status !== 'active') return false;
@@ -141,6 +157,11 @@ export class LudoBot {
 
       // Delay piece movement so frontend dice roll animation finishes first and displays the number
       await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      // Re-validate once more: the game can end or the turn can move on
+      // during the delay above (e.g. the other player resigns/times out).
+      const beforeMove = await this.store.loadGameState(this.gameId);
+      if (!beforeMove || beforeMove.status !== 'active' || beforeMove.currentTurn !== this.color) return false;
 
       // Execute move — engine emits piece_moved and game_ended events via handleEngineEvent
       const { state: finalState } = await this.engine.movePiece(this.gameId, bestMove.pieceId);

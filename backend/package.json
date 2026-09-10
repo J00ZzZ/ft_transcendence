@@ -11,7 +11,7 @@
 		"db:migrate:snapshot": "bash scripts/migrate-snapshot.sh",
 		"db:fresh": "prisma db execute --file ./prisma/drop-all.sql",
 		"db:truncate": "prisma db execute --file ./prisma/truncate-all.sql",
-		"db:seed": "prisma db seed",
+		"db:seed": "prisma generate && prisma db seed",
 		"db:reset": "npm run db:truncate && npm run db:seed"
 	},
 	"dependencies": {

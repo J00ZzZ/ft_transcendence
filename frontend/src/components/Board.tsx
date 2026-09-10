@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { COL, type ColorKey } from '../theme'
 
 const CELL_BG = '#050515'
@@ -158,8 +159,9 @@ function Yard({
   legalPieceIds: Set<string>
   onPieceClick?: (pieceId: string) => void
 }) {
+  const { t } = useTranslation()
   const col = COL[ck]
-  const label = ck === 'yellow' ? 'YELLOW-BAY' : `${ck.toUpperCase()}-BAY`
+  const label = t(`board.${ck}Bay`)
   return (
     <div
       className="retro-yard-box"
@@ -289,9 +291,9 @@ export function Board({ pieces = [], players = [], legalMoves, onPieceClick, ani
   const legalPieceIds = new Set((legalMoves ?? []).map((m) => m.pieceId))
   const activeColors = new Set(players.filter((p) => p.status === 'active' || p.status === 'disconnected').map((p) => p.color))
   const basePieces = (ck: ColorKey) =>
-    activeColors.has(ck) ? pieces.filter((p) => p.color === ck && p.isInBase) : []
+    activeColors.has(ck) ? pieces.filter((p) => p.color === ck && p.isInBase && p.id !== animating?.pieceId) : []
   const goalCount = (ck: ColorKey) =>
-    pieces.filter((p) => p.color === ck && p.isInGoal).length
+    pieces.filter((p) => p.color === ck && p.isInGoal && p.id !== animating?.pieceId).length
 
   const cells: ReactNode[] = []
   for (let r = 0; r < 15; r++) {

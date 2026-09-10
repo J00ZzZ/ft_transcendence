@@ -8,6 +8,7 @@ import {
   handlePlayerReconnect,
   handlePlayerReady,
   handlePlayerExit,
+  handlePlayerResign,
 } from './player-handler';
 import { LobbyManager } from './lobby';
 
@@ -281,6 +282,10 @@ export class LudoEngine {
 
   async handlePlayerExit(gameId: string, color: PlayerColor): Promise<void> {
     return this.withGameLock(gameId, () => handlePlayerExit(this.store, (e) => this.emit(e), gameId, color));
+  }
+
+  async handlePlayerResign(gameId: string, color: PlayerColor): Promise<void> {
+    return this.withGameLock(gameId, () => handlePlayerResign(this.store, (e) => this.emit(e), gameId, color));
   }
 
   async handlePlayerSelectColor(gameId: string, userId: string, color: PlayerColor): Promise<void> {

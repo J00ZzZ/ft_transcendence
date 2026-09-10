@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 // Inside compose the backend/engine resolve as `backend`/`ludo-engine`; running
 // `npm run dev` on the host they're on their published ports instead. Both
@@ -10,7 +11,7 @@ const inContainer = process.env.VITE_IN_CONTAINER === 'true'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   // publish.sh points these outside the bind-mounted /app (see its comments)
   // to dodge a Docker Desktop for Mac VirtioFS bug: reading a bind-mounted
   // file via a zero-copy syscall (used by both Node's fs.copyFileSync and

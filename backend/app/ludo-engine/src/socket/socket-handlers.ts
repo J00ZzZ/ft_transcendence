@@ -36,18 +36,20 @@ export class SocketHandlers {
     const effectiveGameId = socket.data.gameId || gameId;
     const effectiveUserId = socket.data.userId || userId;
     const effectiveUsername = displayName || socket.data.username;
+    const isHotseat = socket.data.mode === 'hotseat';
+    const effectiveColor = (!isHotseat && socket.data.tokenColor) || playerColor;
 
     this.withGameLock(effectiveGameId, async () => {
       try {
         socket.join(effectiveGameId);
         socket.data.gameId = effectiveGameId;
-        socket.data.playerColor = playerColor;
+        socket.data.playerColor = effectiveColor;
 
         if (effectiveUserId) {
           if (!this.userIdMap.has(effectiveGameId)) {
             this.userIdMap.set(effectiveGameId, new Map());
           }
-          this.userIdMap.get(effectiveGameId)!.set(playerColor, effectiveUserId);
+          this.userIdMap.get(effectiveGameId)!.set(effectiveColor, effectiveUserId);
         }
 
         let state = await this.store.loadGameState(effectiveGameId);
@@ -57,7 +59,7 @@ export class SocketHandlers {
         }
 
         if (state) {
-          const discIndex = state.disconnectedPlayers.findIndex(d => d.color === playerColor);
+          const discIndex = state.disconnectedPlayers.findIndex(d => d.color === effectiveColor);
           const isReconnectingPlayer = discIndex !== -1;
 
           // Socket locking: reject non-spectator, non-reconnecting joins to games already in progress
@@ -67,24 +69,24 @@ export class SocketHandlers {
           }
 
           if (isReconnectingPlayer) {
-            await this.engine.handlePlayerReconnect(effectiveGameId, playerColor);
+            await this.engine.handlePlayerReconnect(effectiveGameId, effectiveColor);
             state = await this.store.loadGameState(effectiveGameId);
             // The player is back on their old seat — tell the room so everyone
             // sees them flip from "Reconnecting…" back to active.
-            if (state && !state.disconnectedPlayers.some((d) => d.color === playerColor)) {
-              this.engine.emitEvent({ type: 'player_reconnected', gameId: effectiveGameId, color: playerColor });
+            if (state && !state.disconnectedPlayers.some((d) => d.color === effectiveColor)) {
+              this.engine.emitEvent({ type: 'player_reconnected', gameId: effectiveGameId, color: effectiveColor });
             }
           } else {
-            const player = state.players.find(p => p.color === playerColor);
+            const player = state.players.find(p => p.color === effectiveColor);
             if (player) player.status = 'active';
           }
 
           // Populate PlayerMeta with frontend-compatible fields.
           // `username` is the immutable identity (used for login/avatar/URLs);
           // `displayName` is what the UI actually shows in-game.
-          const meta = state.players.find(p => p.color === playerColor);
+          const meta = state.players.find(p => p.color === effectiveColor);
           if (meta) {
-            const resolvedUsername = effectiveUsername || effectiveUserId || (playerColor.charAt(0).toUpperCase() + playerColor.slice(1));
+            const resolvedUsername = effectiveUsername || effectiveUserId || (effectiveColor.charAt(0).toUpperCase() + effectiveColor.slice(1));
             meta.username = resolvedUsername;
             meta.displayName = displayName || socket.data.displayName || resolvedUsername;
             meta.isBot = isBotUserId(effectiveUserId);
@@ -103,7 +105,7 @@ export class SocketHandlers {
         }
 
         if (isBotUserId(effectiveUserId)) {
-          this.getOrCreateBot(effectiveGameId, playerColor, this.engine, this.store);
+          this.getOrCreateBot(effectiveGameId, effectiveColor, this.engine, this.store);
         }
 
         // PvE/Hotseat auto-start: neither has a second real remote player to
@@ -373,7 +375,10 @@ export class SocketHandlers {
 
     (async () => {
       try {
-        await this.engine.handlePlayerExit(gameId, color);
+        // Resign is NOT exit: conceding has to be recorded as a loss, which
+        // means ending the game and emitting game_ended so the result actually
+        // reaches the backend. handlePlayerExit does neither.
+        await this.engine.handlePlayerResign(gameId, color);
       } catch (error) {
         socket.emit('error', `Resign failed: ${error}`);
       }

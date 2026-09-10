@@ -1,5 +1,5 @@
 export type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
-export type PlayerStatus = 'active' | 'exited' | 'inactive' | 'disconnected';
+export type PlayerStatus = 'active' | 'exited' | 'resigned' | 'inactive' | 'disconnected';
 export type TurnPhase = 'WAITING_FOR_ROLL' | 'WAITING_FOR_MOVE';
 
 export type PieceId = string; // Format: "{color}-{index}" e.g., "red-0", "blue-3"
@@ -114,6 +114,7 @@ export type GameEvent =
 	| { type: 'game_ended'; gameId: string; winner: PlayerColor; resultDetail: string }
 	| { type: 'game_started'; gameId: string }
 	| { type: 'player_exited'; gameId: string; color: PlayerColor }
+	| { type: 'player_resigned'; gameId: string; color: PlayerColor }
 	| { type: 'player_aborted'; gameId: string; color: PlayerColor; username: string }
 	| { type: 'player_disconnected'; gameId: string; color: PlayerColor }
 	| { type: 'player_reconnected'; gameId: string; color: PlayerColor }

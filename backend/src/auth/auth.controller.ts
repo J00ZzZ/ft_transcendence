@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -8,6 +8,7 @@ import { TwoFactorDto } from './dto/twofactor.dto';
 import { TwoFactorSettingDto } from './dto/two-factor-setting.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -197,6 +198,18 @@ export class AuthController {
     );
   }
 
+  // ---- Permanently delete the account (password-verified) ----
+  @UseGuards(JwtAuthGuard)
+  @Delete('profile')
+  @HttpCode(200)
+  async deleteAccount(@Req() req: Request, @Body() dto: DeleteAccountDto, @Res({ passthrough: true }) res: Response) {
+    await this.authService.deleteAccount((req.user as { id: string }).id, dto);
+    // Drop both session cookies so the (now-deleted) browser ends logged out.
+    res.clearCookie(ACCESS_COOKIE, { path: '/' });
+    res.clearCookie(REFRESH_COOKIE, { path: REFRESH_PATH });
+    return { message: 'Account permanently deleted' };
+  }
+
   // ---- 2FA preference (logged-in user toggles their own) ----
   @UseGuards(JwtAuthGuard)
   @Get('2fa')
@@ -253,31 +266,24 @@ export class AuthController {
       username: string;
       email: string | null;
       twoFactorEnabled: boolean;
-    };
+    } | undefined;
     const frontendUrl = frontendUrlFor(req);
+
+    if (!user) {
+      res.redirect(`${frontendUrl}/login?error=access_denied`);
+      return;
+    }
 
     // "Add a sign-in method" flow: the OAuth `state` carried a signed oauth-link
     // token (signed by the guard from the user's access-token cookie). The
     // strategy already linked the provider to that user — just send them back to
     // /profile. No new session is issued, no login/2FA redirect happens, so the
     // user is neither signed out nor logged into a different account.
-    const anyReq = req as any;
-    const state = typeof anyReq.query?.state === 'string' ? anyReq.query.state : undefined;
-    const linkUserId = state
-      ? this.authService.resolveOAuthLink(state, this.providerForRoute(req.path))
-      : undefined;
-    // A link round-trip only counts when the BROWSER that opened the provider
-    // login is still authenticated and matches the linked user. On a fresh
-    // login (no valid token cookie) — even if GitHub echoes a stale state —
-    // fall through to the normal login session flow below. The final
-    // `user.id === linkUserId` guard also catches a stale session whose user
-    // was wiped by a DB reset: validateOAuthLogin then creates a brand-new
-    // user (different id), so this is NOT a link round-trip and the fresh
-    // account must get a real session instead of a dead redirect to /profile.
-    const sessionUser = this.authService.verifyAccessToken(
-      typeof req.cookies?.['token'] === 'string' ? req.cookies['token'] : undefined,
+    const linkUserId = this.authService.resolveOAuthLinkForRequest(
+      req,
+      this.providerForRoute(req.path),
     );
-    if (linkUserId && sessionUser && sessionUser === linkUserId && user.id === linkUserId) {
+    if (linkUserId && user.id === linkUserId) {
       res.redirect(`${frontendUrl}/profile`);
       return;
     }

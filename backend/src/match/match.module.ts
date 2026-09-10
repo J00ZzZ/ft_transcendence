@@ -9,9 +9,10 @@ import { PrismaService } from '../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { AchievementsModule } from '../achievements/achievements.module';
 import { LeaderboardModule } from '../leaderboard/leaderboard.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [AuthModule, AchievementsModule, LeaderboardModule],
+  imports: [AuthModule, AchievementsModule, LeaderboardModule, NotificationModule],
   controllers: [MatchController],
   providers: [
     MatchService,

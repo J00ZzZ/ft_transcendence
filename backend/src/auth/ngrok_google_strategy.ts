@@ -29,7 +29,7 @@ export class NgrokGoogleStrategy extends PassportStrategy(Strategy, 'google-tunn
         email,
         usernameSeed: email?.split('@')[0] ?? `google_${profile.id}`,
       },
-      this.authService.resolveOAuthLink(req?.query?.state, 'google'),
+      this.authService.resolveOAuthLinkForRequest(req, 'google'),
     );
   }
 }

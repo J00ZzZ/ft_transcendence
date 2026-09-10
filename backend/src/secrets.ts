@@ -1,74 +1,13 @@
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-
 /**
- * Secrets live as one-value-per-file under a secrets directory, named after the
- * variable they hold in lower case: JWT_SECRET -> jwt_secret.txt. Nothing
- * sensitive comes from .env any more — .env is only used for non-secret compose
- * interpolation (ports, LAN/ngrok wiring).
- *
- * Directory resolution: SECRETS_DIR wins, then /secrets (the compose mount),
- * then ../secrets relative to cwd so `npm run start:dev` on the host works
- * against the same files the containers see.
+ * Config/secrets live in the root .env now — loaded into containers via
+ * compose's env_file, and via dotenv for host-side scripts. Kept as a single
+ * lookup point so call sites didn't need to change when file-based secrets
+ * were retired.
  */
-function resolveDir(): string {
-  const candidates = [
-    process.env.SECRETS_DIR,
-    '/secrets',
-    join(process.cwd(), '..', 'secrets'),
-    join(process.cwd(), 'secrets'),
-  ].filter(Boolean) as string[];
 
-  return candidates.find((dir) => existsSync(dir)) ?? '/secrets';
-}
-
-const SECRETS_DIR = resolveDir();
-const cache = new Map<string, string | undefined>();
-
-/** Blocking sleep — acceptable here since secret reads only happen once at boot. */
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-const READ_RETRIES = 5;
-const READ_RETRY_DELAY_MS = 100;
-
-/** Read a secret by its variable name. Returns undefined if there's no file. */
+/** Read a config value by its env var name. Returns undefined if unset. */
 export function secret(name: string): string | undefined {
-  if (cache.has(name)) return cache.get(name);
-
-  const file = join(SECRETS_DIR, `${name.toLowerCase()}.txt`);
-  let value: string | undefined;
-  let lastError: NodeJS.ErrnoException | undefined;
-
-  // Bind-mounted secrets can hit transient, non-ENOENT read errors (observed:
-  // EDEADLK on Docker Desktop's macOS virtiofs share) — retry those a few
-  // times before giving up. A genuinely missing file (ENOENT) fails fast.
-  for (let attempt = 0; attempt < READ_RETRIES; attempt++) {
-    try {
-      value = readFileSync(file, 'utf8').trim() || undefined;
-      lastError = undefined;
-      break;
-    } catch (err) {
-      lastError = err as NodeJS.ErrnoException;
-      if (lastError.code === 'ENOENT') break;
-      sleepSync(READ_RETRY_DELAY_MS);
-    }
-  }
-
-  if (lastError) {
-    // Env fallback keeps CI and one-off scripts working when no secrets
-    // directory is mounted. Not a path any deployed service should take.
-    value = process.env[name];
-    if (value) {
-      console.warn(`[secrets] ${file} unreadable (${lastError.code}), falling back to process.env.${name}`);
-    } else if (lastError.code !== 'ENOENT') {
-      console.warn(`[secrets] ${file} unreadable after ${READ_RETRIES} attempts: ${lastError.message}`);
-    }
-  }
-
-  cache.set(name, value);
-  return value;
+  return process.env[name] || undefined;
 }
 
 // Per-request check used by oauth.guards.ts (which OAuth app's strategy to
@@ -87,9 +26,7 @@ export function isTunnelRequest(host: string | undefined): boolean {
 export function requireSecret(name: string): string {
   const value = secret(name);
   if (!value) {
-    throw new Error(
-      `Missing secret ${name}: expected ${join(SECRETS_DIR, `${name.toLowerCase()}.txt`)}`,
-    );
+    throw new Error(`Missing required env var ${name}`);
   }
   return value;
 }

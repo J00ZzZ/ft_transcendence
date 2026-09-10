@@ -1,5 +1,5 @@
 /**
- * Achievement registry — single source of truth for all 15 achievements.
+ * Achievement registry — single source of truth for all 13 achievements.
  * Adding a future achievement = one registry row; no new endpoints, no
  * duplicated unlock/notify logic.
  *
@@ -24,17 +24,13 @@ export type AchKey =
   | 'achft_Transcendence'
   | 'achLoveTheMachine'
   | 'achSpeedDemon'
-  | 'achUnstoppable'
-  | 'achSteadyDefender'
-  | 'achMercilessAttacker';
+  | 'achUnstoppable';
 
 /** Minimal structural shape of a GameParticipant row (fields we read). */
 export interface GameParticipantLike {
   rank: number;
   piecesCaptured: number;
   piecesInGoal: number;
-  clashDefends: number;
-  clashAttacksWon: number;
 }
 
 /** Minimal structural shape of a Game row (fields we read). */
@@ -76,8 +72,6 @@ export const ACHIEVEMENT_KEYS: AchKey[] = [
   'achLoveTheMachine',
   'achSpeedDemon',
   'achUnstoppable',
-  'achSteadyDefender',
-  'achMercilessAttacker',
 ];
 
 export const ACHIEVEMENT_RULES: AchievementRule[] = [
@@ -177,20 +171,6 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     type: 'per-game',
     perGameTarget: 3,
     perGameSource: (part) => part.piecesCaptured,
-  },
-  {
-    key: 'achSteadyDefender',
-    nameKey: 'dashboard.achSteadyDefender',
-    type: 'per-game',
-    perGameTarget: 2,
-    perGameSource: (part) => part.clashDefends,
-  },
-  {
-    key: 'achMercilessAttacker',
-    nameKey: 'dashboard.achMercilessAttacker',
-    type: 'per-game',
-    perGameTarget: 2,
-    perGameSource: (part) => part.clashAttacksWon,
   },
 ];
 

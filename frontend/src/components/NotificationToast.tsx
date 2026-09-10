@@ -7,6 +7,7 @@ import { navigate } from '../router'
 import { apiFetch } from '../api'
 import type { PlayerColor } from '../game/types'
 import { retroAudio } from '../utils/audio'
+import { RETRO_BTN } from '../styles/tw'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,96 @@ function getToastInfo(n: Notification, t: (key: string, options?: any) => string
         badgeBg: 'rgba(0, 255, 136, 0.18)',
         fromUser: null,
         actionMessage: name ? `${name}!` : t('notifications.achievementUnlocked'),
+      }
+    }
+    case 'match_finished': {
+      const rank = payload?.rank
+      const winner = payload?.winnerUsername ? String(payload.winnerUsername) : 'A rival'
+      return {
+        tag: t('notifications.matchEndTag'),
+        badgeLabel: 'END',
+        badgeColor: '#00ff88',
+        badgeBg: 'rgba(0, 255, 136, 0.18)',
+        fromUser: null,
+        actionMessage: rank === 1 ? t('notifications.matchEndWonText') : t('notifications.matchEndLostText', { winner }),
+      }
+    }
+    case 'match_cancelled':
+      return payload?.reason === 'resign'
+        ? {
+            tag: t('notifications.matchCancelledTag'),
+            badgeLabel: 'ABRT',
+            badgeColor: 'var(--accent-yellow, #ffe600)',
+            badgeBg: 'rgba(255, 230, 0, 0.18)',
+            fromUser: from,
+            actionMessage: t('notifications.actionMatchResigned'),
+          }
+        : {
+            tag: t('notifications.matchCancelledTag'),
+            badgeLabel: 'ABRT',
+            badgeColor: 'var(--accent-yellow, #ffe600)',
+            badgeBg: 'rgba(255, 230, 0, 0.18)',
+            fromUser: from,
+            actionMessage: t('notifications.actionMatchCancelled'),
+          }
+    case 'friend_removed':
+      return {
+        tag: t('notifications.friendRemovedTag'),
+        badgeLabel: 'LINK',
+        badgeColor: 'var(--accent-pink, #ff007f)',
+        badgeBg: 'rgba(255, 0, 127, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionFriendRemoved'),
+      }
+    case 'friend_declined':
+      return {
+        tag: t('notifications.friendDeclinedTag'),
+        badgeLabel: 'LINK',
+        badgeColor: 'var(--accent-yellow, #ffe600)',
+        badgeBg: 'rgba(255, 230, 0, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionFriendDeclined'),
+      }
+    case 'friend_online':
+      return {
+        tag: t('notifications.friendOnlineTag'),
+        badgeLabel: 'ON',
+        badgeColor: '#00ff88',
+        badgeBg: 'rgba(0, 255, 136, 0.18)',
+        fromUser: String(payload?.displayName || from),
+        actionMessage: t('notifications.actionFriendOnline', { displayName: payload?.displayName || from }),
+      }
+    case 'friend_offline':
+      return {
+        tag: t('notifications.friendOfflineTag'),
+        badgeLabel: 'OFF',
+        badgeColor: 'var(--accent-yellow, #ffe600)',
+        badgeBg: 'rgba(255, 230, 0, 0.18)',
+        fromUser: String(payload?.displayName || from),
+        actionMessage: t('notifications.actionFriendOffline', { displayName: payload?.displayName || from }),
+      }
+    case 'profile_updated': {
+      const items = Array.isArray(payload?.items) ? (payload.items as string[]) : []
+      const labels = items.map((i) => t(`notifications.profileItem${i.charAt(0).toUpperCase()}${i.slice(1)}`)).join(', ')
+      return {
+        tag: t('notifications.profileUpdatedTag'),
+        badgeLabel: 'PROF',
+        badgeColor: 'var(--accent-cyan, #00f0ff)',
+        badgeBg: 'rgba(0, 240, 255, 0.18)',
+        fromUser: null,
+        actionMessage: t('notifications.profileUpdatedText', { item: labels || '—' }),
+      }
+    }
+    case 'display_name_changed': {
+      const oldName = payload?.oldDisplayName ? String(payload.oldDisplayName) : from
+      const newName = payload?.displayName ? String(payload.displayName) : t('notifications.unknown')
+      return {
+        tag: t('notifications.displayNameChangedTag'),
+        badgeLabel: 'CALL',
+        badgeColor: 'var(--accent-cyan, #00f0ff)',
+        badgeBg: 'rgba(0, 240, 255, 0.18)',
+        fromUser: null,
+        actionMessage: t('notifications.displayNameChangedText', { displayName: oldName, newDisplayName: newName }),
       }
     }
     default:
@@ -195,7 +286,7 @@ function Toast({
     position: 'fixed',
     right: 28,
     bottom: 28 + index * 150,
-    zIndex: 10005,
+    zIndex: 99999,
     width: 430,
     maxWidth: 'calc(100vw - 56px)',
     background: 'var(--bg-card)',
@@ -209,6 +300,7 @@ function Toast({
     transform: visible ? 'translateX(0)' : 'translateX(120%)',
     opacity: visible ? 1 : 0,
     transition: 'transform 0.35s cubic-bezier(.22,1,.36,1), opacity 0.35s ease',
+    pointerEvents: 'auto',
   }
 
   return (
@@ -354,7 +446,7 @@ function Toast({
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button
               onClick={acceptInvite}
-              className="retro-btn"
+              className={RETRO_BTN}
               style={{
                 flex: 1,
                 height: 38,
@@ -375,7 +467,7 @@ function Toast({
             </button>
             <button
               onClick={dismiss}
-              className="retro-btn"
+              className={RETRO_BTN}
               style={{
                 flex: 1,
                 height: 38,
@@ -402,7 +494,7 @@ function Toast({
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button
               onClick={acceptFriend}
-              className="retro-btn"
+              className={RETRO_BTN}
               style={{
                 flex: 1,
                 height: 38,
@@ -423,7 +515,7 @@ function Toast({
             </button>
             <button
               onClick={declineFriend}
-              className="retro-btn"
+              className={RETRO_BTN}
               style={{
                 flex: 1,
                 height: 38,
@@ -445,39 +537,14 @@ function Toast({
           </div>
         )}
 
-        {/* Action Buttons for Friend Accepted */}
+        {/* Action Button for Friend Accepted */}
         {notification.type === 'friend_accepted' && (
-          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button
-              onClick={() => {
-                retroAudio.playUiBeep(650, 0.05)
-                navigate('/friends')
-                dismiss()
-              }}
-              className="retro-btn"
-              style={{
-                flex: 1,
-                height: 38,
-                padding: '0 16px',
-                fontSize: '0.78rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                background: 'rgba(0, 240, 255, 0.18)',
-                border: '2px solid var(--accent-cyan, #00f0ff)',
-                color: 'var(--accent-cyan, #00f0ff)',
-                boxSizing: 'border-box',
-                margin: 0,
-              }}
-            >
-              {t('nav.acceptInvite').toUpperCase()}
-            </button>
+          <div style={{ display: 'flex', marginTop: 4 }}>
             <button
               onClick={dismiss}
-              className="retro-btn"
+              className={RETRO_BTN}
               style={{
-                flex: 1,
+                width: '100%',
                 height: 38,
                 padding: '0 16px',
                 fontSize: '0.78rem',
@@ -485,14 +552,14 @@ function Toast({
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '2px solid rgba(255, 255, 255, 0.25)',
-                color: 'var(--text-muted, #aaa)',
+                background: 'rgba(255, 230, 0, 0.12)',
+                border: '2px solid var(--accent-yellow, #ffe600)',
+                color: 'var(--accent-yellow, #ffe600)',
                 boxSizing: 'border-box',
                 margin: 0,
               }}
             >
-              DISMISS
+              {t('notifications.dismiss')}
             </button>
           </div>
         )}

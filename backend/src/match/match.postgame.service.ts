@@ -5,8 +5,9 @@ import { secret } from '../secrets';
 import Redis from 'ioredis';
 import { LeaderboardRedisService } from '../leaderboard/leaderboard-redis.service';
 import { AchievementsService } from '../achievements/achievements.service';
-
-const BOT_PREFIX = 'bot-';
+import { NotificationService } from '../notification/notification.service';
+import { isBotUserId } from '../common/bot';
+import { ratingDeltaFor } from '../common/scoring'
 
 /**
  * POST-GAME POINTS (piece-based)
@@ -14,12 +15,6 @@ const BOT_PREFIX = 'bot-';
  * Winner gets +1 bonus piece, so a perfect PvP win = (4+1)*2 = 10.
  * Losers still earn points for pieces brought home. Bots are skipped.
  */
-const POINTS_PER_PIECE = 2;      // pts per piece home: 2 (PvP), 1 (PvE)
-const WIN_BONUS_PIECE = 1;       // winner bonus piece: (4+1)*2 = 10 pts max
-
-function isBotUserId(userId: string | undefined): boolean {
-	return !!userId && userId.startsWith(BOT_PREFIX);
-}
 
 @Injectable()
 export class MatchPostgameService {
@@ -30,9 +25,10 @@ export class MatchPostgameService {
 		private readonly jwt: JwtService,
 		private readonly leaderboardRedis: LeaderboardRedisService,
 		private readonly achievements: AchievementsService,
+		private readonly notifications: NotificationService,
 	) {
 		const host = process.env.REDIS_HOST || 'redis';
-		const port = parseInt(process.env.REDIS_PORT || '6379', 10);
+		const port = parseInt(process.env.REDIS_PORT || '6479', 10);
 		const password = secret('REDIS_PASSWORD');
 		this.redis = new Redis({ host, port, password, retryStrategy: (t) => Math.min(t * 50, 2000) });
 		this.redis.on('error', (error) => console.error('Redis error:', (error as Error).message));
@@ -42,7 +38,7 @@ export class MatchPostgameService {
 	// Called by the game engine when a match ends. Creates game + participant rows,
 	// then awards rating based on piecesInGoal (2 pts per piece in PvP, 1 pt per
 	// piece in PvE, +1 bonus piece for the winner) and pushes a leaderboard snapshot.
-	async processGameEnd(data: { gameId: string; participants: Array<{ userId: string; color: string; rank: number; piecesCaptured?: number; piecesInGoal?: number; clashDefends?: number; clashAttacksWon?: number }> }) {
+	async processGameEnd(data: { gameId: string; participants: Array<{ userId: string; color: string; rank: number; piecesCaptured?: number; piecesInGoal?: number }> }) {
 		const { gameId, participants } = data;
 		if (!gameId) throw new BadRequestException('gameId is required');
 		if (!participants || !Array.isArray(participants) || participants.length < 2) {
@@ -90,6 +86,7 @@ export class MatchPostgameService {
 							// displayName is required + unique on User (feature-update-profile
 							// branch); bot rows reuse the same id so it stays unique.
 							displayName: p.userId,
+							achievement: { create: { id: crypto.randomUUID() } },
 						},
 					});
 				}
@@ -103,8 +100,6 @@ export class MatchPostgameService {
 						rank: p.rank,
 						piecesCaptured: p.piecesCaptured || 0,
 						piecesInGoal: p.piecesInGoal || 0,
-						clashDefends: p.clashDefends || 0,
-						clashAttacksWon: p.clashAttacksWon || 0,
 					},
 				});
 
@@ -117,12 +112,11 @@ export class MatchPostgameService {
 
 				const isWinner = p.rank === 1;
 
-				// Piece-based scoring: 2 pts per piece (PvP) / 1 pt per piece (PvE),
-				// winner gets +1 bonus piece. Losers still earn points — no penalty.
-				const piecesInGoal = p.piecesInGoal ?? 0;
-				const effectivePieces = piecesInGoal + (isWinner ? WIN_BONUS_PIECE : 0);
-				const perPiece = gameType === 'PVE' ? POINTS_PER_PIECE / 2 : POINTS_PER_PIECE;
-				const ratingDelta = effectivePieces * perPiece;
+				const ratingDelta = ratingDeltaFor({
+					piecesInGoal: p.piecesInGoal ?? 0,
+					rank: p.rank,
+					gameType,
+				});
 
 				// Example: rating 100, winner, 4 pieces -> +10 => newRating 110,
 				//          highestRating 110, wins++, winStreak 1.
@@ -136,6 +130,7 @@ export class MatchPostgameService {
 							rating: newRating,
 							highestRating: Math.max(user.highestRating, newRating),
 							wins: isWinner ? { increment: 1 } : undefined,
+							losses: isWinner ? undefined : { increment: 1 },
 							humanWins: isWinner ? { increment: 1 } : undefined,
 							botWins: gameType === 'PVE' && isWinner ? { increment: 1 } : undefined,
 							winStreak: isWinner ? { increment: 1 } : 0,
@@ -167,8 +162,39 @@ export class MatchPostgameService {
 			console.warn(`Achievements evaluation failed for game ${gameId}:`, err);
 		});
 
+		// Match-finished notifications — tell every human player the match
+		// concluded and their personal rank. MUST never fail the game-end request.
+		await this.notifyMatchFinished(gameId, gameType, participants).catch((err) => {
+			console.warn(`Match-finished notifications failed for game ${gameId}:`, err);
+		});
+
 		await this.redis.del(`match:${gameId}`);
 		return { message: 'Game processed', gameId };
+	}
+
+	/** Notify each human participant that the match concluded, with their own rank. */
+	private async notifyMatchFinished(
+		gameId: string,
+		gameType: string,
+		participants: Array<{ userId: string; color: string; rank: number }>,
+	) {
+		const winner = participants.find((p) => p.rank === 1);
+		let winnerUsername = 'A rival';
+		if (winner && !isBotUserId(winner.userId)) {
+			const wu = await this.prisma.db.user.findUnique({ where: { id: winner.userId }, select: { username: true } });
+			winnerUsername = wu?.username || 'A rival';
+		}
+
+		for (const p of participants) {
+			if (isBotUserId(p.userId)) continue;
+			await this.notifications.notify(p.userId, 'match_finished', {
+				gameId,
+				mode: (gameType || 'PVP').toLowerCase(),
+				rank: p.rank,
+				winnerColor: winner?.color?.toLowerCase(),
+				winnerUsername,
+			});
+		}
 	}
 
 	// Create a rematch from a completed game if at least 2 original players confirm.

@@ -4,8 +4,8 @@ import { PrismaService } from '../prisma.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
 import { LeaderboardRedisService } from '../leaderboard/leaderboard-redis.service';
+import { BOT_PREFIX, isBotUserId } from '../common/bot';
 
-const BOT_PREFIX = 'bot-';
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 const FRONTEND_URL = secret('FRONTEND_URL') ?? 'https://localhost:8443';
 export const ENGINE_WS_URL = FRONTEND_URL.replace(/^http/, 'ws');
@@ -19,10 +19,6 @@ function generateInviteCode(): string {
 	return code;
 }
 
-function isBotUserId(userId: string | undefined): boolean {
-	return !!userId && userId.startsWith(BOT_PREFIX);
-}
-
 @Injectable()
 export class MatchCreatorService {
 	private redis: Redis;
@@ -33,7 +29,7 @@ export class MatchCreatorService {
 		private readonly leaderboardRedis: LeaderboardRedisService,
 	) {
 		const host = process.env.REDIS_HOST || 'redis';
-		const port = parseInt(process.env.REDIS_PORT || '6379', 10);
+		const port = parseInt(process.env.REDIS_PORT || '6479', 10);
 		const password = secret('REDIS_PASSWORD');
 		this.redis = new Redis({ host, port, password, retryStrategy: (t) => Math.min(t * 50, 2000) });
 		this.redis.on('error', (error) => console.error('Redis error:', (error as Error).message));
@@ -74,6 +70,42 @@ export class MatchCreatorService {
 			throw new BadRequestException('PvP mode requires at least 2 players');
 		}
 
+		return this.withUserCreateLock(userId, () =>
+			this.createMatchLocked(userId, mode, playerCount, botCount, clashEnabled, botColors, seatColors),
+		);
+	}
+
+	private async withUserCreateLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+		const key = `lock:create_match:${userId}`;
+		const deadline = Date.now() + 5000;
+		while (Date.now() < deadline) {
+			// SET NX is atomic: exactly one caller can hold this at a time.
+			const acquired = await this.redis.set(key, '1', 'PX', 5000, 'NX');
+			if (acquired) {
+				try {
+					return await fn();
+				} finally {
+					await this.redis.del(key);
+				}
+			}
+			// Someone else is mid-create for this user. They finish in ms, and
+			// the SCAN will then find their room and we return that instead.
+			await new Promise((r) => setTimeout(r, 50));
+		}
+		// Lock never came free (holder wedged). Proceed unserialised rather than
+		// failing the request outright — worst case is the old behaviour.
+		return fn();
+	}
+
+	private async createMatchLocked(
+		userId: string,
+		mode: 'pvp' | 'pve' | 'hotseat',
+		playerCount: number,
+		botCount: number,
+		clashEnabled: boolean,
+		botColors?: string[],
+		seatColors?: string[],
+	) {
 		// SCAN guard: idempotent room creation — reuse existing WAITING/ACTIVE match if user already seated
 		let cursor = '0';
 		let foundExisting = false;

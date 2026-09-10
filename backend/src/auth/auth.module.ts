@@ -15,6 +15,7 @@ import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
 import { PrismaService } from '../prisma.service';
 import { requireSecret } from '../secrets';
+import { NotificationModule } from '../notification/notification.module';
 
 // Both the localhost and ngrok OAuth apps are registered at once, under
 // distinct passport strategy names ('google'/'github'/'42' vs their
@@ -31,6 +32,7 @@ import { requireSecret } from '../secrets';
       // keeps the user signed in for 7 days by minting new access tokens.
       signOptions: { expiresIn: '15m' },
     }),
+    NotificationModule,
   ],
   controllers: [AuthController],
   providers: [

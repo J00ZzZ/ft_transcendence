@@ -1,8 +1,7 @@
 # secrets & prisma generated client
-secrets/
 backend/generated/
 backend/dist/
-docs/
+
 
 # Logs
 logs
@@ -30,15 +29,8 @@ dist-ssr
 *.sw?
 
 # planning
-roadmap.md
-roadmap2.md
 
 # generated documentation
-TYPESCRIPT.md
-API-list.md
-Ludo_Rules.md
-fixdice.md
-context.md
 
 # dependencies
 /node_modules
@@ -52,6 +44,9 @@ context.md
 
 # testing
 /coverage
+/playwright-report
+/e2e-results.json
+/test-results
 
 # next.js
 /.next/
@@ -72,6 +67,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -81,7 +77,14 @@ yarn-error.log*
 next-env.d.ts
 
 package-lock.json
-docs
+/docs
 *.png
 !frontend/public/*.png
 *.md
+!frontend/src/content/docs/*.md
+*.sh
+.markdownlint.json
+e2e/
+*.skill
+screenshots
+
