@@ -83,7 +83,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // ── SSE connection ───────────────────────────────────────────────────────
   useEffect(() => {
-    if (!user) {
+    // Depend on the stable id, not the whole user object: avatar upload/reset
+    // call setUser({ ...user, hasAvatarPhoto }) on success, which changes the
+    // object identity, tears down this stream and re-opens it. A profile_updated
+    // published during that reconnect window was dropped, so the avatar toast
+    // popped only intermittently.
+    const userId = user?.id;
+    if (!userId) {
       esRef.current?.close();
       esRef.current = null;
       return;
@@ -104,7 +110,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             // get the persisted `profile_updated` toast instead).
             if (notification.type === 'display_name_changed') {
               const p = notification.payload;
-              if (p.fromUserId === user.id) return;
+              if (p.fromUserId === userId) return;
               setToasts((prev) => [notification, ...prev]);
               return;
             }
@@ -113,7 +119,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             // persisted). Skip the actor's own tabs defensively.
             if (notification.type === 'friend_online' || notification.type === 'friend_offline') {
               const p = notification.payload;
-              if (p.userId === user.id) return;
+              if (p.userId === userId) return;
               setToasts((prev) => [notification, ...prev]);
               return;
             }
@@ -156,7 +162,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
       esRef.current = null;
     };
-  }, [user]);
+  }, [user?.id]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 

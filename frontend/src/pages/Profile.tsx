@@ -205,6 +205,7 @@ export function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [photoWarning, setPhotoWarning] = useState('');
   const [avatarBuster, setAvatarBuster] = useState(Date.now());
   const [showEdit, setShowEdit] = useState(false);
   // Bump to refetch the profile after the edit modal saves/closes.
@@ -227,6 +228,7 @@ export function Profile() {
 
     setUploading(true);
     setUploadError('');
+    setPhotoWarning('');
     const formData = new FormData();
     formData.append('avatar', file);
 
@@ -555,6 +557,9 @@ export function Profile() {
                             userId={profile.id}
                             hasAvatarPhoto={profile.hasAvatarPhoto}
                             avatarStyle={profile.avatarStyle}
+                            onPhotoError={() => {
+                              setPhotoWarning(t('profile.photoLoadError'));
+                            }}
                             size={95}
                             fallbackStyle={{
                               width: 95,
@@ -689,62 +694,94 @@ export function Profile() {
                         {/* Action Buttons */}
                         <div style={{ marginTop: 8 }}>
                           {isOwnProfile ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <button
-                                className={RETRO_BTN}
-                                onClick={() => fileInputRef.current?.click()}
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 8,
+                                width: '100%',
+                              }}
+                            >
+                              <div
                                 style={{
-                                  padding: '3px 9px',
-                                  fontSize: '0.68rem',
-                                  color: 'var(--accent-cyan)',
-                                  borderColor: 'rgba(0, 240, 255, 0.45)',
-                                  fontFamily: 'var(--font-display)',
-                                  borderRadius: 4,
+                                  display: 'flex',
+                                  gap: 6,
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
                                 }}
                               >
-                                {t('profile.editAvatar')}
-                              </button>
-                              <button
-                                className={RETRO_BTN}
-                                onClick={() => {
-                                  void handleRemoveAvatar();
-                                }}
-                                style={{
-                                  padding: '3px 8px',
-                                  fontSize: '0.68rem',
-                                  color: '#ff0055',
-                                  borderColor: 'rgba(255, 0, 85, 0.45)',
-                                  fontFamily: 'var(--font-display)',
-                                  borderRadius: 4,
-                                }}
-                              >
-                                {t('profile.resetAvatar')}
-                              </button>
-                              <button
-                                className={RETRO_BTN}
-                                onClick={() => setShowEdit(true)}
-                                style={{
-                                  padding: '3px 9px',
-                                  fontSize: '0.68rem',
-                                  color: 'var(--accent-yellow)',
-                                  borderColor: 'rgba(255, 230, 0, 0.45)',
-                                  fontFamily: 'var(--font-display)',
-                                  borderRadius: 4,
-                                }}
-                              >
-                                {t('profileExtra.editProfileBtn')}
-                              </button>
-                              {uploadError && (
-                                <span
+                                <button
+                                  className={RETRO_BTN}
+                                  onClick={() => fileInputRef.current?.click()}
                                   style={{
-                                    color: '#ff0055',
-                                    fontSize: '0.66rem',
-                                    fontFamily: 'var(--font-mono)',
+                                    padding: '3px 9px',
+                                    fontSize: '0.68rem',
+                                    color: 'var(--accent-cyan)',
+                                    borderColor: 'rgba(0, 240, 255, 0.45)',
+                                    fontFamily: 'var(--font-display)',
+                                    borderRadius: 4,
                                   }}
                                 >
-                                  {uploadError}
-                                </span>
-                              )}
+                                  {t('profile.editAvatar')}
+                                </button>
+                                <button
+                                  className={RETRO_BTN}
+                                  onClick={() => {
+                                    void handleRemoveAvatar();
+                                  }}
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '0.68rem',
+                                    color: '#ff0055',
+                                    borderColor: 'rgba(255, 0, 85, 0.45)',
+                                    fontFamily: 'var(--font-display)',
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  {t('profile.resetAvatar')}
+                                </button>
+                                <button
+                                  className={RETRO_BTN}
+                                  onClick={() => setShowEdit(true)}
+                                  style={{
+                                    padding: '3px 9px',
+                                    fontSize: '0.68rem',
+                                    color: 'var(--accent-yellow)',
+                                    borderColor: 'rgba(255, 230, 0, 0.45)',
+                                    fontFamily: 'var(--font-display)',
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  {t('profileExtra.editProfileBtn')}
+                                </button>
+                              </div>
+                              {/* Stable reserved message area: upload errors show
+                                  red, photo-load fallback shows amber. minHeight
+                                  keeps the box height stable so long translated
+                                  strings never shift the surrounding layout. */}
+                              <div
+                                style={{
+                                  minHeight: 34,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'flex-end',
+                                }}
+                              >
+                                {(uploadError || photoWarning) && (
+                                  <span
+                                    style={{
+                                      color: uploadError ? '#ff0055' : '#ffe600',
+                                      fontSize: '0.66rem',
+                                      fontFamily: 'var(--font-mono)',
+                                      lineHeight: 1.45,
+                                      whiteSpace: 'normal',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
+                                    {uploadError || photoWarning}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <button

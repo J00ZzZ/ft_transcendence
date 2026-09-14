@@ -347,6 +347,7 @@ export const en = {
     fileTypeError: 'Invalid file type. Allowed: PNG, JPEG, GIF, WebP.',
     uploadFailed: 'Failed to upload avatar.',
     uploadErrorGeneric: 'An error occurred during upload.',
+    photoLoadError: 'PHOTO ERROR/UNAVAILABLE - FALLING BACK TO DEFAULT AVATAR',
   },
   multiplayer: {
     title: 'Multiplayer',

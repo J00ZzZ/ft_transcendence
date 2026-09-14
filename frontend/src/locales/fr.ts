@@ -347,6 +347,7 @@ export const fr = {
     fileTypeError: 'Type de fichier non valide. Formats autorisés : PNG, JPEG, GIF, WebP.',
     uploadFailed: 'Échec de l\'envoi de l\'avatar.',
     uploadErrorGeneric: 'Une erreur est survenue lors de l\'envoi.',
+    photoLoadError: 'PHOTO EN ERREUR/INDISPONIBLE - RETOUR À L’AVATAR DÉFAUT',
   },
   multiplayer: {
     title: 'Multijoueur',

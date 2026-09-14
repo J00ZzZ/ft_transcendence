@@ -347,6 +347,7 @@ export const ms = {
     fileTypeError: 'Jenis fail tidak sah. Dibenarkan: PNG, JPEG, GIF, WebP.',
     uploadFailed: 'Gagal memuat naik avatar.',
     uploadErrorGeneric: 'Ralat berlaku semasa muat naik.',
+    photoLoadError: 'RALAT FOTO/TIDAK TERSEDIA - KEMBALI KE AVATAR LALAI',
   },
   multiplayer: {
     title: 'Multiplayer',

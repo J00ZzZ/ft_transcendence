@@ -21,6 +21,10 @@ type UserAvatarProps = {
   hasAvatarPhoto?: boolean;
   /** Bots and other non-account seats have no photo: never request one for them. */
   isBot?: boolean;
+  /** Called when a photo was expected but failed to load (404 on a posted
+   *  avatar, or bytes the browser cannot decode). The DiceBear fallback always
+   *  still happens; this only lets a parent announce the failure. */
+  onPhotoError?: () => void;
 };
 
 export function UserAvatar({
@@ -32,6 +36,7 @@ export function UserAvatar({
   style,
   hasAvatarPhoto,
   isBot,
+  onPhotoError,
 }: UserAvatarProps) {
   // Subscribe to avatar-state changes; the values themselves are read below.
   useAvatarRevision();
@@ -94,6 +99,9 @@ export function UserAvatar({
         // Record the verdict so we stop asking for this user, and fall back to
         // the generated avatar.
         if (userId) markAvatarBroken(userId);
+        // Only announce if a photo was actually expected (not the normal
+        // "no photo" case), so parents can surface a real load failure.
+        if (usePhoto) onPhotoError?.();
         if (imgRef.current) imgRef.current.src = fallbackSrc;
       }}
       style={{
