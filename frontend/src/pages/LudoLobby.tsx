@@ -139,7 +139,7 @@ export function LudoLobby() {
       setActiveMatch(res);
       navigate(`/game?gameId=${res.gameId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to host a table');
+      setError(err instanceof Error ? err.message : t('lobbyBrowser.createFailed'));
     } finally {
       setHostBusy(false);
     }
@@ -154,7 +154,7 @@ export function LudoLobby() {
       setActiveMatch(res);
       navigate(`/game?gameId=${res.gameId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to rejoin table');
+      setError(err instanceof Error ? err.message : t('lobbyBrowser.rejoinFailed'));
       setJoiningRoomId(null);
       fetchRooms();
     }
@@ -178,7 +178,7 @@ export function LudoLobby() {
       setActiveMatch(res);
       navigate(`/game?gameId=${res.gameId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join room');
+      setError(err instanceof Error ? err.message : t('lobbyBrowser.joinFailed'));
       setJoiningByCode(false);
     }
   };
@@ -195,7 +195,7 @@ export function LudoLobby() {
       setActiveMatch(res);
       navigate(`/game?gameId=${res.gameId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join room');
+      setError(err instanceof Error ? err.message : t('lobbyBrowser.joinFailed'));
       setJoiningRoomId(null);
       fetchRooms();
     }

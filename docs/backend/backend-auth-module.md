@@ -366,6 +366,8 @@ sequenceDiagram
 
 Concise decision trees showing every code path through each auth operation, including error branches.
 
+> Every error that the user can see includes a `code` (for example `AUTH_USERNAME_TAKEN`), and the frontend translates it into the selected language. See [API-list.md](../API-list.md) → Error responses for the full list. The HTTP status codes below are unchanged.
+
 ### Registration Path
 
 ```

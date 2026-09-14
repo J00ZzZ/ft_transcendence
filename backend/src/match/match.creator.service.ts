@@ -61,22 +61,40 @@ export class MatchCreatorService {
     seatColors?: string[],
   ) {
     if (playerCount < 2 || playerCount > 4) {
-      throw new BadRequestException('Player count must be between 2 and 4');
+      throw new BadRequestException({
+        code: 'MATCH_PLAYER_COUNT_RANGE',
+        message: 'Player count must be between 2 and 4',
+      });
     }
     if (botCount < 0 || botCount >= playerCount) {
-      throw new BadRequestException('Bot count must be between 0 and playerCount - 1');
+      throw new BadRequestException({
+        code: 'MATCH_BOT_COUNT_RANGE',
+        message: 'Bot count must be between 0 and playerCount - 1',
+      });
     }
     if (mode === 'pvp' && botCount > 0) {
-      throw new BadRequestException('PvP mode cannot have bots');
+      throw new BadRequestException({
+        code: 'MATCH_PVP_NO_BOTS',
+        message: 'PvP mode cannot have bots',
+      });
     }
     if (mode === 'pve' && botCount === 0) {
-      throw new BadRequestException('PvE mode must have at least 1 bot');
+      throw new BadRequestException({
+        code: 'MATCH_PVE_NEEDS_BOT',
+        message: 'PvE mode must have at least 1 bot',
+      });
     }
     if (mode === 'hotseat' && botCount > 0) {
-      throw new BadRequestException('Hot seat mode cannot have bots');
+      throw new BadRequestException({
+        code: 'MATCH_HOTSEAT_NO_BOTS',
+        message: 'Hot seat mode cannot have bots',
+      });
     }
     if (mode === 'pvp' && playerCount < 2) {
-      throw new BadRequestException('PvP mode requires at least 2 players');
+      throw new BadRequestException({
+        code: 'MATCH_PVP_MIN_PLAYERS',
+        message: 'PvP mode requires at least 2 players',
+      });
     }
 
     return this.withUserCreateLock(userId, () =>
@@ -160,7 +178,10 @@ export class MatchCreatorService {
         ? seatColors
         : SLOT_COLORS.slice(0, playerCount);
     if (resolvedSeatColors.length !== playerCount) {
-      throw new BadRequestException('seatColors must have exactly playerCount entries');
+      throw new BadRequestException({
+        code: 'MATCH_SEAT_COLORS_LENGTH',
+        message: 'seatColors must have exactly playerCount entries',
+      });
     }
     for (const c of resolvedSeatColors) {
       if (!colorSlot.has(c)) {
@@ -168,7 +189,10 @@ export class MatchCreatorService {
       }
     }
     if (resolvedSeatColors[0] !== SLOT_COLORS[0]) {
-      throw new BadRequestException('The host (first seat) must be blue');
+      throw new BadRequestException({
+        code: 'MATCH_HOST_BLUE',
+        message: 'The host (first seat) must be blue',
+      });
     }
     updates.seatColors = resolvedSeatColors.join(',');
 
@@ -181,7 +205,10 @@ export class MatchCreatorService {
           ? botColors
           : SLOT_COLORS.slice(1, 1 + totalBots);
       if (assignedBotColors.length !== totalBots) {
-        throw new BadRequestException('botColors must match botCount');
+        throw new BadRequestException({
+          code: 'MATCH_BOT_COLORS',
+          message: 'botColors must match botCount',
+        });
       }
       for (const color of assignedBotColors) {
         const slot = colorSlot.get(color);
@@ -237,7 +264,10 @@ export class MatchCreatorService {
   // Create a PvE match with the specified number of bot opponents.
   async playBot(userId: string, playerCount: number = 2) {
     if (playerCount !== 2 && playerCount !== 4) {
-      throw new BadRequestException('Player count must be 2 or 4');
+      throw new BadRequestException({
+        code: 'MATCH_PLAYER_COUNT_2_4',
+        message: 'Player count must be 2 or 4',
+      });
     }
     const botCount = playerCount - 1;
     return this.createMatch(userId, 'pve', playerCount, botCount);
@@ -257,13 +287,19 @@ export class MatchCreatorService {
         const data = await this.redis.hgetall(key);
         if (data.inviteCode === inviteCode && data.status === 'WAITING') {
           if (data.player1_id === userId) {
-            throw new BadRequestException('You cannot join your own invite');
+            throw new BadRequestException({
+              code: 'MATCH_OWN_INVITE',
+              message: 'You cannot join your own invite',
+            });
           }
           return joiner(data.id, userId);
         }
       }
     } while (cursor !== '0');
-    throw new NotFoundException('Invite code not found or expired');
+    throw new NotFoundException({
+      code: 'MATCH_INVITE_INVALID',
+      message: 'Invite code not found or expired',
+    });
   }
 
   private async resolveUsername(userId: string): Promise<string | null> {

@@ -42,7 +42,7 @@ The shared components are reusable UI (user interface) building blocks used on s
 | `src/components/RetroAuthLayout.tsx` | Retro-styled authentication page container (`tag` + `children`, plus the `NeonCheck` glyph) |
 | `src/components/Board.tsx` | Ludo board — tracks, bases, pieces, legal-move highlights |
 | `src/components/Die.tsx` | Dice component — face rendering with roll animation |
-| `src/components/UserAvatar.tsx` | Avatar image — keyed by the immutable `userId`; requests the photo only when the seat is not a bot and a photo is known to exist (payload flag or a live `avatar_changed` override), otherwise renders the DiceBear default. A failed load marks that id broken for the session so it is not retried |
+| `src/components/UserAvatar.tsx` | Avatar image — keyed by the immutable `userId`; requests the photo only when the seat is not a bot and a photo is known to exist (payload flag or a live `avatar_changed` override), otherwise renders the DiceBear default. A failed load marks that id broken for the session so it is not retried; an optional `onPhotoError` callback runs when that happens, so a parent component can show a message (the Profile page uses it to show a warning in the user's language) |
 | `src/dicebear.ts` | DiceBear helper — generates an avatar data URI (Uniform Resource Identifier) (`avataaars`/`bottts`/`identicon`) |
 | `src/components/RankBadge.tsx` | Rank tier badge based on rating |
 | `src/components/OAuthButtons.tsx` | OAuth provider buttons (42, GitHub, Google) |

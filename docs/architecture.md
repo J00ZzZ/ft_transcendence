@@ -191,6 +191,15 @@ specifically because the ngrok tunnel will not tolerate an idle socket. Because 
 keeping the stream up is also what stops live events (for example `avatar_changed`) from being lost
 during a drop.
 
+**The SSE stream must not be re-created for unrelated state changes.** On the client,
+`useNotifications` opens the stream in a `useEffect` whose dependency array contains the
+**user id**, not the whole `user` object. After a successful avatar upload or reset,
+`Profile.tsx` calls `setUser({ ...user, hasAvatarPhoto })`, which creates a new `user`
+object. If the effect depended on that object, React would close the stream and open a new
+one. Any notification published while the stream is closed (for example the
+`profile_updated` toast) is not delivered, so the toast would appear only some of the
+time. Depending on the user id avoids this, because the id does not change.
+
 ### Client polling cadence
 
 The client's periodic requests use named constants, so an interval can be tuned in one place.

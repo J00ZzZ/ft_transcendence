@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getApi, patchApi } from '../api';
+import { getApi, patchApi, translateErrorCode } from '../api';
 import { passwordError } from '../validatePassword';
 import { useApp } from '../store';
 import { DeleteAccountModal } from './DeleteAccountModal';
@@ -124,8 +124,12 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       if (isPasswordChange) {
         const pwBody: Record<string, string> = { newPassword };
         if (hasPassword) pwBody.currentPassword = currentPassword;
-        const pwResp = await patchApi<{ message?: string }>('/api/auth/profile/password', pwBody);
-        if (pwResp.message) setNotice(pwResp.message);
+        const pwResp = await patchApi<{ code?: string; message?: string }>(
+          '/api/auth/profile/password',
+          pwBody,
+        );
+        const notice = translateErrorCode(pwResp.code) ?? pwResp.message;
+        if (notice) setNotice(notice);
         // Password change keeps the CURRENT session alive — stay signed in.
         setHasPassword(true);
         setCurrentPassword('');

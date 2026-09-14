@@ -1,3 +1,5 @@
+import i18n from './i18n';
+
 // Auth API helpers: on a 401, refresh once (shared across all callers) and
 // retry. An expired refresh token means signed out; a blocked one returns its own
 // status. See docs/frontend/frontend-store-system.md.
@@ -57,6 +59,19 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   });
 }
 
+// Maps a backend error `code` to a localized message (errors.<CODE>), with a few
+// overrides that reuse existing keys. Returns null when there is no mapping, so
+// callers fall back to the server's English message.
+const ERROR_KEY_OVERRIDES: Record<string, string> = {
+  AVATAR_INVALID_TYPE: 'profile.fileTypeError',
+};
+
+export function translateErrorCode(code: unknown): string | null {
+  if (typeof code !== 'string' || code.length === 0) return null;
+  const key = ERROR_KEY_OVERRIDES[code] ?? `errors.${code}`;
+  return i18n.exists(key) ? i18n.t(key) : null;
+}
+
 // Typed JSON REST helpers built on apiFetch.
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -68,9 +83,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    const msg = (body as { message?: string | string[] } | null)?.message;
+    const b = body as { code?: string; message?: string | string[] } | null;
+    const msg = b?.message;
+    const localized = translateErrorCode(b?.code);
     throw new Error(
-      Array.isArray(msg) ? msg.join('. ') : (msg ?? `Request failed (${res.status})`),
+      localized ??
+        (Array.isArray(msg)
+          ? msg.join('. ')
+          : (msg ?? i18n.t('common.requestFailed', { status: res.status }))),
     );
   }
   return res.json() as Promise<T>;

@@ -37,7 +37,11 @@ export class FriendsService {
   // Create a match room, seat both players and notify the invitee.
   // POST /api/friends/:friendId/invite
   async inviteToGame(userId: string, friendId: string) {
-    if (userId === friendId) throw new BadRequestException('Cannot invite yourself');
+    if (userId === friendId)
+      throw new BadRequestException({
+        code: 'FRIEND_INVITE_SELF',
+        message: 'Cannot invite yourself',
+      });
 
     const friendship = await this.prisma.db.friendship.findFirst({
       where: {
@@ -47,7 +51,11 @@ export class FriendsService {
         ],
       },
     });
-    if (!friendship) throw new ForbiddenException('You are not friends with this user');
+    if (!friendship)
+      throw new ForbiddenException({
+        code: 'NOT_FRIENDS_WITH_USER',
+        message: 'You are not friends with this user',
+      });
 
     const match = await this.matchService.createInvite(userId);
     const inviter = await this.prisma.db.user.findUnique({
@@ -96,14 +104,17 @@ export class FriendsService {
   // the target. Used by POST /api/friends/request/:userId.
   async sendFriendRequest(userId: string, targetUserId: string) {
     if (userId === targetUserId) {
-      throw new BadRequestException('Cannot send friend request to yourself');
+      throw new BadRequestException({
+        code: 'FRIEND_REQUEST_SELF',
+        message: 'Cannot send friend request to yourself',
+      });
     }
 
     const targetUser = await this.prisma.db.user.findUnique({
       where: { id: targetUserId },
     });
     if (!targetUser) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
     }
 
     const existing = await this.prisma.db.friendship.findFirst({
@@ -117,14 +128,20 @@ export class FriendsService {
 
     if (existing) {
       if (existing.status === 'accepted') {
-        throw new BadRequestException('Already friends');
+        throw new BadRequestException({ code: 'FRIEND_ALREADY', message: 'Already friends' });
       }
       if (existing.status === 'pending') {
-        throw new BadRequestException('Friend request already pending');
+        throw new BadRequestException({
+          code: 'FRIEND_REQUEST_PENDING',
+          message: 'Friend request already pending',
+        });
       }
       // FriendshipStatus is only accepted/pending/blocked, so this is the
       // remaining case after the two checks above.
-      throw new ForbiddenException('Cannot send request - user is blocked');
+      throw new ForbiddenException({
+        code: 'FRIEND_BLOCKED',
+        message: 'Cannot send request - user is blocked',
+      });
     }
 
     const friendship = await this.prisma.db.friendship.create({
@@ -170,7 +187,10 @@ export class FriendsService {
     });
 
     if (!request) {
-      throw new NotFoundException('Friend request not found');
+      throw new NotFoundException({
+        code: 'FRIEND_REQUEST_NOT_FOUND',
+        message: 'Friend request not found',
+      });
     }
 
     const updated = await this.prisma.db.friendship.update({
@@ -204,7 +224,10 @@ export class FriendsService {
     });
 
     if (!request) {
-      throw new NotFoundException('Friend request not found');
+      throw new NotFoundException({
+        code: 'FRIEND_REQUEST_NOT_FOUND',
+        message: 'Friend request not found',
+      });
     }
 
     await this.prisma.db.friendship.delete({
@@ -238,7 +261,7 @@ export class FriendsService {
     });
 
     if (!friendship) {
-      throw new NotFoundException('Friendship not found');
+      throw new NotFoundException({ code: 'FRIEND_NOT_FOUND', message: 'Friendship not found' });
     }
 
     await this.prisma.db.friendship.delete({
@@ -368,7 +391,10 @@ export class FriendsService {
   // POST /api/friends/block/:userId.
   async blockUser(userId: string, targetUserId: string) {
     if (userId === targetUserId) {
-      throw new BadRequestException('Cannot block yourself');
+      throw new BadRequestException({
+        code: 'FRIEND_BLOCK_SELF',
+        message: 'Cannot block yourself',
+      });
     }
 
     const existing = await this.prisma.db.friendship.findFirst({
@@ -423,7 +449,10 @@ export class FriendsService {
     });
 
     if (!blocked) {
-      throw new NotFoundException('Blocked user record not found');
+      throw new NotFoundException({
+        code: 'FRIEND_BLOCK_NOT_FOUND',
+        message: 'Blocked user record not found',
+      });
     }
 
     await this.prisma.db.friendship.delete({

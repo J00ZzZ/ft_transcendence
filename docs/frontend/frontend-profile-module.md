@@ -18,6 +18,7 @@ The Profile page (`/profile`) shows a user's public profile with statistics, rec
 2. **Stats grid** — wins, losses, win rate, best streak.
 3. **Recent matches** — each game with the opponent names, the result (victory, defeat or draw), pieces in goal and the date.
 4. **Friends panel** — friends with their online status and a rating badge; shown only on your own profile.
+5. **Avatar actions (own profile)** — the `EDIT AVATAR`, `RESET` and `EDIT PROFILE` buttons, and below them a **message area with a fixed height**. The area shows upload and reset errors in red, and the photo-load warning (`profile.photoLoadError`) in amber. Because the height is fixed, a longer translation in Malay or French wraps onto more lines without moving the content below it.
 
 When the page loads it reads the profile, game history, achievements, friends and leaderboard rank. It reads them again when the username changes or when the edit modal closes. It does **not** repeat on a timer.
 
@@ -171,3 +172,5 @@ Hotseat games never count towards any achievement. The badge/tab counter shows `
 | `store.tsx` | `useApp()` for `user` and navigation |
 | `router.tsx` | `useRoute()` to read the `?u=` query parameter |
 | `theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` |
+| `api.ts` | `translateErrorCode()`, which turns an error code from a `fetch` response into text in the user's language |
+| `components/UserAvatar.tsx` | Renders the avatar; `onPhotoError` runs when a photo fails to load |

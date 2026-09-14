@@ -56,7 +56,7 @@ export class UserService {
   // POST /api/user/avatar.
   async uploadAvatar(userId: string, data: Buffer, contentType: string) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     // Prisma 7 uses Bytes type for avatarPhoto
     await this.prisma.db.user.update({
@@ -105,7 +105,7 @@ export class UserService {
   // DELETE /api/user/avatar.
   async deleteAvatar(userId: string) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     await this.prisma.db.user.update({
       where: { id: userId },

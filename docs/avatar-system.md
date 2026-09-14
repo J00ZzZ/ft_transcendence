@@ -66,10 +66,10 @@ Three properties make that work:
 
 | File | Role |
 | --- | --- |
-| `frontend/src/components/UserAvatar.tsx` | The render decision: photo vs generated avatar, the bot guard, the `?v=` stamp, the `onError` fallback. |
+| `frontend/src/components/UserAvatar.tsx` | The render decision: photo vs generated avatar, the bot guard, the `?v=` stamp, the `onError` fallback, and the optional `onPhotoError` callback. |
 | `frontend/src/avatarCache.ts` | Client avatar state: live overrides (`{ has, style, v }`), a per-user attempt stamp, and the `broken` set. |
 | `frontend/src/hooks/useNotifications.tsx` | Applies the `avatar_changed` event to the store. |
-| `frontend/src/pages/Profile.tsx` | Stamps the change locally on upload/delete, so the uploader's own view needs no SSE. |
+| `frontend/src/pages/Profile.tsx` | Sets the change locally on upload/delete, so the uploader's own view needs no SSE; shows upload/reset errors and the `photoLoadError` warning in a message area with a fixed height. |
 | every `<UserAvatar>` call site | Passes `userId` (and `isBot` where the seat can be a bot). |
 
 ---
@@ -208,6 +208,14 @@ flowchart TD
 Only the branch that knows a photo exists issues a request. Every other branch renders the generated
 avatar directly and sends nothing, which is what keeps the console clean. A flag the client never
 received is also treated as "no photo": showing the generated avatar is better than a 404 per seat.
+
+`UserAvatar` also accepts an optional **`onPhotoError`** callback. It runs when a photo was
+expected but failed to load: either the server returned 404 for a photo that should exist, or
+the browser could not read the bytes. The callback only reports the failure; it does not change
+what `UserAvatar` renders. `UserAvatar` still shows the DiceBear image and still records the id
+in the `broken` set. The Profile page uses the callback to show a warning translated into the
+selected language (`profile.photoLoadError`) in the reserved message area below the avatar
+buttons.
 
 ### 4. Game seats (waiting room, live game)
 

@@ -126,7 +126,7 @@ export function Lobby() {
       setActiveMatch(res);
       navigate(`/game?gameId=${res.gameId}`);
     } catch (err) {
-      setStartError(err instanceof Error ? err.message : 'Failed to create match');
+      setStartError(err instanceof Error ? err.message : t('lobby.createFailed'));
       setStarting(false);
     }
   };

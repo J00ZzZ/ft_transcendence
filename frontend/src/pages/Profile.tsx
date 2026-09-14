@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { RetroNavbar } from '../components/RetroNavbar';
 import { UserAvatar } from '../components/UserAvatar';
 import { applyAvatarChange } from '../avatarCache';
+import { translateErrorCode } from '../api';
 import { ProfileEditModal } from '../components/ProfileEditModal';
 import { useRoute, navigate } from '../router';
 import { useApp } from '../store';
@@ -240,7 +241,7 @@ export function Profile() {
       });
       if (!res.ok) {
         const err = await res.json();
-        setUploadError(err.message ?? t('profile.uploadFailed'));
+        setUploadError(translateErrorCode(err?.code) ?? err?.message ?? t('profile.uploadFailed'));
       } else {
         retroAudio.playUiBeep(880, 0.06);
         if (user) setUser({ ...user, hasAvatarPhoto: true });

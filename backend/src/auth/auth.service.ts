@@ -97,14 +97,20 @@ export class AuthService implements OnModuleDestroy {
   async register(dto: RegisterDto, baseUrl: string = BASE_URL) {
     const existing = await this.prisma.db.user.findUnique({ where: { username: dto.username } });
     if (existing) {
-      throw new ConflictException('Username is already taken');
+      throw new ConflictException({
+        code: 'AUTH_USERNAME_TAKEN',
+        message: 'Username is already taken',
+      });
     }
 
     const email = dto.email ? normalizeEmail(dto.email) : dto.email;
     if (email) {
       const emailTaken = await this.prisma.db.user.findUnique({ where: { email } });
       if (emailTaken) {
-        throw new ConflictException('Email already registered. Use a different email');
+        throw new ConflictException({
+          code: 'AUTH_EMAIL_TAKEN',
+          message: 'Email already registered. Use a different email',
+        });
       }
     }
 
@@ -154,12 +160,18 @@ export class AuthService implements OnModuleDestroy {
       },
     });
     if (!user?.password_hash) {
-      throw new UnauthorizedException('Invalid username, email, or password');
+      throw new UnauthorizedException({
+        code: 'AUTH_INVALID_CREDENTIALS',
+        message: 'Invalid username, email, or password',
+      });
     }
 
     const passwordMatches = await bcrypt.compare(dto.password, user.password_hash);
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid username, email, or password');
+      throw new UnauthorizedException({
+        code: 'AUTH_INVALID_CREDENTIALS',
+        message: 'Invalid username, email, or password',
+      });
     }
 
     // 2FA off → password alone is enough; issue the session immediately.
@@ -192,7 +204,10 @@ export class AuthService implements OnModuleDestroy {
   async resetPassword(token: string, newPassword: string) {
     const userId = await this.twoFactor.consumeResetToken(token);
     if (!userId) {
-      throw new UnauthorizedException('This reset link is invalid or has expired');
+      throw new UnauthorizedException({
+        code: 'AUTH_RESET_LINK_INVALID',
+        message: 'This reset link is invalid or has expired',
+      });
     }
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await this.prisma.db.user.update({
@@ -230,11 +245,17 @@ export class AuthService implements OnModuleDestroy {
   async completeTwoFactor(pendingToken: string, code: string) {
     const userId = await this.twoFactor.verifyChallenge(pendingToken, code);
     if (!userId) {
-      throw new UnauthorizedException('Invalid or expired code');
+      throw new UnauthorizedException({
+        code: 'AUTH_CODE_INVALID',
+        message: 'Invalid or expired code',
+      });
     }
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new UnauthorizedException('Invalid or expired code');
+      throw new UnauthorizedException({
+        code: 'AUTH_CODE_INVALID',
+        message: 'Invalid or expired code',
+      });
     }
     return this.issueSession(user.id, user.username);
   }
@@ -264,11 +285,23 @@ export class AuthService implements OnModuleDestroy {
   // Trade a refresh token for a new access token, rotating the refresh token
   // in the same step. Throws 401 when it's missing/expired/revoked.
   async refresh(refreshToken?: string) {
-    if (!refreshToken) throw new UnauthorizedException('Not authenticated');
+    if (!refreshToken)
+      throw new UnauthorizedException({
+        code: 'AUTH_NOT_AUTHENTICATED',
+        message: 'Not authenticated',
+      });
     const rotated = await this.session.rotate(refreshToken);
-    if (!rotated) throw new UnauthorizedException('Session expired : please log in again');
+    if (!rotated)
+      throw new UnauthorizedException({
+        code: 'AUTH_SESSION_EXPIRED',
+        message: 'Session expired : please log in again',
+      });
     const user = await this.prisma.db.user.findUnique({ where: { id: rotated.userId } });
-    if (!user) throw new UnauthorizedException('Session expired : please log in again');
+    if (!user)
+      throw new UnauthorizedException({
+        code: 'AUTH_SESSION_EXPIRED',
+        message: 'Session expired : please log in again',
+      });
     return {
       accessToken: this.signAccess(user.id, user.username),
       refreshToken: rotated.newToken,
@@ -284,7 +317,8 @@ export class AuthService implements OnModuleDestroy {
   // Full profile for the Edit-Profile card (incl. linked OAuth providers).
   async getProfile(userId: string) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     // Repair the avatar-meta cache from this row: /me is the payload every session
     // loads, so the cached flag follows the stored row at no extra query cost.
@@ -327,7 +361,8 @@ export class AuthService implements OnModuleDestroy {
       where: { id: userId },
       select: { twoFactorEnabled: true },
     });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
     return { twoFactorEnabled: user.twoFactorEnabled };
   }
 
@@ -354,7 +389,8 @@ export class AuthService implements OnModuleDestroy {
     },
   ) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     const data: Record<string, unknown> = {};
     let emailChanged = false;
@@ -366,7 +402,11 @@ export class AuthService implements OnModuleDestroy {
       const taken = await this.prisma.db.user.findUnique({
         where: { displayName: dto.displayName },
       });
-      if (taken) throw new ConflictException('Display name is already taken');
+      if (taken)
+        throw new ConflictException({
+          code: 'AUTH_DISPLAY_NAME_TAKEN',
+          message: 'Display name is already taken',
+        });
       data.displayName = dto.displayName;
     }
 
@@ -375,7 +415,10 @@ export class AuthService implements OnModuleDestroy {
       if (email !== user.email) {
         const emailTaken = await this.prisma.db.user.findUnique({ where: { email } });
         if (emailTaken) {
-          throw new ConflictException('Email already registered. Use a different email');
+          throw new ConflictException({
+            code: 'AUTH_EMAIL_TAKEN',
+            message: 'Email already registered. Use a different email',
+          });
         }
         data.email = email;
         // New address must be re-confirmed before it can be used to log in.
@@ -475,11 +518,16 @@ export class AuthService implements OnModuleDestroy {
     currentRefreshToken?: string,
   ) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     if (user.password_hash) {
       const matches = await bcrypt.compare(currentPassword ?? '', user.password_hash);
-      if (!matches) throw new UnauthorizedException('Current password is incorrect');
+      if (!matches)
+        throw new UnauthorizedException({
+          code: 'AUTH_CURRENT_PASSWORD_INCORRECT',
+          message: 'Current password is incorrect',
+        });
     }
 
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
@@ -495,23 +543,38 @@ export class AuthService implements OnModuleDestroy {
       .notify(userId, 'profile_updated', { items: ['password'] })
       .catch(() => {});
 
-    return { message: 'Password updated : other devices were signed out.' };
+    return {
+      code: 'AUTH_PASSWORD_UPDATED',
+      message: 'Password updated : other devices were signed out.',
+    };
   }
 
   // Permanently delete the user's account. Requires `confirm: true` and a
   // verified password. Redis/other cleanup runs first; the DB delete (last)
   // is the single point of no return.
   async deleteAccount(userId: string, dto: DeleteAccountDto) {
-    if (!dto.confirm) throw new BadRequestException('You must confirm account deletion');
+    if (!dto.confirm)
+      throw new BadRequestException({
+        code: 'AUTH_DELETE_CONFIRM_REQUIRED',
+        message: 'You must confirm account deletion',
+      });
 
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     if (!user.password_hash) {
-      throw new ForbiddenException('Set a password before deleting your account');
+      throw new ForbiddenException({
+        code: 'AUTH_DELETE_SET_PASSWORD',
+        message: 'Set a password before deleting your account',
+      });
     }
     const matches = await bcrypt.compare(dto.currentPassword ?? '', user.password_hash);
-    if (!matches) throw new UnauthorizedException('Current password is incorrect');
+    if (!matches)
+      throw new UnauthorizedException({
+        code: 'AUTH_CURRENT_PASSWORD_INCORRECT',
+        message: 'Current password is incorrect',
+      });
 
     // 1. Abort live matches the user is seated in, so a deleted user_id can
     //    never FK-fail processGameEnd and void the opponents' results.
@@ -599,7 +662,10 @@ export class AuthService implements OnModuleDestroy {
     if (existingAccount) {
       // "Add method" intent: same user -> no-op, different user -> conflict.
       if (linkUserId && existingAccount.userId !== linkUserId) {
-        throw new ConflictException('This provider account is linked to another user');
+        throw new ConflictException({
+          code: 'AUTH_PROVIDER_LINKED',
+          message: 'This provider account is linked to another user',
+        });
       }
       return existingAccount.user;
     }
@@ -711,16 +777,24 @@ export class AuthService implements OnModuleDestroy {
   // way to sign in : a password OR another linked provider.
   async removeOAuthMethod(userId: string, provider: string) {
     const account = await this.prisma.db.account.findFirst({ where: { userId, provider } });
-    if (!account) throw new NotFoundException('That provider is not linked to this account');
+    if (!account)
+      throw new NotFoundException({
+        code: 'AUTH_PROVIDER_NOT_LINKED',
+        message: 'That provider is not linked to this account',
+      });
 
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
 
     const remainingAccounts = await this.prisma.db.account.count({
       where: { userId, NOT: { provider } },
     });
     if (!user.password_hash && remainingAccounts === 0) {
-      throw new ForbiddenException('You must keep at least one sign-in method');
+      throw new ForbiddenException({
+        code: 'AUTH_KEEP_ONE_SIGNIN',
+        message: 'You must keep at least one sign-in method',
+      });
     }
 
     await this.prisma.db.account.delete({ where: { id: account.id } });

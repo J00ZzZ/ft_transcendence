@@ -1,10 +1,52 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import type { HttpServer } from '@nestjs/common';
+import type { ValidationError } from 'class-validator';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma.service';
+
+// Maps a failing validation (property + class-validator constraint) to a stable
+// code the frontend localizes (errors.<CODE>). Constraints without an entry keep
+// their English message, so nothing regresses. See docs/API-list.md.
+const VALIDATION_CODES: Record<string, string> = {
+  'username.matches': 'VALIDATION_USERNAME_FORMAT',
+  'code.matches': 'VALIDATION_CODE_FORMAT',
+  'displayName.isLength': 'VALIDATION_DISPLAY_NAME_LENGTH',
+  'displayName.matches': 'VALIDATION_DISPLAY_NAME_CHARS',
+};
+
+// Which failing constraint to prefer when a field breaks more than one rule
+// (e.g. an empty display name fails both length and character rules; length is
+// the clearer message). Only affects fields that have a mapped code.
+const CONSTRAINT_PRIORITY = ['isLength', 'minLength', 'maxLength', 'matches', 'isEmail'];
+
+// Turns class-validator failures into { code?, message } so DTO validation errors
+// are localized like the rest. Unmapped constraints keep Nest's default shape.
+function validationExceptionFactory(errors: ValidationError[]): BadRequestException {
+  const messages = errors.flatMap((e) => (e.constraints ? Object.values(e.constraints) : []));
+  const message = messages.length > 0 ? messages : ['Invalid request payload'];
+
+  // Pick the first failing field that has a mapped code, independent of the
+  // order class-validator reports the errors in.
+  let code: string | undefined;
+  for (const e of errors) {
+    if (!e.constraints) continue;
+    const keys = Object.keys(e.constraints);
+    const constraint =
+      CONSTRAINT_PRIORITY.find((k) => keys.includes(k) && VALIDATION_CODES[`${e.property}.${k}`]) ??
+      keys[0];
+    const candidate = VALIDATION_CODES[`${e.property}.${constraint}`];
+    if (candidate) {
+      code = candidate;
+      break;
+    }
+  }
+
+  if (code) return new BadRequestException({ code, message });
+  return new BadRequestException({ statusCode: 400, message, error: 'Bad Request' });
+}
 
 // App entry point: builds the NestJS app, sets up trust-proxy, cookies and validation,
 // exposes a /health DB check, and starts listening on port 3000.
@@ -17,8 +59,15 @@ async function bootstrap() {
   // JwtStrategy reads the token from req.cookies; without this it's undefined.
   app.use(cookieParser());
 
-  // Enforce the class-validator decorators on register/login DTOs.
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  // Enforce the class-validator decorators on register/login DTOs, localizing
+  // the mapped validation failures (see validationExceptionFactory).
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      exceptionFactory: validationExceptionFactory,
+    }),
+  );
 
   // Health endpoint. Typed via the generic HttpServer interface because the
   // concrete ExpressAdapter's RequestHandler type is too narrow for a custom
