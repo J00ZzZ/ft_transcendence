@@ -5,9 +5,9 @@ Reaching the app from anywhere on the internet, via ngrok. Companion doc:
 
 Verified directly against the current repo (`Makefile`, `backend/src/secrets.ts`,
 `backend/src/auth/oauth.guards.ts`, `backend/src/auth/auth.controller.ts`)
-rather than copied from older docs — see [Known issue](#known-issue) at
-the bottom for one place where a comment/config no longer matches what
-actually runs.
+rather than copied from older docs — see
+[Removed: the `TUNNEL_MODE` environment variable](#removed-the-tunnel_mode-environment-variable)
+at the bottom for the history of one variable that used to exist here.
 
 ## Commands
 
@@ -16,7 +16,7 @@ make ngrok-auth   # one-time: registers NGROK_AUTHTOKEN with the ngrok CLI
 make tunnel       # = make all, then ngrok http https://localhost:$(NGROK_PORT)
 make tunnel-url   # prints the current public URL from ngrok's local API (:4040)
 make dev-tunnel   # opens two Terminal.app tabs: `make dev` + `make tunnel` (macOS only)
-make stop-tunnel  # kills ngrok and stops the compose stack
+make stop-tunnel  # stops ngrok and the compose stack
 ```
 
 ## No separate hop — same nginx TLS listener
@@ -36,7 +36,7 @@ instead of a random one each run.
 
 ## Why OAuth needs two apps per provider
 
-Google/GitHub/42 OAuth apps are registered with a fixed, whitelisted
+Google/GitHub/42 OAuth apps are registered with one fixed, pre-approved
 callback URL. A tunnel's public URL is a different origin from
 `https://localhost:8443`, so **one** OAuth app can't cover both — you'd have
 to reconfigure the provider's callback URL every time you switched modes.
@@ -44,7 +44,7 @@ Instead, the app reuses the **same OAuth client credentials** for local and
 tunnel mode and registers a **second callback URL** per provider
 (`NGROK_GOOGLE_CALLBACK_URL`, etc. — the `NGROK_*_CALLBACK_URL` entries in
 `TUNNEL_VARS`, see the `Makefile`). Google/GitHub/42 OAuth apps allow multiple
-whitelisted redirect URIs, so both callback URLs can be listed on the single
+pre-approved redirect URIs, so both callback URLs can be listed on the single
 app. Both Passport strategies are active on the backend **at the same time**.
 
 Which one handles a given request is resolved **per request**, not at boot,
@@ -72,7 +72,7 @@ check to decide which `FRONTEND_URL` to redirect back to after login
 |---|---|---|
 | `NGROK_AUTHTOKEN` | yes | Required by `make ngrok-auth`, which `tunnel` depends on |
 | `NGROK_DOMAIN` | no | Reserved ngrok domain, for a stable URL across restarts |
-| `NGROK_PORT` | no | Default `8443` — the local port ngrok tunnels (nginx's published port); `make env` seeds it |
+| `NGROK_PORT` | no | Default `8443` — the local port ngrok tunnels (nginx's published port); the default is defined in the `Makefile` and can be overridden in `.env` |
 | `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests |
 | `GOOGLE_/GITHUB_/FORTYTWO_CLIENT_ID` + `_SECRET` + `_CALLBACK_URL` | yes | OAuth app credentials — shared by the local and tunnel strategies |
 | `NGROK_GOOGLE_/GITHUB_/FORTYTWO_CALLBACK_URL` | yes | Tunnel callback URLs registered as extra redirect URIs on the same OAuth apps |
@@ -81,22 +81,16 @@ check to decide which `FRONTEND_URL` to redirect back to after login
 `.env`, validates that every required value (core secrets/DB URLs, OAuth apps,
 tunnel credentials) is present and non-empty — failing hard with the missing
 list otherwise.
-Nothing is auto-generated: copy a real `.env` from a teammate.
+Nothing is auto-generated (the one exception: `LAN_IP`, which `make env`
+overwrites with the machine's current address so LAN mode cannot print a
+stale URL): copy a real `.env` from a teammate.
 
-## Known issue
+## Removed: the `TUNNEL_MODE` environment variable
 
-One place where a comment/default in the code describes different behavior
-than what actually runs — found by tracing the config directly rather than
-trusting the comments:
-
-1. **`TUNNEL_MODE` (in `compose.yaml`'s `backend.environment`) is never read
-   by the backend.** `grep -rn TUNNEL_MODE backend/` turns up nothing outside
-   `compose.yaml` itself. The actual local/tunnel switch is the per-request
-   `isTunnelRequest(host)` check above — `make tunnel`'s
-   `TUNNEL_MODE=true docker compose up -d --no-deps backend` step recreates
-   the backend container, which may still be useful for picking up fresh
-   `.env` values, but the env var it sets does nothing on its own.
-
-This one is not fixed here — flagging it rather than silently patching the
-Makefile, since fixing wasn't asked for and other people may be relying on
-this behavior as-is.
+Earlier versions of this setup had a `TUNNEL_MODE` variable.
+`make tunnel` ran `TUNNEL_MODE=true docker compose up -d --no-deps backend`
+alongside the ngrok command, and `compose.yaml` passed it into the backend
+container. Nothing in the backend ever read it — the actual local/tunnel
+switch has always been the per-request `isTunnelRequest(host)` check
+described above — so it was deleted from the `Makefile` and `compose.yaml`.
+There is now no environment variable to set, and none is needed.

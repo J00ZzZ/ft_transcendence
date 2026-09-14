@@ -9,7 +9,7 @@ Reaching the app from another device on the same WiFi. Companion docs:
 make all      # = make build && make start
 ```
 
-Nothing special: the whole compose stack comes up, and `https://localhost:8443`
+This is the baseline: the whole compose stack starts, and `https://localhost:8443`
 resolves to nginx on your own machine. LAN mode is this plus one more step.
 
 ## LAN mode
@@ -18,7 +18,7 @@ resolves to nginx on your own machine. LAN mode is this plus one more step.
 make lan      # = make all, then prints the LAN URL
 ```
 
-There is genuinely no extra configuration here — nginx already single-origins
+There is no extra configuration here — nginx already single-origins
 everything (the SPA calls relative `/api/` paths, not an absolute
 `localhost:...` URL — see [`nginx.md`](./nginx.md)), so whatever hostname or
 IP a client typed into their browser is what those relative calls resolve
@@ -32,7 +32,7 @@ against. `make lan` just:
 Because nginx's `"8443:443"` port mapping is published on all interfaces
 (not loopback-only like every other service — see `compose.yaml`), any
 device on the same network can reach it directly — same self-signed cert,
-same "tap through the browser warning" step as local mode.
+the same step of accepting the browser certificate warning as in local mode.
 
 ## Environment variables
 
@@ -40,7 +40,7 @@ same "tap through the browser warning" step as local mode.
 |---|---|---|
 | `LAN_IP` | no | Auto-detected from `en0`/`en1` (macOS) or the default route (Linux) if unset |
 | `HTTPS_PORT` | no | Default `8443` — used in the printed URL; the actual nginx port mapping in `compose.yaml` is hardcoded to `8443:443` regardless of this value |
-| `FRONTEND_URL` | yes | Default `https://localhost:8443` — used by OAuth post-login redirects, not LAN routing itself (LAN clients hit the same nginx origin they typed) |
+| `FRONTEND_URL` | yes | Default `https://localhost:8443` — used by OAuth post-login redirects, not LAN routing itself (LAN clients use the same nginx origin they typed) |
 
 ## Known caveat
 
