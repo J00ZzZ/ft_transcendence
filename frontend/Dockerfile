@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Frontend Dockerfile: builds the React SPA and publishes it.
 # Serving is the nginx service's job (see ../nginx). This container stays
 # alive: it publishes the build into the shared spa_dist volume, then watches
@@ -9,7 +10,7 @@ FROM node:22-alpine
 RUN apk add --no-cache inotify-tools
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm npm install
 COPY . .
 RUN chmod +x publish.sh
 

@@ -2,9 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
+// Aggregate player stats for the stats card. Used by
+// stats.controller.ts (GET /api/stats).
 export class StatsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Lifetime totals for the logged-in user: rating, games, wins/losses,
+  // captures and goals. Used by GET /api/stats.
   async getStats(userId: string) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -21,12 +25,14 @@ export class StatsService {
     const totalPiecesInGoal = participations.reduce((s, p) => s + p.piecesInGoal, 0);
 
     return {
+      rating: user.rating,
+      highestRating: user.highestRating,
       totalGames,
       wins,
       losses: totalGames - wins,
       totalCaptures,
       totalPiecesInGoal,
-      avgCapturesPerGame: totalGames > 0 ? Math.round(totalCaptures / totalGames * 10) / 10 : 0,
+      avgCapturesPerGame: totalGames > 0 ? Math.round((totalCaptures / totalGames) * 10) / 10 : 0,
     };
   }
 }

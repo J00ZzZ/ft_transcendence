@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, Profile } from 'passport-github2';
-import { AuthService } from './auth.service';
+import { AuthService, OAuthCallbackRequest } from './auth.service';
 import { requireSecret } from '../secrets';
 
 @Injectable()
+// Passport strategy for GitHub OAuth login on localhost. Used by
+// GithubAuthGuard on the /api/auth/github routes.
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   constructor(private readonly authService: AuthService) {
     super({
@@ -15,10 +17,18 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
       // Default mode returns only the primary email and DROPS the verified
       // flag; raw mode keeps { value, verified, primary } for every address.
       allRawEmails: true,
+      passReqToCallback: true,
     });
   }
 
-  async validate(_accessToken: string, _refreshToken: string, profile: Profile) {
+  // Runs after GitHub redirects back: pick a verified email, then log the
+  // user in (or link the provider account) via validateOAuthLogin.
+  async validate(
+    req: OAuthCallbackRequest | undefined,
+    _accessToken: string,
+    _refreshToken: string,
+    profile: Profile,
+  ) {
     const emails = (profile.emails ?? []) as Array<{
       value: string;
       verified?: boolean;
@@ -26,11 +36,14 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     }>;
     const email = (emails.find((e) => e.primary && e.verified) ?? emails.find((e) => e.verified))
       ?.value;
-    return this.authService.validateOAuthLogin({
-      provider: 'github',
-      providerAccountId: profile.id,
-      email,
-      usernameSeed: profile.username ?? `github_${profile.id}`,
-    });
+    return this.authService.validateOAuthLogin(
+      {
+        provider: 'github',
+        providerAccountId: profile.id,
+        email,
+        usernameSeed: profile.username ?? `github_${profile.id}`,
+      },
+      this.authService.resolveOAuthLinkForRequest(req, 'github'),
+    );
   }
 }

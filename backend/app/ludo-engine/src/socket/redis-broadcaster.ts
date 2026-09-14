@@ -1,32 +1,23 @@
-import { readFileSync } from 'fs';
 import Redis from 'ioredis';
 import { Server } from 'socket.io';
 
-/**
- * RedisBroadcaster subscribes to game state changes published via Redis pub/sub
- * and forwards them to the corresponding Socket.IO room.
- * This decouples the broadcast mechanism from the event publishing logic.
- */
+// RedisBroadcaster forwards game:* Redis pub/sub messages to the matching
+// Socket.IO room, decoupling broadcast from event publishing.
 export class RedisBroadcaster {
   private subscriber: Redis;
 
   constructor(redisUrl?: string) {
     const host = process.env.REDIS_HOST || 'redis';
-    const port = parseInt(process.env.REDIS_PORT || '6379', 10);
-    let password: string | undefined;
-    try {
-      password = readFileSync('/secrets/redis_password.txt', 'utf8').trim();
-    } catch { /* no password file, connect without auth */ }
+    const port = parseInt(process.env.REDIS_PORT || '6479', 10);
+    const password = process.env.REDIS_PASSWORD;
 
     this.subscriber = redisUrl
       ? new Redis(redisUrl)
       : new Redis({ host, port, password, retryStrategy: (t) => Math.min(t * 50, 2000) });
   }
 
-  /**
-   * Start listening for game events on Redis pub/sub channels (game:* pattern).
-   * Forwards each message to the matching Socket.IO room.
-   */
+  // Listen on the game:* pattern and forward each message to the matching
+  // Socket.IO room.
   start(io: Server): void {
     this.subscriber.psubscribe('game:*', (err, count) => {
       if (err) {

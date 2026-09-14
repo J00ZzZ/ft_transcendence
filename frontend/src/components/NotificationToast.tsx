@@ -1,30 +1,198 @@
-import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
-import type { Notification } from '../hooks/useNotifications'
-import { btnGold, btnOutline } from '../theme'
-import { useApp } from '../store'
-import { navigate } from '../router'
-import type { PlayerColor } from '../game/types'
+import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { Notification } from '../hooks/useNotifications';
+import { useApp } from '../store';
+import { navigate } from '../router';
+import { apiFetch } from '../api';
+import type { PlayerColor } from '../game/types';
+import { retroAudio } from '../utils/audio';
+import { RETRO_BTN } from '../styles/tw';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Human-readable title for each notification type. */
-function title(n: Notification): string {
-  switch (n.type) {
-    case 'friend_request':
-      return `${n.payload.fromUsername ?? 'Someone'} sent you a friend request`
-    case 'friend_accepted':
-      return `${n.payload.fromUsername ?? 'Someone'} accepted your friend request`
-    case 'game_invite':
-      return `${n.payload.fromUsername ?? 'A friend'} invited you to a game`
-    case 'achievement':
-      return `Achievement unlocked!`
-    default:
-      return 'New notification'
+// Notification.payload is typed as an object, but the backend historically sent
+// a JSON string for some rows. Keep the defensive parse for old/streamed rows.
+function parseNotificationPayload(raw: Record<string, unknown>): Record<string, unknown> {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
   }
+  return raw;
 }
 
+function getToastInfo(
+  n: Notification,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): {
+  tag: string;
+  badgeLabel: string;
+  badgeColor: string;
+  badgeBg: string;
+  fromUser: string | null;
+  actionMessage: string;
+} {
+  const payload = parseNotificationPayload(n.payload);
+  const from = payload.fromUsername ? String(payload.fromUsername) : null;
 
+  switch (n.type) {
+    case 'friend_request':
+      return {
+        tag: t('notifications.linkReqTag'),
+        badgeLabel: 'LINK',
+        badgeColor: 'var(--accent-pink, #ff007f)',
+        badgeBg: 'rgba(255, 0, 127, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionFriendReq'),
+      };
+    case 'friend_accepted':
+      return {
+        tag: t('notifications.linkEstablishedTag'),
+        badgeLabel: 'SYNC',
+        badgeColor: 'var(--accent-yellow, #ffe600)',
+        badgeBg: 'rgba(255, 230, 0, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionFriendAccepted'),
+      };
+    case 'game_invite':
+      return {
+        tag: t('notifications.matchChallengeTag'),
+        badgeLabel: payload.playerCount === 4 ? '4P' : '1v1',
+        badgeColor: 'var(--accent-cyan, #00f0ff)',
+        badgeBg: 'rgba(0, 240, 255, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionMatchChallenge'),
+      };
+    case 'achievement': {
+      const nameKey = payload.nameKey as string | undefined;
+      const name = nameKey ? t(nameKey) : '';
+      return {
+        tag: t('notifications.achievementTag'),
+        badgeLabel: 'ACHV',
+        badgeColor: '#00ff88',
+        badgeBg: 'rgba(0, 255, 136, 0.18)',
+        fromUser: null,
+        actionMessage: name ? `${name}!` : t('notifications.achievementUnlocked'),
+      };
+    }
+    case 'match_finished': {
+      const rank = payload.rank;
+      const winner = payload.winnerUsername ? String(payload.winnerUsername) : 'A rival';
+      return {
+        tag: t('notifications.matchEndTag'),
+        badgeLabel: 'END',
+        badgeColor: '#00ff88',
+        badgeBg: 'rgba(0, 255, 136, 0.18)',
+        fromUser: null,
+        actionMessage:
+          rank === 1
+            ? t('notifications.matchEndWonText')
+            : t('notifications.matchEndLostText', { winner }),
+      };
+    }
+    case 'match_cancelled':
+      return payload.reason === 'resign'
+        ? {
+            tag: t('notifications.matchCancelledTag'),
+            badgeLabel: 'ABRT',
+            badgeColor: 'var(--accent-yellow, #ffe600)',
+            badgeBg: 'rgba(255, 230, 0, 0.18)',
+            fromUser: from,
+            actionMessage: t('notifications.actionMatchResigned'),
+          }
+        : {
+            tag: t('notifications.matchCancelledTag'),
+            badgeLabel: 'ABRT',
+            badgeColor: 'var(--accent-yellow, #ffe600)',
+            badgeBg: 'rgba(255, 230, 0, 0.18)',
+            fromUser: from,
+            actionMessage: t('notifications.actionMatchCancelled'),
+          };
+    case 'friend_removed':
+      return {
+        tag: t('notifications.friendRemovedTag'),
+        badgeLabel: 'LINK',
+        badgeColor: 'var(--accent-pink, #ff007f)',
+        badgeBg: 'rgba(255, 0, 127, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionFriendRemoved'),
+      };
+    case 'friend_declined':
+      return {
+        tag: t('notifications.friendDeclinedTag'),
+        badgeLabel: 'LINK',
+        badgeColor: 'var(--accent-yellow, #ffe600)',
+        badgeBg: 'rgba(255, 230, 0, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionFriendDeclined'),
+      };
+    case 'friend_online':
+      return {
+        tag: t('notifications.friendOnlineTag'),
+        badgeLabel: 'ON',
+        badgeColor: '#00ff88',
+        badgeBg: 'rgba(0, 255, 136, 0.18)',
+        fromUser: String(payload.displayName ?? from),
+        actionMessage: t('notifications.actionFriendOnline', {
+          displayName: payload.displayName ?? from,
+        }),
+      };
+    case 'friend_offline':
+      return {
+        tag: t('notifications.friendOfflineTag'),
+        badgeLabel: 'OFF',
+        badgeColor: 'var(--accent-yellow, #ffe600)',
+        badgeBg: 'rgba(255, 230, 0, 0.18)',
+        fromUser: String(payload.displayName ?? from),
+        actionMessage: t('notifications.actionFriendOffline', {
+          displayName: payload.displayName ?? from,
+        }),
+      };
+    case 'profile_updated': {
+      const items = Array.isArray(payload.items) ? (payload.items as string[]) : [];
+      const labels = items
+        .map((i) => t(`notifications.profileItem${i.charAt(0).toUpperCase()}${i.slice(1)}`))
+        .join(', ');
+      return {
+        tag: t('notifications.profileUpdatedTag'),
+        badgeLabel: 'PROF',
+        badgeColor: 'var(--accent-cyan, #00f0ff)',
+        badgeBg: 'rgba(0, 240, 255, 0.18)',
+        fromUser: null,
+        actionMessage: t('notifications.profileUpdatedText', { item: labels || '—' }),
+      };
+    }
+    case 'display_name_changed': {
+      const oldName = payload.oldDisplayName ? String(payload.oldDisplayName) : from;
+      const newName = payload.displayName
+        ? String(payload.displayName)
+        : t('notifications.unknown');
+      return {
+        tag: t('notifications.displayNameChangedTag'),
+        badgeLabel: 'CALL',
+        badgeColor: 'var(--accent-cyan, #00f0ff)',
+        badgeBg: 'rgba(0, 240, 255, 0.18)',
+        fromUser: null,
+        actionMessage: t('notifications.displayNameChangedText', {
+          displayName: oldName,
+          newDisplayName: newName,
+        }),
+      };
+    }
+    default:
+      return {
+        tag: t('notifications.sysBroadcastTag'),
+        badgeLabel: 'SYS',
+        badgeColor: 'var(--accent-cyan, #00f0ff)',
+        badgeBg: 'rgba(0, 240, 255, 0.18)',
+        fromUser: null,
+        actionMessage: t('notifications.actionSysBroadcast'),
+      };
+  }
+}
 
 // ─── Single Toast ────────────────────────────────────────────────────────────
 
@@ -33,36 +201,56 @@ function Toast({
   onDismiss,
   index,
 }: {
-  notification: Notification
-  onDismiss: (id: string) => void
-  index: number
+  notification: Notification;
+  onDismiss: (id: string) => void;
+  index: number;
 }) {
-  const { setActiveMatch } = useApp()
-  const [visible, setVisible] = useState(false)
+  const { t } = useTranslation();
+  const { setActiveMatch } = useApp();
+  const [visible, setVisible] = useState(false);
 
-  // Slide in on mount.
+  // Play audio alert and slide in on mount.
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 30)
-    return () => clearTimeout(t)
-  }, [])
+    try {
+      retroAudio.playUiBeep(1200, 0.04);
+      setTimeout(() => {
+        retroAudio.playUiBeep(1760, 0.08);
+      }, 60);
+    } catch {
+      // Audio safety fallback
+    }
 
-  // Auto-dismiss after 8 seconds.
+    const t = setTimeout(() => setVisible(true), 30);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Auto-dismiss after 9 seconds.
   useEffect(() => {
     const t = setTimeout(() => {
-      setVisible(false)
-      setTimeout(() => onDismiss(notification.id), 350) // wait for slide-out
-    }, 8000)
-    return () => clearTimeout(t)
-  }, [notification.id, onDismiss])
+      setVisible(false);
+      setTimeout(() => onDismiss(notification.id), 350);
+    }, 9000);
+    return () => clearTimeout(t);
+  }, [notification.id, onDismiss]);
 
   const dismiss = () => {
-    setVisible(false)
-    setTimeout(() => onDismiss(notification.id), 350)
-  }
+    try {
+      retroAudio.playUiBeep(400, 0.04);
+    } catch {
+      // Ignore: a sound failure should never break the UI.
+    }
+    setVisible(false);
+    setTimeout(() => onDismiss(notification.id), 350);
+  };
 
-  // Accept a game invite — same logic as the old Shell.tsx invite handler.
+  // Accept a game invite
   const acceptInvite = () => {
-    const p = notification.payload
+    try {
+      retroAudio.playUiBeep(880, 0.08);
+    } catch {
+      // Ignore: a sound failure should never break the UI.
+    }
+    const p = parseNotificationPayload(notification.payload);
     setActiveMatch({
       gameId: p.gameId as string,
       token: p.token as string,
@@ -70,77 +258,343 @@ function Toast({
       inviteCode: p.inviteCode as string | undefined,
       mode: 'pvp',
       playerCount: 4,
-    })
-    onDismiss(notification.id)
-    navigate(`/game?gameId=${p.gameId}`)
-  }
+    });
+    onDismiss(notification.id);
+    if (p.gameId) {
+      navigate(`/game?gameId=${p.gameId}`);
+    }
+  };
+
+  // Accept a friend request directly from toast
+  const acceptFriend = async () => {
+    try {
+      retroAudio.playUiBeep(880, 0.08);
+    } catch {
+      // Ignore: a sound failure should never break the UI.
+    }
+    const p = parseNotificationPayload(notification.payload);
+    if (p.requestId) {
+      try {
+        await apiFetch(`/api/friends/accept/${p.requestId}`, { method: 'POST' });
+      } catch {
+        // Ignore: non-critical action; the toast still dismisses.
+      }
+    }
+    dismiss();
+  };
+
+  // Decline a friend request directly from toast
+  const declineFriend = async () => {
+    try {
+      retroAudio.playUiBeep(400, 0.05);
+    } catch {
+      // Ignore: a sound failure should never break the UI.
+    }
+    const p = parseNotificationPayload(notification.payload);
+    if (p.requestId) {
+      try {
+        await apiFetch(`/api/friends/decline/${p.requestId}`, { method: 'POST' });
+      } catch {
+        // Ignore: non-critical action; the toast still dismisses.
+      }
+    }
+    dismiss();
+  };
+
+  const { tag, badgeLabel, badgeColor, badgeBg, fromUser, actionMessage } = getToastInfo(
+    notification,
+    t,
+  );
+  const isInvite = notification.type === 'game_invite';
 
   const toastStyle: CSSProperties = {
     position: 'fixed',
-    right: 24,
-    bottom: 24 + index * 110, // stack toasts vertically
-    zIndex: 60,
-    width: 340,
-    padding: 18,
-    borderRadius: 16,
-    background: 'linear-gradient(180deg,#241b13,#1a130d)',
-    border: '1px solid #c99b45',
-    boxShadow: '0 20px 44px -20px rgba(0,0,0,.85)',
+    right: 28,
+    bottom: 28 + index * 150,
+    zIndex: 99999,
+    width: 430,
+    background: 'rgba(10, 4, 24, 0.97)',
+    border: '2px solid var(--accent-pink, #ff007f)',
+    boxShadow: '0 0 24px rgba(255, 0, 127, 0.4), 0 20px 48px rgba(0, 0, 0, 0.95)',
+    borderRadius: 4,
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
-    // Slide-in animation
+    overflow: 'hidden',
+    backdropFilter: 'blur(12px)',
     transform: visible ? 'translateX(0)' : 'translateX(120%)',
     opacity: visible ? 1 : 0,
     transition: 'transform 0.35s cubic-bezier(.22,1,.36,1), opacity 0.35s ease',
-  }
+    pointerEvents: 'auto',
+  };
 
   return (
     <div style={toastStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-
-        <div style={{ flex: 1, fontWeight: 700, fontSize: 14, color: '#f0e2c4', lineHeight: 1.4 }}>
-          {title(notification)}
+      {/* Toast Titlebar Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 16px',
+          background: 'rgba(255, 0, 127, 0.22)',
+          borderBottom: '1.5px solid rgba(255, 0, 127, 0.4)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#ff007f',
+              boxShadow: '0 0 8px #ff007f',
+              animation: 'pulse 1s infinite',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-heading, monospace)',
+              fontSize: '0.8rem',
+              color: 'var(--accent-pink, #ff007f)',
+              letterSpacing: 1,
+              fontWeight: 'bold',
+            }}
+          >
+            INCOMING TRANSMISSION // {tag}
+          </span>
         </div>
+
         <button
           onClick={dismiss}
           style={{
-            background: 'none', border: 'none', color: '#8a7a64', cursor: 'pointer',
-            fontSize: 18, padding: 0, lineHeight: 1,
+            background: 'none',
+            border: 'none',
+            color: 'var(--accent-pink, #ff007f)',
+            cursor: 'pointer',
+            fontSize: '1.1rem',
+            padding: '0 4px',
+            lineHeight: 1,
+            fontWeight: 'bold',
           }}
+          title="Dismiss Alert"
         >
-          ✕
+          &times;
         </button>
       </div>
 
-      {/* Action buttons for game invites */}
-      {notification.type === 'game_invite' && (
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={acceptInvite} style={{ ...btnGold, flex: 1, padding: '10px 14px', fontSize: 13 }}>
-            Accept
-          </button>
-          <button onClick={dismiss} style={{ ...btnOutline, flex: 1, padding: '10px 14px', fontSize: 13 }}>
-            Decline
-          </button>
-        </div>
-      )}
-
-      {/* Action buttons for friend requests */}
-      {notification.type === 'friend_request' && (
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => { navigate('/friends'); dismiss() }}
-            style={{ ...btnGold, flex: 1, padding: '10px 14px', fontSize: 13 }}
+      {/* Toast Content Body with Type Identifier Badge */}
+      <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Notification Type Identifier Badge (e.g. "1v1", "LINK", "ACHV") */}
+          <div
+            style={{
+              width: 48,
+              height: 38,
+              borderRadius: 4,
+              background: badgeBg,
+              border: `1.5px solid ${badgeColor}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'var(--font-heading, monospace)',
+              fontSize: '0.78rem',
+              fontWeight: 'bold',
+              color: badgeColor,
+              boxShadow: `0 0 12px ${badgeColor}35`,
+              letterSpacing: 1,
+              flexShrink: 0,
+            }}
           >
-            View
-          </button>
-          <button onClick={dismiss} style={{ ...btnOutline, flex: 1, padding: '10px 14px', fontSize: 13 }}>
-            Dismiss
-          </button>
+            {badgeLabel}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+            {fromUser ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-heading, monospace)',
+                    fontSize: '0.82rem',
+                    color: 'var(--accent-yellow, #ffe600)',
+                    textShadow: '0 0 8px rgba(255, 230, 0, 0.6)',
+                    letterSpacing: 1,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  @{fromUser.toUpperCase()}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.62rem',
+                    background: 'rgba(0, 240, 255, 0.18)',
+                    border: '1px solid var(--accent-cyan, #00f0ff)',
+                    color: 'var(--accent-cyan, #00f0ff)',
+                    padding: '1px 6px',
+                    borderRadius: 2,
+                    fontFamily: 'var(--font-mono, monospace)',
+                    fontWeight: 'bold',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  PILOT
+                </span>
+              </div>
+            ) : (
+              <span
+                style={{
+                  fontFamily: 'var(--font-heading, monospace)',
+                  fontSize: '0.82rem',
+                  color: 'var(--accent-cyan, #00f0ff)',
+                  letterSpacing: 1,
+                  fontWeight: 'bold',
+                }}
+              >
+                SYSTEM ALERT
+              </span>
+            )}
+
+            <div
+              style={{
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: '0.82rem',
+                color: '#e4e4e4',
+                lineHeight: 1.35,
+              }}
+            >
+              {actionMessage}
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Action Buttons for Game Invites */}
+        {isInvite && (
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button
+              onClick={acceptInvite}
+              className={RETRO_BTN}
+              style={{
+                flex: 1,
+                height: 38,
+                padding: '0 16px',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                background: 'rgba(0, 240, 255, 0.18)',
+                border: '2px solid var(--accent-cyan, #00f0ff)',
+                color: 'var(--accent-cyan, #00f0ff)',
+                boxSizing: 'border-box',
+                margin: 0,
+              }}
+            >
+              {t('nav.acceptInvite').toUpperCase()}
+            </button>
+            <button
+              onClick={dismiss}
+              className={RETRO_BTN}
+              style={{
+                flex: 1,
+                height: 38,
+                padding: '0 16px',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                background: 'rgba(255, 0, 127, 0.15)',
+                border: '2px solid rgba(255, 0, 127, 0.5)',
+                color: 'var(--accent-pink, #ff007f)',
+                boxSizing: 'border-box',
+                margin: 0,
+              }}
+            >
+              {t('nav.declineInvite').toUpperCase()}
+            </button>
+          </div>
+        )}
+
+        {/* Action Buttons for Friend Requests */}
+        {notification.type === 'friend_request' && (
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button
+              onClick={() => {
+                void acceptFriend();
+              }}
+              className={RETRO_BTN}
+              style={{
+                flex: 1,
+                height: 38,
+                padding: '0 16px',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                background: 'rgba(0, 240, 255, 0.18)',
+                border: '2px solid var(--accent-cyan, #00f0ff)',
+                color: 'var(--accent-cyan, #00f0ff)',
+                boxSizing: 'border-box',
+                margin: 0,
+              }}
+            >
+              {t('nav.acceptInvite').toUpperCase()}
+            </button>
+            <button
+              onClick={() => {
+                void declineFriend();
+              }}
+              className={RETRO_BTN}
+              style={{
+                flex: 1,
+                height: 38,
+                padding: '0 16px',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                background: 'rgba(255, 0, 127, 0.15)',
+                border: '2px solid rgba(255, 0, 127, 0.5)',
+                color: 'var(--accent-pink, #ff007f)',
+                boxSizing: 'border-box',
+                margin: 0,
+              }}
+            >
+              {t('nav.declineInvite').toUpperCase()}
+            </button>
+          </div>
+        )}
+
+        {/* Action Button for Friend Accepted */}
+        {notification.type === 'friend_accepted' && (
+          <div style={{ display: 'flex', marginTop: 4 }}>
+            <button
+              onClick={dismiss}
+              className={RETRO_BTN}
+              style={{
+                width: '100%',
+                height: 38,
+                padding: '0 16px',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                background: 'rgba(255, 230, 0, 0.12)',
+                border: '2px solid var(--accent-yellow, #ffe600)',
+                color: 'var(--accent-yellow, #ffe600)',
+                boxSizing: 'border-box',
+                margin: 0,
+              }}
+            >
+              {t('notifications.dismiss')}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }
 
 // ─── Toast Container ─────────────────────────────────────────────────────────
@@ -149,11 +603,11 @@ export function NotificationToasts({
   toasts,
   onDismiss,
 }: {
-  toasts: Notification[]
-  onDismiss: (id: string) => void
+  toasts: Notification[];
+  onDismiss: (id: string) => void;
 }) {
   // Show at most 3 toasts at once — oldest ones get pushed off.
-  const visible = toasts.slice(0, 3)
+  const visible = toasts.slice(0, 3);
 
   return (
     <>
@@ -161,5 +615,5 @@ export function NotificationToasts({
         <Toast key={n.id} notification={n} onDismiss={onDismiss} index={i} />
       ))}
     </>
-  )
+  );
 }

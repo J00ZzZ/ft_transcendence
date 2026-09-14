@@ -1,8 +1,30 @@
-import { Controller, Get, Post, Delete, Param, UseGuards, Request, Res, UploadedFile, UseInterceptors, NotFoundException, BadRequestException, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Param,
+  UseGuards,
+  Request,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Query,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { isImageValid } from '../avatar/image-signature.util';
+
+// User routes: public profile/history plus authenticated avatar upload, fetch and
+// delete. Avatars are cacheable but revalidated (no-cache + ETag); the full
+// contract is in docs/avatar-system.md.
+interface UploadedAvatarFile {
+  mimetype: string;
+  buffer: Buffer;
+}
 
 @Controller('api/user')
 export class UserController {
@@ -26,29 +48,52 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('avatar')
-  @UseInterceptors(FileInterceptor('avatar', { limits: { fileSize: 2 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('avatar', { limits: { fileSize: 2 * 1024 * 1024 } })) //Max 2Mb
   async uploadAvatar(
     @Request() req: { user: { id: string } },
-    @UploadedFile() file: any,
+    @UploadedFile() file: UploadedAvatarFile | undefined,
   ) {
     if (!file) {
-      throw new BadRequestException('Avatar file is required');
+      throw new BadRequestException({
+        code: 'AVATAR_FILE_REQUIRED',
+        message: 'Avatar file is required',
+      });
     }
-    const allowedMimes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Invalid file type. Allowed: PNG, JPEG, GIF, WebP');
+    // The declared mimetype is only the client's claim, so check both the MIME
+    // whitelist and the actual magic bytes before storing anything.
+    if (!isImageValid(file.buffer, file.mimetype)) {
+      throw new BadRequestException({
+        code: 'AVATAR_INVALID_TYPE',
+        message: 'Invalid file type. Allowed: PNG, JPEG, GIF, WebP',
+      });
     }
     return this.userService.uploadAvatar(req.user.id, file.buffer, file.mimetype);
   }
 
-  @Get(':username/avatar')
-  async getAvatar(@Param('username') username: string, @Res() res: Response) {
-    const result = await this.userService.getAvatar(username);
+  // The photo, keyed by the immutable user id: a rename can never turn this URL
+  // into a 404 the way a display-name-keyed route could.
+  @Get('id/:userId/avatar')
+  async getAvatarById(@Param('userId') userId: string, @Res() res: Response) {
+    this.sendAvatar(res, await this.userService.getAvatarById(userId));
+  }
+
+  // Shared responder so the caching contract can't drift from the route.
+  private sendAvatar(res: Response, result: { data: Buffer; contentType: string } | null): void {
     if (!result) {
-      throw new NotFoundException('No custom avatar set');
+      // "No photo" is a normal state, not something to retry, so mark it
+      // uncacheable: with an ETag, Express would answer a later revalidation 304
+      // and pin the missing photo in place.
+      res.set('Cache-Control', 'no-store');
+      res
+        .status(404)
+        .json({ message: 'No custom avatar set', error: 'Not Found', statusCode: 404 });
+      return;
     }
     res.set('Content-Type', result.contentType);
-    res.set('Cache-Control', 'public, max-age=86400');
+    // Deliberately not max-age: the URL is stable and the bytes change on every
+    // re-upload. `no-cache` = store but revalidate before reuse, so with the ETag
+    // an unchanged photo costs a 304 and a changed one returns the new bytes.
+    res.set('Cache-Control', 'public, no-cache, no-transform');
     res.send(result.data);
   }
 

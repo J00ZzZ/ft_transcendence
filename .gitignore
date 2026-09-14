@@ -1,8 +1,6 @@
 # secrets & prisma generated client
-secrets/
 backend/generated/
 backend/dist/
-docs/
 
 # Logs
 logs
@@ -30,15 +28,14 @@ dist-ssr
 *.sw?
 
 # planning
-roadmap.md
-roadmap2.md
+eslint.md
+prettier.md
+.prettierignore
+.prettierrc
+TYPESCRIPT.md
+fixavatar.md
 
 # generated documentation
-TYPESCRIPT.md
-API-list.md
-Ludo_Rules.md
-fixdice.md
-context.md
 
 # dependencies
 /node_modules
@@ -52,6 +49,11 @@ context.md
 
 # testing
 /coverage
+/playwright-report
+/e2e-results.json
+/test-results
+
+
 
 # next.js
 /.next/
@@ -61,27 +63,18 @@ context.md
 /build
 
 # misc
-.DS_Store
 *.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
 
 # env files
 .env*
-
-# vercel
-.vercel
+!.env.example
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 package-lock.json
-docs
-*.png
-!frontend/public/*.png
-*.md
+.markdownlint.json
+e2e/
+*.skill
+screenshots

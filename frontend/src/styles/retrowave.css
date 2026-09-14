@@ -1,0 +1,950 @@
+/* ==========================================================================
+   RETRO WAVE ARCADE & OS - MAIN STYLESHEET
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+/* --------------------------------------------------------------------------
+   THEME DESIGN SYSTEM TOKENS
+   -------------------------------------------------------------------------- */
+
+:root,
+[data-theme='synthwave'] {
+  /* Default Theme: Synthwave '84 */
+  --bg-primary: #0d0221;
+  --bg-secondary: #190a38;
+  --bg-card: rgba(25, 10, 56, 0.85);
+  --accent-cyan: #00f0ff;
+  --accent-pink: #ff007f;
+  --accent-yellow: #ffe600;
+  --accent-purple: #9d00ff;
+  --text-main: #ffffff;
+  --text-muted: #b8a6e4;
+  --border-color: #ff007f;
+  --box-shadow: 0 0 15px rgba(255, 0, 127, 0.5), inset 0 0 15px rgba(0, 240, 255, 0.2);
+  --font-heading: 'Press Start 2P', cursive;
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --grid-line-color: rgba(255, 0, 127, 0.35);
+  --grid-bg-glow: rgba(157, 0, 255, 0.2);
+  --btn-bg: linear-gradient(135deg, #ff007f, #9d00ff);
+  --btn-hover-shadow: 0 0 20px #00f0ff, 0 0 35px #ff007f;
+  --crt-scanline-opacity: 0.15;
+  --crt-flicker-opacity: 0.03;
+  --window-header-bg: linear-gradient(90deg, #ff007f, #00f0ff);
+  --window-header-text: #ffffff;
+  --card-border-style: 2px solid var(--accent-pink);
+}
+
+/* Theme: Windows 95 Desktop */
+[data-theme='win95'] {
+  --bg-primary: #008080;
+  --bg-secondary: #c0c0c0;
+  --bg-card: #c0c0c0;
+  --accent-cyan: #000080;
+  --accent-pink: #800080;
+  --accent-yellow: #ffff00;
+  --accent-purple: #000080;
+  --text-main: #000000;
+  --text-muted: #404040;
+  --border-color: #ffffff;
+  --box-shadow: 2px 2px 0px #000000, inset -1px -1px 0px #000000, inset 1px 1px 0px #dfdfdf;
+  --font-heading: 'Press Start 2P', cursive;
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --grid-line-color: transparent;
+  --grid-bg-glow: transparent;
+  --btn-bg: #c0c0c0;
+  --btn-hover-shadow: inset 1px 1px 0px #ffffff, inset -1px -1px 0px #000000;
+  --crt-scanline-opacity: 0.05;
+  --crt-flicker-opacity: 0.01;
+  --window-header-bg: linear-gradient(90deg, #000080, #1084d0);
+  --window-header-text: #ffffff;
+  --card-border-style: 2px solid #ffffff;
+}
+
+/* Theme: CRT Terminal (Green Phosphor) */
+[data-theme='terminal'] {
+  --bg-primary: #051005;
+  --bg-secondary: #0a1f0a;
+  --bg-card: rgba(10, 31, 10, 0.9);
+  --accent-cyan: #33ff33;
+  --accent-pink: #00cc00;
+  --accent-yellow: #aaffaa;
+  --accent-purple: #116611;
+  --text-main: #33ff33;
+  --text-muted: #22aa22;
+  --border-color: #33ff33;
+  --box-shadow: 0 0 10px rgba(51, 255, 51, 0.4), inset 0 0 10px rgba(51, 255, 51, 0.15);
+  --font-heading: 'Press Start 2P', cursive;
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --grid-line-color: rgba(51, 255, 51, 0.1);
+  --grid-bg-glow: rgba(51, 255, 51, 0.05);
+  --btn-bg: #0a1f0a;
+  --btn-hover-shadow: 0 0 15px #33ff33;
+  --crt-scanline-opacity: 0.25;
+  --crt-flicker-opacity: 0.06;
+  --window-header-bg: #116611;
+  --window-header-text: #33ff33;
+  --card-border-style: 1px solid #33ff33;
+}
+
+/* --------------------------------------------------------------------------
+   GLOBAL & RESET STYLES
+   -------------------------------------------------------------------------- */
+
+/* Removed a redundant `* { box-sizing; margin: 0; padding: 0 }` reset here —
+   this file is imported as a plain (unlayered) stylesheet, so that rule sat
+   outside Tailwind's cascade layers and, per the CSS layers spec, ANY
+   unlayered rule beats ANY rule in a layer (incl. `@layer utilities`)
+   regardless of specificity. It was silently zeroing out every margin/
+   padding utility class site-wide (m-*, p-*, gap unaffected). Tailwind's
+   own preflight (`@layer base`) already applies the identical reset, so
+   deleting this restores normal utility-wins-over-base cascade behavior
+   with no loss of the reset itself. */
+
+html,
+body {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  overflow-x: hidden;
+  position: relative;
+  transition:
+    background-color 0.4s ease,
+    color 0.4s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-pink);
+  border: 1px solid var(--accent-cyan);
+}
+
+/* --------------------------------------------------------------------------
+   SYNTHWAVE 3D ANIMATED GRID BACKGROUND
+   -------------------------------------------------------------------------- */
+
+/* Kept for GRID_BACKGROUND/SYNTHWAVE_SUN/PERSPECTIVE_GRID/GRID_HORIZON in
+   tw.ts, which apply this animation via an arbitrary `animation:` value. */
+@keyframes grid-scroll {
+  0% {
+    transform: perspective(220px) rotateX(65deg) translateY(0);
+  }
+
+  100% {
+    transform: perspective(220px) rotateX(65deg) translateY(50px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   CRT MONITOR OVERLAY EFFECTS
+   -------------------------------------------------------------------------- */
+
+/* Literal `.crt-screen` class must stay on the element in JSX (alongside the
+   CRT_SCREEN tw.ts constant) — the body:has(.game-page) rule below targets
+   it by name, and :has() can't be expressed as a single element's Tailwind
+   classlist. */
+.crt-screen {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+}
+
+/* --------------------------------------------------------------------------
+   LAYOUT CONTAINER & NAVIGATION
+   -------------------------------------------------------------------------- */
+
+@keyframes pulse-glow {
+  from {
+    filter: drop-shadow(0 0 2px var(--accent-cyan));
+  }
+
+  to {
+    filter: drop-shadow(0 0 12px var(--accent-pink));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   BUTTONS & FORM INPUTS
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   HERO BANNER
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   MAMEE MONSTER APEX RANK SPECIAL FX (RISING CYBER FIRE & FLAMES)
+   -------------------------------------------------------------------------- */
+
+/* The ::before/::after aura rules that used to live here (targeting
+   .badge-mamee-monster-aura) are now BADGE_MAMEE_AURA in tw.ts — the
+   keyframes below stay, referenced via arbitrary `animation:` values. */
+@keyframes mamee-flame-steady-glow {
+  0% {
+    border-color: #ff3d00;
+    box-shadow:
+      0 0 14px rgba(255, 61, 0, 0.85),
+      0 -6px 18px rgba(255, 170, 0, 0.8),
+      0 -14px 26px rgba(255, 23, 68, 0.7),
+      0 -20px 34px rgba(255, 230, 0, 0.48),
+      inset 0 0 12px rgba(255, 170, 0, 0.55);
+  }
+
+  50% {
+    border-color: #ffd700;
+    box-shadow:
+      0 0 18px rgba(255, 215, 0, 1),
+      0 -9px 24px rgba(255, 100, 0, 0.95),
+      0 -18px 34px rgba(255, 23, 68, 0.85),
+      0 -26px 44px rgba(255, 230, 0, 0.65),
+      inset 0 0 16px rgba(255, 230, 0, 0.75);
+  }
+
+  100% {
+    border-color: #ff1744;
+    box-shadow:
+      0 0 16px rgba(255, 23, 68, 0.95),
+      0 -8px 20px rgba(255, 140, 0, 0.9),
+      0 -16px 30px rgba(255, 23, 68, 0.78),
+      0 -22px 38px rgba(255, 230, 0, 0.55),
+      inset 0 0 14px rgba(255, 100, 0, 0.65);
+  }
+}
+
+@keyframes mamee-flame-steady-wave {
+  0% {
+    transform: scale(0.99, 1.01) translateY(0);
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: scale(1.02, 1.06) translateY(-1.5px);
+    opacity: 1;
+  }
+}
+
+@keyframes mamee-flame-steady-halo {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 0.85;
+  }
+
+  100% {
+    transform: scale(1.03, 1.04) translateY(-1px);
+    opacity: 0.98;
+  }
+}
+
+@keyframes mamee-spark-rise {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.95;
+  }
+
+  50% {
+    transform: translate(var(--spark-drift, -4px), -12px) scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(calc(var(--spark-drift, -4px) * 2), -26px) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* Elemental Auras for Other Ranks */
+
+/* The ::before/::after aura rules that used to live here (targeting
+   .badge-tier-milo-aura) are now BADGE_MILO_AURA in tw.ts — the keyframes
+   below stay, referenced via arbitrary `animation:` values. */
+
+@keyframes milo-plasma-aura-wave {
+  0% {
+    transform: scale(0.98, 1.01) translateY(0);
+    opacity: 0.85;
+  }
+
+  100% {
+    transform: scale(1.04, 1.08) translateY(-2px);
+    opacity: 1;
+  }
+}
+
+@keyframes milo-plasma-aura-halo {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1.03, 1.05) translateY(-1px);
+    opacity: 0.98;
+  }
+}
+
+@keyframes milo-plasma-pulse {
+  0% {
+    border-color: #bd00ff;
+    box-shadow:
+      0 0 14px rgba(189, 0, 255, 0.8),
+      0 -4px 16px rgba(255, 0, 255, 0.65),
+      0 -8px 24px rgba(0, 240, 255, 0.45),
+      inset 0 0 10px rgba(189, 0, 255, 0.4);
+  }
+
+  50% {
+    border-color: #00f0ff;
+    box-shadow:
+      0 0 20px rgba(0, 240, 255, 0.95),
+      0 -8px 26px rgba(255, 0, 255, 0.9),
+      0 -14px 34px rgba(189, 0, 255, 0.7),
+      inset 0 0 14px rgba(0, 240, 255, 0.6);
+  }
+
+  100% {
+    border-color: #ff00ff;
+    box-shadow:
+      0 0 18px rgba(255, 0, 255, 0.9),
+      0 -6px 22px rgba(189, 0, 255, 0.8),
+      0 -12px 30px rgba(0, 240, 255, 0.55),
+      inset 0 0 12px rgba(255, 0, 255, 0.5);
+  }
+}
+
+@keyframes milo-spark-rise {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.95;
+  }
+
+  50% {
+    transform: translate(var(--spark-drift, -4px), -12px) scale(1.25);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(calc(var(--spark-drift, -4px) * 2), -26px) scale(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes paddle-prism-sweep {
+  0% {
+    left: -130%;
+  }
+
+  40%,
+  100% {
+    left: 170%;
+  }
+}
+
+@keyframes paddle-rainbow-border {
+  0% {
+    border-color: #00f0ff;
+    box-shadow:
+      0 0 16px rgba(0, 240, 255, 0.85),
+      0 -4px 18px rgba(255, 0, 234, 0.65),
+      inset 0 0 10px rgba(0, 240, 255, 0.45);
+  }
+
+  33% {
+    border-color: #ff00ea;
+    box-shadow:
+      0 0 20px rgba(255, 0, 234, 0.9),
+      0 -6px 22px rgba(255, 230, 0, 0.7),
+      inset 0 0 12px rgba(255, 0, 234, 0.5);
+  }
+
+  66% {
+    border-color: #ffe600;
+    box-shadow:
+      0 0 20px rgba(255, 230, 0, 0.9),
+      0 -5px 20px rgba(0, 255, 136, 0.7),
+      inset 0 0 12px rgba(255, 230, 0, 0.5);
+  }
+
+  100% {
+    border-color: #00ff88;
+    box-shadow:
+      0 0 18px rgba(0, 255, 136, 0.85),
+      0 -5px 20px rgba(0, 240, 255, 0.75),
+      inset 0 0 10px rgba(0, 255, 136, 0.45);
+  }
+}
+
+@keyframes honey-starlight-pulse {
+  0% {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+
+  100% {
+    box-shadow:
+      0 0 18px rgba(255, 215, 0, 0.85),
+      0 0 28px rgba(255, 230, 0, 0.4);
+  }
+}
+
+/* Apex Champion Podium Card - Steady Constant Glow */
+
+/* --------------------------------------------------------------------------
+   GRID DASHBOARD BOARDS & WIDGETS
+   -------------------------------------------------------------------------- */
+
+.app-wrapper.game-page {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
+  max-width: 1440px !important;
+  box-sizing: border-box !important;
+}
+
+body:has(.game-page) .crt-screen {
+  min-height: 100vh !important;
+}
+
+/* --------------------------------------------------------------------------
+   AUDIO BOOMBOX & SYNTH CONTROLLER
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   RETRO MINI ARCADE CANVAS
+   -------------------------------------------------------------------------- */
+
+/* Kept for ARCADE_START_OVERLAY in tw.ts, which applies these via arbitrary
+   `animation:` values. Only animates `scale` — NOT `translateX(-50%)`.
+   ARCADE_START_OVERLAY centers via Tailwind's `-translate-x-1/2`, which
+   (confirmed by testing, not assumed) sets the modern standalone CSS
+   `translate` property, not the legacy `transform` property. `translate`
+   and `transform` compose together rather than one overriding the other,
+   so a keyframe `transform: translateX(-50%) ...` here doesn't replace the
+   utility's centering offset — it adds a SECOND -50% shift on top of it,
+   pushing the whole overlay roughly its own width to the left. */
+@keyframes arcade-start-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px rgba(255, 0, 127, 0.35),
+      inset 0 0 12px rgba(0, 240, 255, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 0, 127, 0.7),
+      inset 0 0 18px rgba(0, 240, 255, 0.4),
+      0 0 10px #ff007f;
+    transform: scale(1.02);
+  }
+}
+
+/* Kept for ARCADE_START_OVERLAY in tw.ts, which applies these via arbitrary
+   `animation:` values. See arcade-start-pulse above for why this only
+   animates `scale`, not `translateX(-50%)`. */
+@keyframes terminal-start-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 15px rgba(51, 255, 51, 0.35),
+      inset 0 0 10px rgba(51, 255, 51, 0.15);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 25px rgba(51, 255, 51, 0.65),
+      inset 0 0 15px rgba(51, 255, 51, 0.3);
+    transform: scale(1.02);
+  }
+}
+
+canvas#arcadeCanvas,
+canvas#snakeCanvas {
+  background: #000000;
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   STICKY NOTES & GUESTBOOK WIDGET
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   DIGITAL CLOCK & SYSTEM STATS
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   FOOTER
+   -------------------------------------------------------------------------- */
+
+/* ==========================================================================
+   CUSTOM RETRO FIELDSET & COLOR SCHEME COMPONENT
+   ========================================================================== */
+
+@font-face {
+  src: url('https://assets.codepen.io/2392/Silkscreen-Regular.woff2');
+  font-family: 'Silkscreen';
+}
+
+/* Base Theme Variable Mapping */
+:root {
+  --fs-border: #ff007f;
+  --fs-text: #ffffff;
+  --fs-accent: #ff007f;
+  --fs-cyan: #00f0ff;
+  --fs-bg: rgba(25, 10, 56, 0.9);
+  --fs-glow: rgba(255, 0, 127, 0.5);
+}
+
+[data-theme='win95'] {
+  --fs-border: #808080;
+  --fs-text: #000000;
+  --fs-accent: #000080;
+  --fs-cyan: #000080;
+  --fs-bg: #c0c0c0;
+  --fs-glow: transparent;
+}
+
+[data-theme='terminal'] {
+  --fs-border: #33ff33;
+  --fs-text: #33ff33;
+  --fs-accent: #33ff33;
+  --fs-cyan: #33ff33;
+  --fs-bg: #0a1f0a;
+  --fs-glow: rgba(51, 255, 51, 0.4);
+}
+
+/* Kept for THEME_POPOVER_MENU_ACTIVE_DOWN/_ACTIVE_UP in tw.ts, which apply
+   these via arbitrary `animation:` values. */
+@keyframes popover-slide-down {
+  0% {
+    opacity: 0;
+    transform: perspective(600px) rotateX(-20deg) translateY(-12px) scale(0.9);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
+  }
+}
+
+@keyframes popover-slide-up {
+  0% {
+    opacity: 0;
+    transform: perspective(600px) rotateX(20deg) translateY(12px) scale(0.9);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   THEME-SPECIFIC COMPONENT OVERRIDES (WIN95 & TERMINAL)
+   -------------------------------------------------------------------------- */
+
+#color-scheme {
+  border: 2px solid var(--fs-border);
+  border-radius: 5px;
+  color: var(--fs-text);
+  background: var(--fs-bg);
+  outline: 2px solid var(--fs-cyan);
+  outline-offset: 2px;
+  filter: drop-shadow(0 0 8px var(--fs-glow));
+
+  font-family: 'Silkscreen', monospace;
+  font-size: 0.75rem;
+  letter-spacing: -0.05ch;
+  text-rendering: geometricprecision;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+
+  margin: 0;
+  padding: 14px 10px 10px 10px;
+  box-sizing: border-box;
+  width: 100%;
+
+  position: relative;
+  z-index: 3;
+}
+
+#color-scheme legend {
+  color: var(--fs-cyan);
+  text-align: center;
+  position: relative;
+  top: -2px;
+  padding: 0 8px;
+  font-size: 0.62rem;
+  letter-spacing: 1.5px;
+  font-weight: bold;
+  background: var(--fs-bg);
+}
+
+#color-scheme input {
+  --d: 10px;
+  --rotation: 225deg;
+
+  appearance: none;
+
+  background: currentColor;
+  color: inherit;
+
+  border-radius: 3px;
+  rotate: var(--rotation);
+
+  margin: 0;
+
+  outline: 1.5px solid var(--fs-text);
+  outline-offset: 1px;
+
+  height: var(--d);
+  width: var(--d);
+  flex-shrink: 0;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* Hover rotation & morphing animation */
+#color-scheme label:hover input:not(:checked) {
+  --rotation: 90deg;
+  outline-color: var(--fs-cyan);
+}
+
+/* Checked state animation */
+#color-scheme input:checked {
+  --rotation: 0deg;
+  color: inherit;
+  outline-color: var(--fs-cyan);
+  outline-offset: 1px;
+}
+
+#color-scheme label:hover input:checked {
+  outline-color: var(--fs-cyan);
+}
+
+/* Vertical List Item Labels */
+#color-scheme label {
+  border-radius: 4px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+
+  user-select: none;
+  padding: 8px 12px;
+  height: 34px;
+  width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+#color-scheme label span {
+  display: inline-block;
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+#color-scheme label:has(:checked) {
+  background: var(--fs-cyan);
+  color: var(--fs-bg);
+  box-shadow: 0 0 10px var(--fs-cyan);
+  border-color: var(--fs-cyan);
+}
+
+#color-scheme label:has(:checked) input {
+  color: var(--fs-bg);
+}
+
+#color-scheme label:not(:has(:checked)):hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in oklab, var(--fs-cyan), transparent 60%);
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #color-scheme,
+  #color-scheme label,
+  #color-scheme input {
+    transition-property: background, border-color, box-shadow, color, filter, rotate, transform;
+    transition-duration: 0.2s;
+    transition-timing-function: ease-out;
+  }
+
+  #color-scheme label,
+  #color-scheme input {
+    &:focus-within,
+    &:focus,
+    &:hover,
+    &:focus-visible {
+      transition-property: background, border-color, rotate, transform;
+      transition-duration: 0.2s;
+      transition-timing-function: ease-in;
+    }
+  }
+}
+
+/* ==========================================================================
+   RETRO AUTH SCENE — Neon City Skyline Login
+   ========================================================================== */
+
+/* Sunset gradient sky */
+
+/* Animated perspective grid floor */
+
+@keyframes retro-grid-scroll {
+  0% {
+    background-position-y: 0;
+  }
+
+  100% {
+    background-position-y: 50px;
+  }
+}
+
+/* Neon horizon glow line */
+
+/* Floating city building silhouettes */
+
+/* CRT scanlines overlay */
+
+/* Floating 42 holographic logo */
+
+@keyframes retro-auth-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Kept for RESULTS_INVOICE in tw.ts, which applies this via an arbitrary
+   `animation:` value. */
+@keyframes printVendingTicketJitter {
+  0% {
+    transform: translate3d(0, -100%, 0);
+    opacity: 0;
+  }
+
+  8% {
+    transform: translate3d(1.2px, -82%, 0);
+    opacity: 1;
+  }
+
+  18% {
+    transform: translate3d(-1px, -62%, 0);
+  }
+
+  28% {
+    transform: translate3d(0.9px, -44%, 0);
+  }
+
+  40% {
+    transform: translate3d(-0.8px, -28%, 0);
+  }
+
+  54% {
+    transform: translate3d(0.6px, -15%, 0);
+  }
+
+  68% {
+    transform: translate3d(-0.4px, -6%, 0);
+  }
+
+  82% {
+    transform: translate3d(0.3px, -1.5%, 0);
+  }
+
+  92% {
+    transform: translate3d(-0.2px, 0.5px, 0);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   GAME BOARD THEME STYLES (SYNTHWAVE, WIN95, CRT TERMINAL)
+   ========================================================================== */
+
+/* 1. Board Chassis */
+
+/* 2. Home Bays (Yards) */
+
+/* 3. Inner Yards */
+
+/* 4. Goal Counter Chips */
+
+/* 5. Center Triangle Cross */
+
+/* 6. Track Cells */
+
+/* 7. Die Styling */
+
+/* ==========================================================================
+   CYBERPUNK GLITCH POPOVER MODAL & CYBER BUTTON DESIGN SYSTEM
+   ========================================================================== */
+
+:root {
+  --flicker: linear(
+    0 0%,
+    0.1864 6.17%,
+    0.0001 14.41%,
+    0.5244 20.97%,
+    0.3927 37.91%,
+    0.8115 60.62%,
+    0.9416 61.92%,
+    0.9928 67.98%,
+    0.5032 70.42%,
+    0.9077 96.96%,
+    0.6736 98.74%,
+    1 100%
+  );
+}
+
+/* Kept for CYBER_MODAL_GLITCH/CYBER_BTN_GLITCH_LAYER/CYBER_MODAL_BOX in
+   tw.ts, which apply these via arbitrary `animation:` values. */
+@keyframes cyberModalFullGlitch {
+  0% {
+    clip-path: var(--clip-one);
+  }
+
+  2%,
+  8% {
+    clip-path: var(--clip-two);
+    transform: translate(calc(var(--shimmy-distance) * -1%), 0);
+  }
+
+  6% {
+    clip-path: var(--clip-two);
+    transform: translate(calc(var(--shimmy-distance) * 1%), 0);
+  }
+
+  9% {
+    clip-path: var(--clip-two);
+    transform: translate(0, 0);
+  }
+
+  10% {
+    clip-path: var(--clip-three);
+    transform: translate(calc(var(--shimmy-distance) * 1%), 0);
+  }
+
+  13% {
+    clip-path: var(--clip-three);
+    transform: translate(0, 0);
+  }
+
+  14%,
+  21% {
+    clip-path: var(--clip-four);
+    transform: translate(calc(var(--shimmy-distance) * 1%), 0);
+  }
+
+  25% {
+    clip-path: var(--clip-five);
+    transform: translate(calc(var(--shimmy-distance) * 1%), 0);
+  }
+
+  30% {
+    clip-path: var(--clip-five);
+    transform: translate(calc(var(--shimmy-distance) * -1%), 0);
+  }
+
+  35%,
+  45% {
+    clip-path: var(--clip-six);
+    transform: translate(calc(var(--shimmy-distance) * -1%), 0);
+  }
+
+  40% {
+    clip-path: var(--clip-six);
+    transform: translate(calc(var(--shimmy-distance) * 1%), 0);
+  }
+
+  50% {
+    clip-path: var(--clip-six);
+    transform: translate(0, 0);
+  }
+
+  55% {
+    clip-path: var(--clip-seven);
+    transform: translate(calc(var(--shimmy-distance) * 1%), 0);
+  }
+
+  60% {
+    clip-path: var(--clip-seven);
+    transform: translate(0, 0);
+  }
+
+  31%,
+  61%,
+  100% {
+    clip-path: var(--clip-four);
+    opacity: 0;
+  }
+}
+
+@keyframes cyberBtnGlitch {
+  0% {
+    clip-path: polygon(0 2%, 100% 2%, 100% 95%, 85% 95%, 0 70%);
+    transform: translate(-2px, 1px);
+  }
+
+  25% {
+    clip-path: polygon(0 44%, 100% 44%, 100% 54%, 85% 54%, 0 54%);
+    transform: translate(2px, -1px);
+  }
+
+  50% {
+    clip-path: polygon(0 63%, 100% 63%, 100% 80%, 85% 80%, 0 70%);
+    transform: translate(-1px, 2px);
+  }
+
+  75% {
+    clip-path: polygon(0 15%, 100% 15%, 100% 30%, 85% 30%, 0 25%);
+    transform: translate(1px, -1px);
+  }
+
+  100% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 95% 0, 0 0);
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes cyberModalFlicker {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}

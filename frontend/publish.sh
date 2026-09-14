@@ -45,7 +45,18 @@ stage_public() {
 
 publish() {
   with_retry stage_public
-  npm run build
+  # `publish` runs as the tested command of an `if`/`||` in every caller
+  # (with_retry, and the watch loop's `... || echo`), which suppresses
+  # `set -e` for the rest of this function on a failure deep inside it —
+  # POSIX/dash don't propagate errexit out of a function once its result is
+  # itself being tested. Without this explicit check, a failed `npm run
+  # build` fell through to `rm -rf /export/*`, wiping the last good build
+  # and leaving nginx with an empty document root (directory-listing-
+  # forbidden / index.html redirect-loop errors) until the next good build.
+  if ! npm run build; then
+    echo "❌ [$(date '+%H:%M:%S')] Build failed — keeping the last published build in place."
+    return 1
+  fi
   rm -rf /export/*
   cp -a "$BUILD_OUT_DIR/." /export/
   echo "📦 [$(date '+%H:%M:%S')] SPA published to spa_dist"

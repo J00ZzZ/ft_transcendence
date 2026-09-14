@@ -1,30 +1,16 @@
 #!/bin/sh
 # =============================================================================
 # postgres_16_db init script
-# Inception-style: read secrets, then exec the main process
+# POSTGRES_PASSWORD now arrives directly via compose's env_file (root .env)
+# instead of a mounted secret file — the official postgres entrypoint already
+# reads it from the environment, so this just validates it's set.
 # =============================================================================
 
 echo "🔧 Configuring PostgreSQL..."
 
-# Read password from secret file
-if [ -f "/secrets/db_password.txt" ]; then
-  PASSWORD=$(cat /secrets/db_password.txt | tr -d '\n')
-  echo "✅ Read password from secret file"
-else
-  echo "❌ Secret file not found: /secrets/db_password.txt"
+if [ -z "$POSTGRES_PASSWORD" ]; then
+  echo "❌ POSTGRES_PASSWORD is not set!"
   exit 1
 fi
 
-# Check that password is not empty
-if [ -z "$PASSWORD" ]; then
-  echo "❌ Password is empty!"
-  exit 1
-fi
-
-echo "🔑 Setting POSTGRES_PASSWORD"
-
-# Export the password
-export POSTGRES_PASSWORD="$PASSWORD"
-
-# Execute the original postgres entrypoint with the password in environment
 exec /usr/local/bin/docker-entrypoint.sh postgres

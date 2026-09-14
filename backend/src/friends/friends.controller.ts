@@ -1,8 +1,10 @@
-import { Controller, Post, Get, Patch, Delete, UseGuards, Request, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Delete, UseGuards, Request, Param, Query } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller()
+// HTTP routes for the friend system and game invitations. All routes are
+// JWT-protected and delegate to FriendsService.
 export class FriendsController {
   constructor(private readonly friends: FriendsService) {}
 
@@ -32,8 +34,8 @@ export class FriendsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('api/friends')
-  getFriends(@Request() req: { user: { id: string } }) {
-    return this.friends.getFriends(req.user.id);
+  getFriends(@Request() req: { user: { id: string } }, @Query('username') username?: string) {
+    return this.friends.getFriends(req.user.id, username);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -60,7 +62,7 @@ export class FriendsController {
     return this.friends.unblockUser(req.user.id, targetUserId);
   }
 
-  // ─── Game Invitations ───────────────────────────────────────────────────
+  // Game Invitations
   @UseGuards(JwtAuthGuard)
   @Post('api/friends/:friendId/invite')
   inviteToGame(@Request() req: { user: { id: string } }, @Param('friendId') friendId: string) {

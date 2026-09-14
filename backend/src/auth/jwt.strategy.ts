@@ -6,10 +6,12 @@ import { JwtPayload } from './jwt-payload';
 import { requireSecret } from '../secrets';
 
 function extractFromCookie(req: Request): string | null {
-  return req?.cookies?.token ?? null;
+  return req.cookies.token ?? null;
 }
 
 @Injectable()
+// Passport strategy that authenticates users from the `token` JWT cookie.
+// Used by JwtAuthGuard, which protects every auth-required route.
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
@@ -18,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  validate(payload: JwtPayload) {
     return { id: payload.sub, username: payload.username };
   }
 }

@@ -1,10 +1,10 @@
-import { btnOutline } from '../theme'
+import { btnOutline } from '../theme';
 
 const PROVIDERS = [
   { name: '42', icon: '/forty_two.png', path: '/api/auth/42' },
   { name: 'GitHub', icon: '/github.png', path: '/api/auth/github' },
   { name: 'Google', icon: '/google.png', path: '/api/auth/google' },
-] as const
+] as const;
 
 /** Row of OAuth provider buttons (42 / GitHub / Google) shared by login and signup. */
 export function OAuthButtons() {
@@ -14,7 +14,7 @@ export function OAuthButtons() {
         <button
           key={p.name}
           onClick={() => {
-            window.location.href = p.path
+            window.location.href = p.path;
           }}
           style={{
             ...btnOutline,
@@ -31,7 +31,7 @@ export function OAuthButtons() {
         </button>
       ))}
     </div>
-  )
+  );
 }
 
 /** "OR" hairline divider used around the OAuth row. */
@@ -51,5 +51,5 @@ export function OrDivider({ text = 'OR' }: { text?: string }) {
       {text}
       <span style={{ flex: 1, height: 1, background: '#3a2c1d' }} />
     </div>
-  )
+  );
 }

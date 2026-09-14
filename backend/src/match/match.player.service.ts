@@ -1,252 +1,413 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
+import { NotificationService } from '../notification/notification.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
+import { isBotUserId } from '../common/bot';
 
-const BOT_PREFIX = 'bot-';
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
-function isBotUserId(userId: string | undefined): boolean {
-	return !!userId && userId.startsWith(BOT_PREFIX);
-}
 
 @Injectable()
+// Per-player match actions: joining, rejoining, inviting friends, ready
+// checks, exiting, resigning, and marking matches started/ended. Edits the
+// match:* hashes in Redis. Used by MatchService.
 export class MatchPlayerService {
-	private redis: Redis;
+  // Redis client for match:* game hashes and ready:<gameId> sets.
+  private redis: Redis;
 
-	constructor(
-		private readonly prisma: PrismaService,
-		private readonly jwt: JwtService,
-	) {
-		const host = process.env.REDIS_HOST || 'redis';
-		const port = parseInt(process.env.REDIS_PORT || '6379', 10);
-		const password = secret('REDIS_PASSWORD');
-		this.redis = new Redis({ host, port, password, retryStrategy: (t) => Math.min(t * 50, 2000) });
-		this.redis.on('error', (error) => console.error('Redis error:', (error as Error).message));
-	}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly notificationService: NotificationService,
+  ) {
+    const host = process.env.REDIS_HOST ?? 'redis';
+    const port = parseInt(process.env.REDIS_PORT ?? '6479', 10);
+    const password = secret('REDIS_PASSWORD');
+    this.redis = new Redis({ host, port, password, retryStrategy: (t) => Math.min(t * 50, 2000) });
+    this.redis.on('error', (error) => {
+      console.error('Redis error:', error.message);
+    });
+  }
 
-	// Join an existing WAITING match by filling the next empty slot.
-	async joinMatch(gameId: string, userId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
-		if (data.status !== 'WAITING') throw new ForbiddenException('Game already started');
-		// Humans can only join human rooms — PvE/hotseat rooms are auto-started
-		// and never accept a second human via this endpoint.
-		if (data.gameType !== 'PVP') throw new ForbiddenException('Only PvP rooms can be joined');
+  // Join an existing WAITING match by filling the next empty slot.
+  async joinMatch(gameId: string, userId: string) {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
-		const maxSeats = parseInt(data.playerCount || '4', 10);
-		const occupiedIds = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].filter(Boolean);
-		if (occupiedIds.length >= maxSeats) throw new ForbiddenException('Room is full');
+    // If player already in game, then hand back the same seat instead of allocating another
+    const seatedSlot = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].indexOf(
+      userId,
+    );
+    if (seatedSlot !== -1) return this.rejoin(gameId, userId);
 
-		const clashEnabled = data.clashEnabled === 'true';
-		const slotIndex = !data.player2_id ? 1 : !data.player3_id ? 2 : 3;
-		const slotKey = `player${slotIndex + 1}`;
-		const assignedColor = SLOT_COLORS[slotIndex];
+    if (data.status !== 'WAITING')
+      throw new ForbiddenException({
+        code: 'MATCH_ALREADY_STARTED',
+        message: 'Game already started',
+      });
+    // Humans can only join human rooms : PvE/hotseat rooms are auto-started
+    // and never accept a second human via this endpoint.
+    if (data.gameType !== 'PVP')
+      throw new ForbiddenException({
+        code: 'MATCH_PVP_ONLY_JOIN',
+        message: 'Only PvP rooms can be joined',
+      });
 
-		await this.redis.hset(`match:${gameId}`, `${slotKey}_id`, userId, `${slotKey}_color`, assignedColor);
+    const maxSeats = parseInt(data.playerCount || '4', 10);
+    const occupiedIds = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].filter(
+      Boolean,
+    );
+    if (occupiedIds.length >= maxSeats)
+      throw new ForbiddenException({ code: 'MATCH_ROOM_FULL', message: 'Room is full' });
 
-		const username = await this.resolveUsername(userId);
-		const token = this.jwt.sign(
-			{ gameId, playerId: userId, username: username || undefined, role: 'player', clashEnabled, color: assignedColor },
-			{ expiresIn: '24h' },
-		);
+    const slotIndex = !data.player2_id ? 1 : !data.player3_id ? 2 : 3;
+    const slotKey = `player${slotIndex + 1}`;
+    const assignedColor = SLOT_COLORS[slotIndex];
 
-		return { gameId, token, engineUrl: 'ws://localhost:3001', color: assignedColor, inviteCode: data.inviteCode || undefined, mode: data.gameType ? data.gameType.toLowerCase() : 'pvp', playerCount: parseInt(data.playerCount || '2', 10) };
-	}
+    await this.redis.hset(
+      `match:${gameId}`,
+      `${slotKey}_id`,
+      userId,
+      `${slotKey}_color`,
+      assignedColor,
+    );
 
-	// Rejoin a match the user is already seated in (fresh token, no new slot).
-	async rejoin(gameId: string, userId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
+    const username = await this.resolveUsername(userId);
+    const displayName = await this.resolveDisplayName(userId);
+    const token = this.jwt.sign(
+      {
+        gameId,
+        playerId: userId,
+        username: username ?? undefined,
+        displayName,
+        role: 'player',
+        color: assignedColor,
+      },
+      { expiresIn: '24h' },
+    );
 
-		const slotIndex = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].indexOf(userId);
-		if (slotIndex === -1) throw new ForbiddenException('You are not a player in this game');
+    return {
+      gameId,
+      token,
+      engineUrl: 'ws://localhost:3001',
+      color: assignedColor,
+      inviteCode: data.inviteCode || undefined,
+      mode: (data as { gameType?: string }).gameType?.toLowerCase() ?? 'pvp',
+      playerCount: parseInt(data.playerCount || '2', 10),
+    };
+  }
 
-		const color = (data[`player${slotIndex + 1}_color`] as string) || SLOT_COLORS[slotIndex];
-		const clashEnabled = data.clashEnabled === 'true';
-		const username = await this.resolveUsername(userId);
-		const token = this.jwt.sign(
-			{
-				gameId,
-				playerId: userId,
-				username: username || undefined,
-				role: slotIndex === 0 ? 'player1' : 'player',
-				clashEnabled,
-				color,
-			},
-			{ expiresIn: '24h' },
-		);
+  // Rejoin a match the user is already seated in (fresh token, no new slot).
+  async rejoin(gameId: string, userId: string) {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
-		return { gameId, token, engineUrl: 'ws://localhost:3001', color, inviteCode: data.inviteCode || undefined, mode: data.gameType ? data.gameType.toLowerCase() : 'pvp', playerCount: parseInt(data.playerCount || '2', 10) };
-	}
+    const slotIndex = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].indexOf(
+      userId,
+    );
+    if (slotIndex === -1)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
-	/**
-	 * Seat a friend into an existing WAITING PvP room and stage an invite record
-	 * (`invite:{friendId}`) so their client's poll (Shell /api/friends/invites/
-	 * pending) picks it up. Same transport as FriendsService.inviteToGame, but
-	 * works on a room that already exists instead of creating a fresh one.
-	 */
-	async inviteFriendToGame(gameId: string, hostId: string, friendId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
-		if (data.gameType !== 'PVP') throw new ForbiddenException('Only PvP rooms can be invited to');
-		if (data.status !== 'WAITING') throw new ForbiddenException('Game already started');
+    // Reclaiming the seat makes it PRESENT again: clear the reservation flag a
+    // "returned to lobby" leave set, so the room counts this player and the
+    // idle-abort stops applying.
+    await this.redis.hdel(`match:${gameId}`, `player${slotIndex + 1}_left`);
 
-		const isHost = data.player1_id === hostId || data.player2_id === hostId ||
-			data.player3_id === hostId || data.player4_id === hostId;
-		if (!isHost) throw new ForbiddenException('You are not a player in this game');
+    const color = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
+    const username = await this.resolveUsername(userId);
+    const displayName = await this.resolveDisplayName(userId);
+    const token = this.jwt.sign(
+      {
+        gameId,
+        playerId: userId,
+        username: username ?? undefined,
+        displayName,
+        role: slotIndex === 0 ? 'player1' : 'player',
+        color,
+      },
+      { expiresIn: '24h' },
+    );
 
-		const friendship = await this.prisma.db.friendship.findFirst({
-			where: {
-				OR: [
-					{ userId: hostId, friendId, status: 'accepted' },
-					{ userId: friendId, friendId: hostId, status: 'accepted' },
-				],
-			},
-		});
-		if (!friendship) throw new ForbiddenException('You are not friends with this user');
+    return {
+      gameId,
+      token,
+      engineUrl: 'ws://localhost:3001',
+      color,
+      inviteCode: data.inviteCode || undefined,
+      mode: (data as { gameType?: string }).gameType?.toLowerCase() ?? 'pvp',
+      playerCount: parseInt(data.playerCount || '2', 10),
+    };
+  }
 
-		const friendSeat = await this.joinMatch(gameId, friendId);
+  // Seat a friend into an existing WAITING PvP room and stage an
+  // `invite:{friendId}` record for their client's next poll.
+  async inviteFriendToGame(gameId: string, hostId: string, friendId: string) {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
+    if (data.gameType !== 'PVP')
+      throw new ForbiddenException({
+        code: 'MATCH_PVP_ONLY_INVITE',
+        message: 'Only PvP rooms can be invited to',
+      });
+    if (data.status !== 'WAITING')
+      throw new ForbiddenException({
+        code: 'MATCH_ALREADY_STARTED',
+        message: 'Game already started',
+      });
 
-		await this.redis.set(
-			`invite:${friendId}`,
-			JSON.stringify({
-				gameId: friendSeat.gameId,
-				token: friendSeat.token,
-				engineUrl: friendSeat.engineUrl,
-				color: friendSeat.color,
-				inviteCode: data.inviteCode || undefined,
-				fromUsername: (await this.resolveUsername(hostId)) || 'A friend',
-				createdAt: Date.now(),
-			}),
-			'EX', 300,
-		);
+    const isHost =
+      data.player1_id === hostId ||
+      data.player2_id === hostId ||
+      data.player3_id === hostId ||
+      data.player4_id === hostId;
+    if (!isHost)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
-		return { message: 'Invite sent', gameId: friendSeat.gameId };
-	}
+    const friendship = await this.prisma.db.friendship.findFirst({
+      where: {
+        OR: [
+          { userId: hostId, friendId, status: 'accepted' },
+          { userId: friendId, friendId: hostId, status: 'accepted' },
+        ],
+      },
+    });
+    if (!friendship)
+      throw new ForbiddenException({
+        code: 'NOT_FRIENDS_WITH_USER',
+        message: 'You are not friends with this user',
+      });
 
-	// Generate a spectator token for an ACTIVE match.
-	async spectate(gameId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
-		if (data.status !== 'ACTIVE') throw new ForbiddenException('Game is not active');
+    const friendSeat = await this.joinMatch(gameId, friendId);
+    const fromUsername = (await this.resolveUsername(hostId)) ?? 'A friend';
 
-		const token = this.jwt.sign(
-			{ gameId, playerId: null, role: 'spectator' },
-			{ expiresIn: '24h' },
-		);
+    await this.redis.set(
+      `invite:${friendId}`,
+      JSON.stringify({
+        gameId: friendSeat.gameId,
+        token: friendSeat.token,
+        engineUrl: friendSeat.engineUrl,
+        color: friendSeat.color,
+        inviteCode: data.inviteCode || undefined,
+        fromUsername,
+        createdAt: Date.now(),
+      }),
+      'EX',
+      300,
+    );
 
-		return { gameId, token, engineUrl: 'ws://localhost:3001' };
-	}
+    // Push real-time notification to the friend via SSE / Redis pub/sub
+    await this.notificationService.notify(friendId, 'game_invite', {
+      gameId: friendSeat.gameId,
+      token: friendSeat.token,
+      engineUrl: friendSeat.engineUrl,
+      color: friendSeat.color,
+      inviteCode: data.inviteCode || undefined,
+      fromUsername,
+      playerCount: parseInt(data.playerCount || '4', 10),
+    });
 
-	// Toggle the ready flag for a player in a WAITING match.
-	async readyGame(gameId: string, userId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
+    return { message: 'Invite sent', gameId: friendSeat.gameId };
+  }
 
-		const isPlayer = data.player1_id === userId || data.player2_id === userId ||
-			data.player3_id === userId || data.player4_id === userId;
-		if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+  // Toggle the ready flag for a player in a WAITING match.
+  async readyGame(gameId: string, userId: string) {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
-		const readyKey = `ready:${gameId}`;
-		const current = new Set<string>(JSON.parse(await this.redis.get(readyKey) || '[]'));
-		if (current.has(userId)) {
-			current.delete(userId);
-		} else {
-			current.add(userId);
-		}
-		await this.redis.set(readyKey, JSON.stringify(Array.from(current)), 'EX', 86400);
+    const isPlayer =
+      data.player1_id === userId ||
+      data.player2_id === userId ||
+      data.player3_id === userId ||
+      data.player4_id === userId;
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
-		const readyCount = current.size;
-		const totalPlayers = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].filter(Boolean).length;
+    const readyKey = `ready:${gameId}`;
+    const current = new Set<string>(JSON.parse((await this.redis.get(readyKey)) ?? '[]'));
+    if (current.has(userId)) {
+      current.delete(userId);
+    } else {
+      current.add(userId);
+    }
+    await this.redis.set(readyKey, JSON.stringify(Array.from(current)), 'EX', 86400);
 
-		return {
-			message: 'Player ready',
-			gameId,
-			readyCount,
-			totalPlayers,
-			allReady: readyCount === totalPlayers,
-		};
-	}
+    const readyCount = current.size;
+    const totalPlayers = [
+      data.player1_id,
+      data.player2_id,
+      data.player3_id,
+      data.player4_id,
+    ].filter(Boolean).length;
 
-	// Remove a player from a match room and clear their ready state.
-	async exitGame(gameId: string, userId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
+    return {
+      message: 'Player ready',
+      gameId,
+      readyCount,
+      totalPlayers,
+      allReady: readyCount === totalPlayers,
+    };
+  }
 
-		const isPlayer = data.player1_id === userId || data.player2_id === userId ||
-			data.player3_id === userId || data.player4_id === userId;
-		if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+  // Remove a player from a match room and clear their ready state.
+  async exitGame(gameId: string, userId: string) {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
-		const slotMap: Record<string, string> = {
-			[data.player1_id]: 'player1_id',
-			[data.player2_id || '']: 'player2_id',
-			[data.player3_id || '']: 'player3_id',
-			[data.player4_id || '']: 'player4_id',
-		};
-		const slotKey = slotMap[userId];
-		if (slotKey) {
-			await this.redis.hdel(`match:${gameId}`, slotKey, `${slotKey.replace('_id', '_color')}`);
-		}
+    const isPlayer =
+      data.player1_id === userId ||
+      data.player2_id === userId ||
+      data.player3_id === userId ||
+      data.player4_id === userId;
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
-		const readyKey = `ready:${gameId}`;
-		const current = new Set<string>(JSON.parse(await this.redis.get(readyKey) || '[]'));
-		current.delete(userId);
-		await this.redis.set(readyKey, JSON.stringify(Array.from(current)), 'EX', 86400);
+    const slotMap: Record<string, string> = {
+      [data.player1_id]: 'player1_id',
+      [data.player2_id || '']: 'player2_id',
+      [data.player3_id || '']: 'player3_id',
+      [data.player4_id || '']: 'player4_id',
+    };
+    const slotKey = slotMap[userId];
+    if (slotKey) {
+      await this.redis.hdel(`match:${gameId}`, slotKey, slotKey.replace('_id', '_color'));
+    }
 
-		return { message: 'Exited game', gameId };
-	}
+    const readyKey = `ready:${gameId}`;
+    const current = new Set<string>(JSON.parse((await this.redis.get(readyKey)) ?? '[]'));
+    current.delete(userId);
+    await this.redis.set(readyKey, JSON.stringify(Array.from(current)), 'EX', 86400);
 
-	// Cancel (abort) a match, setting its status to ABORTED.
-	async cancelGame(gameId: string, userId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
+    return { message: 'Exited game', gameId };
+  }
 
-		const isPlayer = data.player1_id === userId || data.player2_id === userId ||
-			data.player3_id === userId || data.player4_id === userId;
-		if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+  // Cancel (abort) a match, setting its status to ABORTED.
+  async cancelGame(gameId: string, userId: string, reason: 'cancel' | 'resign' = 'cancel') {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
-		await this.redis.hset(`match:${gameId}`, 'status', 'ABORTED');
-		await this.redis.expire(`match:${gameId}`, 3600);
+    const isPlayer =
+      data.player1_id === userId ||
+      data.player2_id === userId ||
+      data.player3_id === userId ||
+      data.player4_id === userId;
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
-		return { message: 'Game cancelled', gameId };
-	}
+    await this.redis.hset(`match:${gameId}`, 'status', 'ABORTED');
+    await this.redis.expire(`match:${gameId}`, 3600);
 
-	// Alias for cancelGame — player resigns from the match.
-	async resign(gameId: string, userId: string) {
-		return this.cancelGame(gameId, userId);
-	}
+    // Notify the other human players that the match was aborted/resigned.
+    await this.notifyMatchAbort(gameId, data, userId, reason);
 
-	// listOpenRooms only ever shows WAITING rooms — without this, a match stays
-	// WAITING in Redis forever after the ready-check flips it active in the
-	// engine, so it keeps showing up as "open" even mid-game.
-	async markStarted(gameId: string) {
-		const exists = await this.redis.exists(`match:${gameId}`);
-		if (!exists) return { message: 'Game not found', gameId };
+    return { message: 'Game cancelled', gameId };
+  }
 
-		await this.redis.hset(`match:${gameId}`, 'status', 'ACTIVE');
-		await this.redis.hsetnx(`match:${gameId}`, 'startedAt', Date.now().toString());
-		return { message: 'Game marked active', gameId };
-	}
+  // Alias for cancelGame : player resigns from the match.
+  async resign(gameId: string, userId: string) {
+    return this.cancelGame(gameId, userId, 'resign');
+  }
 
-	// Mark a match as ENDED (called when the game is finished).
-	async gameEnd(gameId: string, userId: string) {
-		const data = await this.redis.hgetall(`match:${gameId}`);
-		if (!data || !data.id) throw new NotFoundException('Game not found');
+  // Notify the other human players when a match is aborted or a player resigns.
+  private async notifyMatchAbort(
+    gameId: string,
+    data: Record<string, string>,
+    actorId: string,
+    reason: 'cancel' | 'resign',
+  ) {
+    const actor = await this.prisma.db.user.findUnique({
+      where: { id: actorId },
+      select: { username: true },
+    });
+    const targets = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].filter(
+      (id): id is string => !!id && id !== actorId && !isBotUserId(id),
+    );
 
-		const isPlayer = data.player1_id === userId || data.player2_id === userId ||
-			data.player3_id === userId || data.player4_id === userId;
-		if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+    for (const targetId of targets) {
+      try {
+        await this.notificationService.notify(targetId, 'match_cancelled', {
+          gameId,
+          reason,
+          fromUserId: actorId,
+          fromUsername: actor?.username ?? 'A player',
+        });
+      } catch (err) {
+        console.warn(`Failed to notify ${targetId} about match ${gameId} cancellation:`, err);
+      }
+    }
+  }
 
-		await this.redis.hset(`match:${gameId}`, 'status', 'ENDED');
-		await this.redis.expire(`match:${gameId}`, 3600);
+  // listOpenRooms only ever shows WAITING rooms : without this, a match stays
+  // WAITING in Redis forever after the ready-check flips it active in the
+  // engine, so it keeps showing up as "open" even mid-game.
+  async markStarted(gameId: string) {
+    const exists = await this.redis.exists(`match:${gameId}`);
+    if (!exists) return { message: 'Game not found', gameId };
 
-		return { message: 'Game ended', gameId };
-	}
+    await this.redis.hset(`match:${gameId}`, 'status', 'ACTIVE');
+    await this.redis.hsetnx(`match:${gameId}`, 'startedAt', Date.now().toString());
+    return { message: 'Game marked active', gameId };
+  }
 
-	private async resolveUsername(userId: string): Promise<string | null> {
-		if (isBotUserId(userId)) return null;
-		const user = await this.prisma.db.user.findUnique({ where: { id: userId }, select: { username: true } });
-		return user?.username ?? null;
-	}
+  // Mark a match as ENDED (called when the game is finished).
+  async gameEnd(gameId: string, userId: string) {
+    const data = await this.redis.hgetall(`match:${gameId}`);
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
+
+    const isPlayer =
+      data.player1_id === userId ||
+      data.player2_id === userId ||
+      data.player3_id === userId ||
+      data.player4_id === userId;
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
+
+    await this.redis.hset(`match:${gameId}`, 'status', 'ENDED');
+    await this.redis.expire(`match:${gameId}`, 3600);
+
+    return { message: 'Game ended', gameId };
+  }
+
+  private async resolveUsername(userId: string): Promise<string | null> {
+    if (isBotUserId(userId)) return null;
+    const user = await this.prisma.db.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+    return user?.username ?? null;
+  }
+
+  private async resolveDisplayName(userId: string): Promise<string | undefined> {
+    if (isBotUserId(userId)) return undefined;
+    const user = await this.prisma.db.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true },
+    });
+    return user?.displayName ?? undefined;
+  }
 }

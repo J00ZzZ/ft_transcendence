@@ -1,61 +1,60 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
-import { useTranslation } from 'react-i18next'
-import { AuthLayout } from '../components/AuthLayout'
-import { navigate, useRoute } from '../router'
-import { btnGold, goldText, input, label } from '../theme'
-import { useApp } from '../store'
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import { RetroAuthLayout } from '../components/RetroAuthLayout';
+import { navigate, useRoute } from '../router';
+import { useApp } from '../store';
+import '../styles/retrowave.css';
+import {
+  RETRO_AUTH_BTN,
+  RETRO_AUTH_ERROR,
+  RETRO_AUTH_INPUT,
+  RETRO_AUTH_LABEL,
+  RETRO_AUTH_LINK,
+  RETRO_AUTH_MUTED,
+  RETRO_AUTH_SUBTITLE,
+  RETRO_AUTH_TITLE,
+} from '../styles/tw';
 
 /**
- * Second login factor. Reached two ways, both carrying ?token=<pendingToken>:
- *  - password login: Login.tsx navigates here after factor one succeeds
- *  - OAuth: the backend callback redirects here after emailing the code
+ * Second login factor: ?token=<pendingToken> from password login or OAuth callback.
  */
 export function TwoFactor() {
-  const { t } = useTranslation()
-  const { verify2fa } = useApp()
-  const { query } = useRoute()
-  const pendingToken = query.get('token') ?? ''
-  const [code, setCode] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const { t } = useTranslation();
+  const { verify2fa } = useApp();
+  const { query } = useRoute();
+  const pendingToken = query.get('token') ?? '';
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (submitting) return
-    setSubmitting(true)
-    setError(null)
-    const err = await verify2fa(pendingToken, code)
-    setSubmitting(false)
-    if (err) setError(err)
-    else navigate('/home')
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const err = await verify2fa(pendingToken, code);
+    setSubmitting(false);
+    if (err) setError(err);
+    else navigate('/home');
   }
 
   return (
-    <AuthLayout tag={t('auth.oneMoreStep')}>
+    <RetroAuthLayout tag={t('auth.oneMoreStep')}>
       <form
-        onSubmit={onSubmit}
-        style={{ width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 20 }}
+        onSubmit={(e) => {
+          void onSubmit(e);
+        }}
+        style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
       >
         <div>
-          <div
-            style={{
-              fontFamily: "'Cinzel',serif",
-              fontWeight: 700,
-              letterSpacing: 1.5,
-              fontSize: 30,
-              lineHeight: 1,
-              ...goldText,
-            }}
-          >
-            {t('auth.checkEmailTitle')}
+          <div className={RETRO_AUTH_TITLE} style={{ fontSize: 32 }}>
+            {t('authExtra.twoFactorAuthTitle')}
           </div>
-          <div style={{ color: '#a99a83', fontSize: '14.5px', marginTop: 8 }}>
-            {t('auth.codeSentDesc')}
-          </div>
+          <div className={RETRO_AUTH_SUBTITLE}>{t('auth.codeSentDesc')}</div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <div style={label}>{t('auth.loginCodeLabel')}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className={RETRO_AUTH_LABEL}>{t('auth.loginCodeLabel')}</div>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -63,27 +62,35 @@ export function TwoFactor() {
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
-            style={{ ...input, letterSpacing: 8, fontSize: 22, textAlign: 'center' }}
+            className={RETRO_AUTH_INPUT}
+            style={{
+              letterSpacing: 10,
+              fontSize: 26,
+              fontWeight: 900,
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--accent-cyan)',
+              textShadow: '0 0 10px rgba(0, 240, 255, 0.5)',
+            }}
           />
         </div>
-        {error && (
-          <div style={{ color: '#e4574d', fontSize: '13.5px', lineHeight: 1.4 }}>{error}</div>
-        )}
-        <button
-          type="submit"
-          disabled={submitting || code.length !== 6}
-          style={{ ...btnGold, opacity: submitting || code.length !== 6 ? 0.6 : 1 }}
-        >
-          {submitting ? t('auth.checkingBtn') : t('auth.enterParlorBtn')}
+        {error && <div className={RETRO_AUTH_ERROR}>{error}</div>}
+        <button type="submit" disabled={submitting || code.length !== 6} className={RETRO_AUTH_BTN}>
+          {submitting ? t('auth.checkingBtn') : t('authExtra.verifyEnterArenaBtn')}
         </button>
-        <div style={{ textAlign: 'center', color: '#a99a83', fontSize: 14 }}>
+        <div className={RETRO_AUTH_MUTED} style={{ textAlign: 'center' }}>
           {t('auth.codeExpired')}{' '}
-          <a onClick={() => navigate('/login')} style={{ cursor: 'pointer', fontWeight: 700 }}>
+          <a
+            onClick={() => {
+              navigate('/login');
+            }}
+            className={RETRO_AUTH_LINK}
+          >
             {t('auth.logInAgainLink')}
           </a>{' '}
           {t('auth.toGetNewOne')}
         </div>
       </form>
-    </AuthLayout>
-  )
+    </RetroAuthLayout>
+  );
 }

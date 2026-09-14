@@ -1,84 +1,121 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { LeaderboardRedisService } from './leaderboard-redis.service';
+import { BOT_PREFIX, isBotUserId } from '../common/bot';
 
 export interface LeaderboardEntry {
-  rank: number;
-  username: string;
-  rating: number;
-  gamesPlayed: number;
+  rank: number; // 1-based position on this page
+  username: string; // immutable account name
+  id: string; // immutable user id : the key every avatar is looked up by
+  displayName: string; // shown name
+  rating: number; // current Elo-style score
+  gamesPlayed: number; // wins + losses
   wins: number;
   losses: number;
   draws: number;
-  winRate: number;
-  avatarStyle: string | null;
+  winRate: number; // wins / gamesPlayed, as a whole-number percent
+  avatarStyle: string | null; // dicebear fallback style
+  hasAvatarPhoto: boolean; // true when a photo avatar was uploaded
 }
 
+// Envelope the frontend receives from GET /api/leaderboard.
 export interface LeaderboardResponse {
-  entries: LeaderboardEntry[];
-  total: number;
-  page: number;
-  limit: number;
-  myRank?: { rank: number; username: string; rating: number } | null;
-  source?: 'redis' | 'postgres';
+  entries: LeaderboardEntry[]; // one page of ranked players
+  total: number; // total entries on the board
+  page: number; // current page (1-based)
+  limit: number; // page size
+  myRank?: { rank: number; username: string; displayName: string; rating: number } | null; // caller's own position, when logged in
+  source: 'redis'; // where the data was read from
 }
 
 @Injectable()
+// Leaderboard reads: merges Redis-ranked user ids with Postgres user
+// details, rebuilding the Redis board from User.rating when empty.
+// Used by leaderboard.controller.ts (GET /api/leaderboard).
 export class LeaderboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: LeaderboardRedisService,
   ) {}
 
+  // One page of the board for a mode (global/ranked/casual/bot), plus the
+  // caller's own rank when userId is given. Used by GET /api/leaderboard.
   async getLeaderboard(options: {
     mode?: 'global' | 'ranked' | 'casual' | 'bot';
     page: number;
     limit: number;
     userId?: string;
   }): Promise<LeaderboardResponse> {
-    const { mode, page, limit, userId } = options;
+    // Default to a mode so passing `mode` to Redis methods (which require a
+    // string) never sends undefined. The public API treats 'global' as default.
+    const { mode = 'global', page, limit, userId } = options;
 
     // Try Redis first (fast path)
     try {
-      const redisEntries = await this.redisService.getLeaderboardFromRedis(mode, page, limit);
-      const total = await this.redisService.getLeaderboardCount(mode);
+      let redisEntries = await this.redisService.getLeaderboardFromRedis(mode, page, limit);
+      let total = await this.redisService.getLeaderboardCount(mode);
+
+      // If Redis has no entries or is missing users, auto-populate from PostgreSQL
+      if (redisEntries.length === 0 || total < 5) {
+        // Bots are real User rows (FK), so exclude them here just like
+        // match.postgame.service.ts does when it zadds ratings.
+        const allDbUsers = await this.prisma.db.user.findMany({
+          where: { NOT: { id: { startsWith: BOT_PREFIX } } },
+          select: { id: true, rating: true },
+        });
+        if (allDbUsers.length > 0) {
+          for (const u of allDbUsers) {
+            await this.redisService.updateLeaderboardEntry(u.id, u.rating, mode);
+          }
+          redisEntries = await this.redisService.getLeaderboardFromRedis(mode, page, limit);
+          total = await this.redisService.getLeaderboardCount(mode);
+        }
+      }
 
       if (redisEntries.length > 0) {
-        const userIds = redisEntries.map(e => e.userId);
+        const userIds = redisEntries.map((e) => e.userId);
         const users = await this.prisma.db.user.findMany({
           where: { id: { in: userIds } },
           select: {
             id: true,
             username: true,
+            displayName: true,
             rating: true,
             wins: true,
             losses: true,
             avatarStyle: true,
+            avatarPhotoContentType: true,
           },
         });
 
-        const userMap = new Map(users.map(u => [u.id, u]));
-        const entries: LeaderboardEntry[] = redisEntries
-          .filter(e => userMap.has(e.userId))
-          .map((entry, i) => {
-            const user = userMap.get(entry.userId)!;
-            const gamesPlayed = user.wins + user.losses;
-            const wins = user.wins;
-            const losses = user.losses;
-            const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
+        const userMap = new Map(users.map((u) => [u.id, u]));
+        const entries: LeaderboardEntry[] = [];
+        for (const entry of redisEntries) {
+          const user = userMap.get(entry.userId);
+          if (!user || isBotUserId(entry.userId)) continue;
 
-            return {
-              rank: (page - 1) * limit + i + 1,
-              username: user.username,
-              rating: entry.rating,
-              gamesPlayed,
-              wins,
-              losses,
-              draws: 0,
-              winRate,
-              avatarStyle: user.avatarStyle,
-            };
+          const gamesPlayed = user.wins + user.losses;
+          const wins = user.wins;
+          const losses = user.losses;
+          const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
+
+          entries.push({
+            rank: (page - 1) * limit + entries.length + 1,
+            // The immutable id : the client keys avatars on it, so a renamed
+            // display name can never break an avatar URL.
+            id: user.id,
+            username: user.username,
+            displayName: user.displayName,
+            rating: entry.rating,
+            gamesPlayed,
+            wins,
+            losses,
+            draws: 0,
+            winRate,
+            avatarStyle: user.avatarStyle,
+            hasAvatarPhoto: user.avatarPhotoContentType !== null,
           });
+        }
 
         const response: LeaderboardResponse = {
           entries,
@@ -93,12 +130,13 @@ export class LeaderboardService {
           if (myRank) {
             const user = await this.prisma.db.user.findUnique({
               where: { id: userId },
-              select: { username: true, rating: true },
+              select: { username: true, displayName: true, rating: true },
             });
             if (user) {
               response.myRank = {
                 rank: myRank,
                 username: user.username,
+                displayName: user.displayName,
                 rating: user.rating,
               };
             }
@@ -108,55 +146,19 @@ export class LeaderboardService {
         return response;
       }
     } catch (err) {
-      console.warn('Redis leaderboard read failed, falling back to PostgreSQL snapshot:', err);
+      // Redis is the leaderboard's only store, rebuilt from User.rating whenever it
+      // comes up empty. Surfaces the failure instead of hiding it.
+      console.warn('Redis leaderboard read failed:', err);
+      throw err;
     }
 
-    // Fallback to PostgreSQL snapshot (mirror of Redis, written on every game end)
-    const modeFilter = mode || 'global';
-    const snapshotEntries = await this.prisma.db.leaderboardSnapshot.findMany({
-      where: { mode: modeFilter },
-      orderBy: { rank: 'asc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    const total = await this.prisma.db.leaderboardSnapshot.count({
-      where: { mode: modeFilter },
-    });
-
-    const entries: LeaderboardEntry[] = snapshotEntries.map(entry => ({
-      rank: entry.rank,
-      username: entry.username,
-      rating: entry.rating,
-      gamesPlayed: 0,
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      winRate: 0,
-      avatarStyle: null,
-    }));
-
-    const response: LeaderboardResponse = {
-      entries,
-      total,
+    // Nothing to serve from Redis (fresh database with no users yet) : return an empty board
+    return {
+      entries: [],
+      total: 0,
       page,
       limit,
-      source: 'postgres',
+      source: 'redis',
     };
-
-    if (userId) {
-      const mySnapshot = await this.prisma.db.leaderboardSnapshot.findUnique({
-        where: { mode_userId: { mode: modeFilter, userId } },
-      });
-      if (mySnapshot) {
-        response.myRank = {
-          rank: mySnapshot.rank,
-          username: mySnapshot.username,
-          rating: mySnapshot.rating,
-        };
-      }
-    }
-
-    return response;
   }
 }
