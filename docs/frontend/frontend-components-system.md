@@ -18,9 +18,8 @@
 
 The shared components are reusable UI (user interface) building blocks used on several pages. They are:
 
-1. **RetroNavbar** — top navigation bar used by the full-bleed pages.
-2. **Shell** — layout container with a side rail and a header (no route uses it yet).
-3. **AccountMenu** — user menu dropdown (language, 2FA, sign out).
+1. **RetroNavbar** — top navigation bar used by the full-screen pages.
+2. **RetroNavbar** — top navigation bar used by every page (logo, nav links, language selector, user menu).
 4. **RetroAuthLayout** — centered layout for the authentication pages (login, signup, 2FA, forgot/reset password).
 5. **Board / Die** — the Ludo board and the animated die.
 6. **UserAvatar / RankBadge** — avatar rendering and rank tier badges.
@@ -36,9 +35,7 @@ The shared components are reusable UI (user interface) building blocks used on s
 
 | File | Role |
 |------|------|
-| `src/components/RetroNavbar.tsx` | Top navigation bar — logo, nav links, user menu, theme switcher (used by full-bleed pages) |
-| `src/components/Shell.tsx` | Layout container — side rail, header, `AccountMenu` (no route uses it yet) |
-| `src/components/AccountMenu.tsx` | Account menu dropdown (language, 2FA, sign out) |
+| `src/components/RetroNavbar.tsx` | Top navigation bar — logo, nav links, language selector, user menu, sign out (used by every page) |
 | `src/components/RetroAuthLayout.tsx` | Retro-styled authentication page container (`tag` + `children`, plus the `NeonCheck` glyph) |
 | `src/components/Board.tsx` | Ludo board — tracks, bases, pieces, legal-move highlights |
 | `src/components/Die.tsx` | Dice component — face rendering with roll animation |
@@ -87,24 +84,6 @@ type DieProps = {
 ### OAuthButtons
 
 No props; it renders the three provider buttons.
-
----
-
-### AccountMenu
-
-Dropdown menu that opens when you click the user avatar in the Shell header. It has:
-
-- **Language selector** — switch between English, Malay and French.
-- **2FA toggle** — turn two-factor authentication on or off by calling `PATCH /api/auth/2fa`.
-- **Sign out** — calls `POST /api/auth/logout`, then navigates to `/login`.
-
-```typescript
-type AccountMenuProps = {
-  // No explicit props — reads user from useApp()
-}
-```
-
-The menu uses the `Menu` component from the theme library, positioned directly below the avatar button. It closes when you click outside it or pick an action.
 
 ---
 
@@ -220,13 +199,12 @@ sequenceDiagram
   └── Render Google button → onClick → '/api/auth/google'
 ```
 
-### AccountMenu Path
+### RetroNavbar Account Popover Path
 ```
-<AccountMenu />
+<RetroNavbar /> account button
   ├── Render avatar button with initials
-  ├── onClick → toggle dropdown
+  ├── onClick → toggle popover
   ├── Language option → setLang(lang)
-  ├── 2FA option → toggleTwoFactor() → PATCH /api/auth/2fa
   └── Sign out → logout() → POST /api/auth/logout → navigate('/login')
 ```
 
@@ -274,7 +252,7 @@ Per-constant notes:
 | `RETRO_TICKET_PASS` | LudoLobby's quick-deploy tickets. The CSS had two win95/terminal override blocks that applied one property at a time; the values here are the combined result (the later block wins for each property it sets), not a copy of either block. |
 | `ARCADE_START_TITLE` | `whitespace-nowrap` fixes a bug that already existed in the CSS: at 1.5px letter-spacing the heading and its spaced arrows are wider than the overlay, so the arrows wrapped onto their own lines. |
 | `CYBER_CASSETTE_CHASSIS` | Home's "CYBERSOUND DECK" widget. The theme overrides become `&` variants; the `.lit-*` LED classes are utility strings chosen in JavaScript; `.cyber-deck-key-play.active` is a conditional class. The unused `.tape-reel.active`, `@keyframes reelSpin` and `.track-matrix-btn.active` were deleted. |
-| `CYBER_MODAL_OVERLAY` | The most involved conversion. CyberModal's state has to reach many descendants, so the overlay carries `data-modal-state` and `data-glitching`, and the constants read them with `group-data-` variants. The overlay's group is **named** (`group/modal`) because `CyberButton`, which renders inside it, has its own unnamed `group`/`group-hover:` for a separate hover glitch, and an unnamed group matches *any* ancestor. While it was unnamed, hovering anywhere over the modal triggered the button's glitch and the label became garbled; this was confirmed by taking a screenshot, not assumed. `:root { --flicker }` and the three `@keyframes` stay in CSS. The `:not(:disabled)` guard on the hover rules was dropped because no call site passes `disabled`. |
+| `CYBER_MODAL_OVERLAY` | The most involved conversion. CyberModal's state has to reach many descendants, so the overlay includes `data-modal-state` and `data-glitching`, and the constants read them with `group-data-` variants. The overlay's group is **named** (`group/modal`) because `CyberButton`, which renders inside it, has its own unnamed `group`/`group-hover:` for a separate hover glitch, and an unnamed group matches *any* ancestor. While it was unnamed, hovering anywhere over the modal triggered the button's glitch and the label became garbled; this was confirmed by taking a screenshot, not assumed. `:root { --flicker }` and the three `@keyframes` stay in CSS. The `:not(:disabled)` guard on the hover rules was dropped because no call site passes `disabled`. |
 | `CYBER_BTN_PINK` / `_YELLOW` / `_DANGER` | Need `!` on their `--btn-accent`/`--btn-shadow` overrides: `CYBER_BTN_BASE` sets defaults of the same specificity, and those defaults otherwise win no matter what order the classes are joined in. |
 | `CYBER_BTN_BACKDROP_SHARED` | `before:!mask-clip-*` / `before:!mask-composite-*` need `!` because the `mask` shorthand utility resets its longhand properties, and Tailwind placed the shorthand after them. Without `!` the bevel cut turned back into a solid fill and the label became unreadable. |
 | `TICKET_CONTAINER` / `RESULTS_INVOICE` / `INVOICE_VALUE` | ResultsModal's "vending machine ticket". The CSS held two copies of the widget. The older "receipt printer" slot and hole rules were unused and were deleted, but selectors it shared with the current design applied as well. The values were read with `getComputedStyle()` on the live modal in all three themes, so a few properties came from the old block: `top-6`, `z-5`, Share Tech Mono, VT323, and the win95/terminal title colour plus the terminal value's text-shadow and font-size. |
@@ -286,9 +264,9 @@ Per-constant notes:
 ## Implementation Notes
 
 - **Overlays rendered through a portal.** `NotificationBell`'s dropdown and `RetroNavbar`'s account popover both render into `<body>`. A high `z-index` cannot escape an ancestor's stacking context (the sticky sidebar's `position: sticky` creates one, which traps even very large z-indices), so the overlays render outside it. Their position comes from the trigger's current `getBoundingClientRect()` instead of CSS anchoring.
-- **Avatars are keyed by the immutable user id, and the URL is stamped on change.** `UserAvatar` takes `userId` (the photo key) and keeps `username` only as the DiceBear seed and alt text, so a display-name rename can never invalidate an avatar URL. It requests `/api/user/id/<userId>/avatar` only when the seat is not a bot **and** a photo is known to exist — from the payload's `hasAvatarPhoto` or from a live `avatar_changed` override in `avatarCache.ts`. Anything else renders the DiceBear default, so a photo-less user never produces a 404. **A change also appends `?v=<stamp>`**, because React re-rendering is not enough on its own: a byte-identical image URL can be served from the browser's in-memory image cache without any request, so `no-cache` never gets to revalidate. The stamp comes from the SSE event (or `Date.now()` for the uploader's own client, so its own view needs no SSE). A failed load records that id in the store's `broken` set, so the session stops retrying it. `ResultsModal` passes no id for opponents (the client-side `LastResult` carries none), so they render the generated avatar. The full pipeline — storage, the shared Redis record, caching and freshness — is described in [`avatar-system.md`](../avatar-system.md).
+- **Avatars are keyed by the immutable user id, and a version marker is appended when the URL changes.** `UserAvatar` takes `userId` (the photo key) and keeps `username` only as the DiceBear seed and alt text, so a display-name rename can never invalidate an avatar URL. It requests `/api/user/id/<userId>/avatar` only when the seat is not a bot **and** a photo is known to exist — from the payload's `hasAvatarPhoto` or from a live `avatar_changed` override in `avatarCache.ts`. Anything else renders the DiceBear default, so a user without a photo never causes a 404 request. **A change also appends `?v=<stamp>`**, because React re-rendering is not enough on its own: a byte-identical image URL can be served from the browser's in-memory image cache without any request, so `no-cache` never gets the chance to revalidate. The stamp value comes from the SSE event (or `Date.now()` for the uploader's own client, so its own view needs no SSE). A failed load records that id in the store's `broken` set, so the session stops retrying it. `ResultsModal` passes no id for opponents (the client-side `LastResult` does not include one), so they render the generated avatar. The full pipeline — storage, the shared Redis record, caching and freshness — is described in [`avatar-system.md`](../avatar-system.md).
 - **`DeleteAccountModal` is a two-step dialog.** Accounts created through a provider have no password, so they set one first, because deletion always requires the password. They then confirm with that password and an acknowledgement checkbox. On success the store's `logout()` clears the session and the user lands on `/login`.
-- **CJK label sizing (`AccountMenu`).** CJK (Chinese, Japanese and Korean) glyphs fill the em box, while Latin letters take up roughly half of it, so Latin labels use a smaller px value and look the same size.
+- **CJK label sizing (`RetroNavbar` account popover).** CJK (Chinese, Japanese and Korean) glyphs fill the em box, while Latin letters take up roughly half of it, so Latin labels use a smaller px value and look the same size.
 - **RetroNavbar compact mode.** Below Tailwind's `xl` breakpoint (1280px) the sidebar collapses to an icon-only rail. The labels are hidden from JavaScript rather than by CSS, because parts of the bar are plain inline styles. Every page that renders the bar uses the same threshold with `w-[88px] xl:w-[270px]`.
 - **RetroNavbar track layout.** The nav track uses `overflow-y: auto` only as a fallback. An earlier version also shifted the track vertically to move the active item nearer the centre, and that shift was removed: at short window heights it pushed the last item over the theme button.
 
@@ -303,4 +281,4 @@ Per-constant notes:
 | `Board` | `theme.ts` | `COL`, inline styles |
 | `Die` | `theme.ts` | Keyframe CSS for the shake animation, gradient backgrounds |
 | `OAuthButtons` | `theme.ts` | `btnOutline` style |
-| `AccountMenu` | `store.tsx` | `useApp` for `user`, `lang`, `setLang`, `toggleTwoFactor`, `logout` |
+| `RetroNavbar` | `store.tsx` | `useApp` for `user`, `lang`, `setLang`, `logout` |

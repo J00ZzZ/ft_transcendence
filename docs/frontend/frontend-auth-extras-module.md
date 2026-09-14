@@ -16,7 +16,7 @@ These pages handle the steps that happen after the password check:
 2. **ForgotPassword** (`/forgot-password`) — password reset step one: collect an email and request a reset link.
 3. **ResetPassword** (`/reset-password`) — password reset step two: use the emailed token to set a new password.
 
-All three are full-bleed routes (no side rail) and are public, so no session is required.
+All three are full-screen routes (no side rail) and are public, so no session is required.
 
 ---
 
@@ -29,7 +29,7 @@ All three are full-bleed routes (no side rail) and are public, so no session is 
 | `src/pages/ResetPassword.tsx` | Password reset step 2 — new password form |
 | `src/components/RetroAuthLayout.tsx` | Layout container for all auth pages |
 | `src/store.tsx` | `verify2fa`, `forgotPassword`, `resetPassword` actions |
-| `src/validatePassword.ts` | Client-side password validation (mirrors backend policy) |
+| `src/validatePassword.ts` | Client-side password validation (same rules as the backend policy) |
 
 ---
 
@@ -123,7 +123,7 @@ export function passwordError(password: string): string | null {
 ## Page Notes
 
 - **ForgotPassword** collects an email and asks the backend to send a reset link. The confirmation screen always appears: the backend never reveals whether the address is registered, and neither does the page.
-- **ResetPassword** is reached from the emailed link, which carries `?token=<resetToken>`. It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`.
+- **ResetPassword** is reached from the emailed link, which includes `?token=<resetToken>`. It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`.
 - **TwoFactor** is reached in two ways, both with `?token=<pendingToken>`: from `Login.tsx` after the password step succeeds, or from the backend's OAuth callback after it emails the code.
 
 ---

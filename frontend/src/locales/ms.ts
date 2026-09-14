@@ -75,15 +75,6 @@ export const ms = {
     playerDashboard: 'Papan Pemuka Pemain',
     playerProfile: 'Profil Pemain',
   },
-  accountMenu: {
-    signedIn: 'Log masuk sebagai',
-    language: 'Bahasa',
-    security: 'Keselamatan',
-    twoFactorAuth: 'Pengesahan dua faktor',
-    codeRequired: 'Kod diperlukan semasa log masuk',
-    passwordOnly: 'Kata laluan sahaja',
-    signOut: 'Log keluar',
-  },
   home: {
     greeting: 'Selamat petang, {{name}}',
     readyToRoll: 'Bersedia untuk membaling dadu?',

@@ -5,7 +5,7 @@ Reaching the app from anywhere on the internet, via ngrok. Companion doc:
 
 Verified directly against the current repo (`Makefile`, `backend/src/secrets.ts`,
 `backend/src/auth/oauth.guards.ts`, `backend/src/auth/auth.controller.ts`)
-rather than copied from older docs — see [Known gotcha](#known-gotcha) at
+rather than copied from older docs — see [Known issue](#known-issue) at
 the bottom for one place where a comment/config no longer matches what
 actually runs.
 
@@ -59,8 +59,8 @@ export function isTunnelRequest(host: string | undefined): boolean {
 ```
 
 ngrok forwards the browser's original `Host` header unmodified, so a request
-that came in through the tunnel carries the public `*.ngrok-free.dev` host;
-a local request carries `localhost`. `oauth.guards.ts`
+that arrives through the tunnel includes the public `*.ngrok-free.dev` host;
+a local request has `localhost`. `oauth.guards.ts`
 checks this on every OAuth kickoff to pick the matching Passport strategy
 (`google` vs `google-tunnel`, etc.), and `auth.controller.ts` uses the same
 check to decide which `FRONTEND_URL` to redirect back to after login
@@ -83,7 +83,7 @@ tunnel credentials) is present and non-empty — failing hard with the missing
 list otherwise.
 Nothing is auto-generated: copy a real `.env` from a teammate.
 
-## Known gotcha
+## Known issue
 
 One place where a comment/default in the code describes different behavior
 than what actually runs — found by tracing the config directly rather than

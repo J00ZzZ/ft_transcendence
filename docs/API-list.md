@@ -1735,7 +1735,7 @@ SSE stream — pushes new notifications to the browser in real time.
 
 Types: `friend_request` | `friend_accepted` | `friend_removed` | `friend_declined` | `game_invite` | `achievement` | `match_finished` | `match_cancelled` | `profile_updated` | `display_name_changed` | `friend_online` | `friend_offline` | `avatar_changed`
 
-**Keep-alive (server → client):** the server writes a `ping` frame into the stream every 20 s (`SSE_HEARTBEAT_MS`). Between notifications this response is byte-silent for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the frame exists to satisfy the tunnel's socket requirements and stop the stream being treated as dead. It is unrelated to the **client → server** presence heartbeat ([`POST /api/presence/heartbeat`](#post-apipresenceheartbeat)), which is a separate request that writes nothing into this stream. See [architecture.md](architecture.md) → Connection liveness (two-direction heartbeats).
+**Keep-alive (server → client):** the server writes a `ping` frame into the stream every 20 s (`SSE_HEARTBEAT_MS`). Between notifications this response sends no bytes for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the frame exists to satisfy the tunnel's socket requirements and stop the stream being treated as dead. It is unrelated to the **client → server** presence heartbeat ([`POST /api/presence/heartbeat`](#post-apipresenceheartbeat)), which is a separate request that writes nothing into this stream. See [architecture.md](architecture.md) → Connection liveness (two-direction heartbeats).
 
 ---
 

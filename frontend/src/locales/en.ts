@@ -75,15 +75,6 @@ export const en = {
     playerDashboard: 'Player Dashboard',
     playerProfile: 'Player Profile',
   },
-  accountMenu: {
-    signedIn: 'Signed in',
-    language: 'Language',
-    security: 'Security',
-    twoFactorAuth: 'Two-factor auth',
-    codeRequired: 'Code required at sign in',
-    passwordOnly: 'Password only',
-    signOut: 'Sign out',
-  },
   home: {
     greeting: 'Good evening, {{name}}',
     readyToRoll: 'Ready to roll the bones?',

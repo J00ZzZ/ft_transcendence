@@ -38,7 +38,7 @@ The engine core is the game's referee: it runs inside the `ludo-engine` service 
 | `redis.ts` | `RedisGameStore` — Redis persistence layer |
 | `bot.ts` | Heuristic bot AI |
 | `player-handler.ts` | Disconnect/reconnect/exit/ready management and turn advance |
-| `lobby.ts` | Lobby management — color selection with seat swap (ready gate lives in player-handler.ts) |
+| `lobby.ts` | Lobby management — color selection with seat swap (ready gate is in player-handler.ts) |
 | `index.ts` | Entry point — starts Socket.IO server on port 3001 |
 
 ---
@@ -164,7 +164,7 @@ One source of truth for game lifecycle — the engine emits these, and the socke
 
 ```typescript
 export type GameEvent =
-  | { type: 'dice_rolled'; gameId; value; legalMoves; bonusRoll; currentTurn; forfeited? }      // A roll happened; carries the value + legal moves (+ forfeited on third 6)
+  | { type: 'dice_rolled'; gameId; value; legalMoves; bonusRoll; currentTurn; forfeited? }      // A roll happened; includes the value + legal moves (+ forfeited on third 6)
   | { type: 'piece_moved'; gameId; result: MoveResult }                                         // A piece moved; full MoveResult payload
   | { type: 'game_ended'; gameId; winner; resultDetail }                                        // Game finished; winner + reason
   | { type: 'game_started'; gameId }                                                            // Game transitioned from waiting → active

@@ -76,15 +76,6 @@ export const fr = {
     playerDashboard: 'Tableau de bord joueur',
     playerProfile: 'Profil joueur',
   },
-  accountMenu: {
-    signedIn: 'Connecté en tant que',
-    language: 'Langue',
-    security: 'Sécurité',
-    twoFactorAuth: 'Authentification 2FA',
-    codeRequired: 'Code requis à la connexion',
-    passwordOnly: 'Mot de passe uniquement',
-    signOut: 'Se déconnecter',
-  },
   home: {
     greeting: 'Bonsoir, {{name}}',
     readyToRoll: 'Prêt à lancer les dés ?',

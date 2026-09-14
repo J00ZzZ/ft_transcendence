@@ -32,7 +32,7 @@ modal overlay (`ResultsModal`). It shows:
 | File | Role |
 |------|------|
 | `src/components/ResultsModal.tsx` | Results overlay — podium, summary, rank badges, outcome title |
-| `src/pages/Game.tsx` | Opens the modal on `game_ended`; owns the socket and `lastResult` |
+| `src/pages/Game.tsx` | Opens the modal on `game_ended`; holds the socket connection and the `lastResult` state |
 | `src/store.tsx` | `setLastResult` / `lastResult` state |
 
 ---
@@ -109,7 +109,7 @@ ResultsModal renders
 
 ## Avatar Flags
 
-`LastResult.players` is built from client-side game state and never carries `hasAvatarPhoto`, so `ResultsModal` passes `false` for opponents and bots, and `user?.hasAvatarPhoto ?? false` for the viewer. Passing `undefined` would make `UserAvatar` request the photo URL (Uniform Resource Locator) and log a 404 for every opponent without a photo. See [frontend-components-system.md](frontend-components-system.md) → Implementation Notes.
+`LastResult.players` is built from client-side game state and never includes `hasAvatarPhoto`, so `ResultsModal` passes `false` for opponents and bots, and `user?.hasAvatarPhoto ?? false` for the viewer. Passing `undefined` would make `UserAvatar` request the photo URL (Uniform Resource Locator) and log a 404 for every opponent without a photo. See [frontend-components-system.md](frontend-components-system.md) → Implementation Notes.
 
 ---
 

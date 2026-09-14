@@ -174,7 +174,7 @@ Edit these module-level constants to tweak auth behaviour (all defined in `backe
 | `RESET_TOKEN_TTL_S` | `twofactor.service.ts` | 1 h | Password-reset link lifetime |
 | `CODE_TTL_S` | `twofactor.service.ts` | 5 min | 2FA login-code lifetime |
 | `MAX_ATTEMPTS` | `twofactor.service.ts` | 5 | 2FA / reset attempt limit |
-| `PASSWORD_MIN` / `PASSWORD_MAX` | `auth/dto/password.rules.ts` | 12 / 72 | Password length bounds (mirrored in `frontend/src/validatePassword.ts`) |
+| `PASSWORD_MIN` / `PASSWORD_MAX` | `auth/dto/password.rules.ts` | 12 / 72 | Password length bounds (the same values are used in `frontend/src/validatePassword.ts`) |
 
 ---
 

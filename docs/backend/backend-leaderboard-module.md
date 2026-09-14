@@ -28,7 +28,7 @@ The Leaderboard module shows a **ranked list of players**, sorted by rating
 
 ## Data Flow & Population
 
-### Where the data lives
+### Where the data is stored
 
 | Store | What it holds | Role |
 |-------|---------------|------|
@@ -40,7 +40,7 @@ The Leaderboard module shows a **ranked list of players**, sorted by rating
 Redis keeps one **sorted set** per mode.
 
 **What a sorted set is (plain English):** a Redis *sorted set* is a collection
-of unique members (here, `userId`s) where **each member carries a numeric
+of unique members (here, `userId`s) where **each member has a numeric
 "score"** (here, the player's rating). Redis keeps the set **ordered by that
 score automatically** — every insert immediately lands in the right position,
 in `O(log n)` time. You never sort by hand: to read the leaderboard you just
@@ -386,7 +386,7 @@ FILL ON DEMAND (first read after Redis is empty)
 | Dependency | Purpose |
 |-----------|---------|
 | `PrismaService` | Database access (User model — ratings, profile info) |
-| `LeaderboardRedisService` | Redis layer: sorted-set reads/writes (PostgreSQL backfill lives in LeaderboardService) |
+| `LeaderboardRedisService` | Redis layer: sorted-set reads/writes (PostgreSQL backfill is in LeaderboardService) |
 | `ioredis` | Redis client |
 
 ---

@@ -13,7 +13,7 @@
 
 ## Overview
 
-The Leaderboard page (`/leaderboard`, full-bleed) shows players in rank order. It has:
+The Leaderboard page (`/leaderboard`, full-screen) shows players in rank order. It has:
 
 1. **Rankings table** — rank, player (avatar + username), rating, matches, win rate.
 2. **Top-3 podium** — highlighted cards for the top three players.

@@ -22,7 +22,7 @@ colors, mark ready, and trigger the start.
 
 | File | Role |
 |------|------|
-| `lobby.ts` | `LobbyManager` — color selection (with swap); readiness lives in the engine GameState |
+| `lobby.ts` | `LobbyManager` — color selection (with swap); readiness is part of the engine GameState |
 
 ---
 

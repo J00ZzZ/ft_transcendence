@@ -134,7 +134,7 @@ OAuth provider links, one row per provider per user.
 
 ### Game
 
-Historical results only — live matchmaking state lives in Redis, not here.
+Historical results only — live matchmaking state is stored in Redis, not here.
 
 | Field | Type | Attributes | Description |
 |-------|------|------------|-------------|
@@ -174,7 +174,7 @@ the literal string `bot-<color>` (`bot-red`, `bot-green`, `bot-yellow`,
 `bot-blue`). The row exists because `GameParticipant.user_id` is a foreign key to
 `User.id`, so every seeded seat must reference a real user.
 
-`backend/src/common/bot.ts` owns `BOT_PREFIX` and `isBotUserId()`. The engine
+`backend/src/common/bot.ts` defines `BOT_PREFIX` and `isBotUserId()`. The engine
 process keeps its own copy of both in `socket/auth.ts`, so bot identity must be
 changed in both places at once.
 

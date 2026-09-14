@@ -291,10 +291,9 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 
 | Document                                                                                         | Responsibility                                             |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| [docs/frontend/frontend-app-bootstrap-system.md](docs/frontend/frontend-app-bootstrap-system.md) | App bootstrap, route categories, auth guard                |
+| [docs/frontend/frontend-app-bootstrap-system.md](docs/frontend/frontend-app-bootstrap-system.md) | App bootstrap, route maps, auth guard                      |
 | [docs/frontend/frontend-router-system.md](docs/frontend/frontend-router-system.md)               | Custom client-side router                                  |
 | [docs/frontend/frontend-store-system.md](docs/frontend/frontend-store-system.md)                 | Global state (auth, game setup, settings, real-time match) |
-| [docs/frontend/frontend-shell-system.md](docs/frontend/frontend-shell-system.md)                 | Shell layout wrapper (side rail + header)                  |
 | [docs/frontend/frontend-auth-pages-module.md](docs/frontend/frontend-auth-pages-module.md)       | Login and signup pages                                     |
 | [docs/frontend/frontend-auth-extras-module.md](docs/frontend/frontend-auth-extras-module.md)     | 2FA, forgot/reset password pages                           |
 | [docs/frontend/frontend-home-module.md](docs/frontend/frontend-home-module.md)                   | Home page — stats, rank, friends, notifications            |
@@ -304,9 +303,11 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/frontend/frontend-results-module.md](docs/frontend/frontend-results-module.md)             | Post-game results card                                     |
 | [docs/frontend/frontend-friends-module.md](docs/frontend/frontend-friends-module.md)             | Friends page — list, requests, blocked, invites            |
 | [docs/frontend/frontend-leaderboard-module.md](docs/frontend/frontend-leaderboard-module.md)     | Leaderboard page                                           |
-| [docs/frontend/frontend-settings-module.md](docs/frontend/frontend-settings-module.md)           | Settings (AccountMenu, game preferences)                   |
+| [docs/frontend/frontend-settings-module.md](docs/frontend/frontend-settings-module.md)           | Settings (language, 2FA, game preferences)                 |
 | [docs/frontend/frontend-profile-module.md](docs/frontend/frontend-profile-module.md)             | Profile page — stats, history, friends                     |
 | [docs/frontend/frontend-components-system.md](docs/frontend/frontend-components-system.md)       | Shared UI components                                       |
+| [docs/frontend/frontend-styles-system.md](docs/frontend/frontend-styles-system.md)               | Stylesheets and the three-theme design system              |
+| [docs/frontend/frontend-i18n-utilities-system.md](docs/frontend/frontend-i18n-utilities-system.md) | i18n/translations, audio, bot names, legal pages          |
 
 #### Ludo Engine (real-time game engine)
 
@@ -401,8 +402,8 @@ material was reviewed and adapted by the team member responsible for that area.
 
 ## Known Limitations
 
-- The self-signed certificate triggers a browser warning on first visit (expected — it is a local development setup).
-- Ngrok's free tier shows an interstitial page for new visitors.
+- The self-signed certificate triggers a browser warning on first visit (expected for localhost).
+- Ngrok's free tier shows an intermediate page for new visitors similar to the issue with localhost.
 
 ## License
 

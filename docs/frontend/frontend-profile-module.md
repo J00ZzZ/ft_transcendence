@@ -12,7 +12,7 @@
 
 ## Overview
 
-The Profile page (`/profile`) shows a user's public profile with statistics, recent match history and a friends panel. It is a full-bleed route (rendered directly, with no `Shell` container); the page renders its own `RetroNavbar`.
+The Profile page (`/profile`) shows a user's public profile with statistics, recent match history and a friends panel. It is a full-screen route (rendered directly by the router); the page renders its own `RetroNavbar`.
 
 1. **Profile header** — username, status indicator, avatar initials, rating and the date the account was created.
 2. **Stats grid** — wins, losses, win rate, best streak.
@@ -29,7 +29,7 @@ When the page loads it reads the profile, game history, achievements, friends an
 | File | Role |
 |------|------|
 | `src/pages/Profile.tsx` | Profile page component |
-| `src/components/RetroNavbar.tsx` | Top navigation bar (profile page is full-bleed) |
+| `src/components/RetroNavbar.tsx` | Top navigation bar (profile page is full-screen) |
 | `src/store.tsx` | `useApp` for authentication state, presence and API (Application Programming Interface) calls |
 | `src/theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` styles |
 
@@ -109,7 +109,7 @@ sequenceDiagram
     participant API as Backend
     participant Store as useApp
 
-    App->>Profile: Mount (full-bleed route)
+    App->>Profile: Mount (full-screen route)
     Profile->>Profile: Read ?u= query or use logged-in user
     Profile->>API: GET /api/user/:username
     Profile->>API: GET /api/user/:username/games
