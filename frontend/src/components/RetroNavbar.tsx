@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { navigate, useRoute } from '../router';
+import { railButtonStyle, railHoverHandlers } from './railButton';
 import { useApp } from '../store';
 import { retroAudio } from '../utils/audio';
 import { UserAvatar } from './UserAvatar';
@@ -17,6 +18,11 @@ import {
   THEME_POPOVER_MENU_ACTIVE_UP,
   RETRO_FLOATING_DOCK,
 } from '../styles/tw';
+
+const REJOIN_EDGE = {
+  borderColor: 'var(--accent-pink)',
+  boxShadow: '0 0 16px rgba(255, 0, 127, 0.55), inset 0 0 8px rgba(0, 240, 255, 0.25)',
+};
 
 type ThemeType = 'synthwave' | 'win95' | 'terminal';
 
@@ -280,24 +286,15 @@ export function RetroNavbar({
             id="userAccountBtn"
             aria-label="Account Settings, Language and 2FA"
             style={{
+              ...railButtonStyle(isAccountPopoverOpen),
               width: '100%',
               height: 48,
               padding: isCompact ? 0 : '0 12px',
               borderRadius: 12,
-              background: isAccountPopoverOpen
-                ? 'rgba(255, 0, 127, 0.2)'
-                : 'rgba(255, 255, 255, 0.04)',
-              border: isAccountPopoverOpen
-                ? '1.5px solid #ff007f'
-                : '1px solid rgba(0, 240, 255, 0.3)',
-              boxShadow: isAccountPopoverOpen ? '0 0 16px rgba(255, 0, 127, 0.4)' : 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: isCompact ? 'center' : 'space-between',
               gap: 10,
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-              transition: 'all 0.2s ease',
               color: '#ffffff',
             }}
             onClick={(e) => {
@@ -307,18 +304,7 @@ export function RetroNavbar({
               setIsAccountPopoverOpen(next);
               retroAudio.playUiBeep(next ? 880 : 440, 0.05);
             }}
-            onMouseEnter={(e) => {
-              if (!isAccountPopoverOpen) {
-                e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-                e.currentTarget.style.boxShadow = '0 0 14px rgba(0, 240, 255, 0.35)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isAccountPopoverOpen) {
-                e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.3)';
-                e.currentTarget.style.boxShadow = 'none';
-              }
-            }}
+            {...railHoverHandlers(isAccountPopoverOpen)}
             title="Account Settings, Language & 2FA"
           >
             <div
@@ -660,8 +646,8 @@ export function RetroNavbar({
               borderRadius: 12,
               background:
                 'linear-gradient(135deg, rgba(255, 0, 127, 0.35), rgba(0, 240, 255, 0.35))',
-              border: '1.5px solid var(--accent-pink)',
-              boxShadow: '0 0 16px rgba(255, 0, 127, 0.55), inset 0 0 8px rgba(0, 240, 255, 0.25)',
+              border: `1.5px solid ${REJOIN_EDGE.borderColor}`,
+              boxShadow: REJOIN_EDGE.boxShadow,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -673,6 +659,10 @@ export function RetroNavbar({
               boxSizing: 'border-box',
               transition: 'all 0.2s ease',
             }}
+            // Same hover animation as the other rail buttons, but it returns to
+            // its pink alert edge rather than the default, so an in-progress
+            // game still stands out at rest.
+            {...railHoverHandlers(false, REJOIN_EDGE)}
             title={t('navbar.rejoinActiveTooltip')}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
@@ -724,18 +714,18 @@ export function RetroNavbar({
         className="nav-slider-viewport"
         style={{
           position: 'relative',
-          width: '100%',
+          boxSizing: 'border-box',
+          width: `calc(100% + ${isCompact ? 20 : 32}px)`,
+          marginLeft: isCompact ? -10 : -16,
+          marginRight: isCompact ? -10 : -16,
           flex: 1,
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          // `overflow-y: auto` is only a safety net. The old centre-shift "coverflow"
-          // was removed: at short window heights it pushed the last item over the theme
-          // button.
           overflowY: 'auto',
-          padding: '8px 0',
+          padding: isCompact ? '8px 10px' : '8px 16px',
         }}
       >
         {/* Nav Items Track */}
@@ -758,15 +748,13 @@ export function RetroNavbar({
             });
             const safeActiveIdx = activeIdx >= 0 ? activeIdx : 0;
             const isActive = idx === safeActiveIdx;
-            const dist = Math.abs(idx - safeActiveIdx);
-            const itemOpacity = isActive ? 1.0 : Math.max(0.35, 0.75 - dist * 0.14);
-            const itemScale = isActive ? 1.02 : Math.max(0.93, 1.0 - dist * 0.02);
 
             return (
               <button
                 key={item.path}
                 className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isActive ? 'active' : ''}`}
                 style={{
+                  ...railButtonStyle(isActive),
                   width: '100%',
                   height: 52,
                   justifyContent: isCompact ? 'center' : 'flex-start',
@@ -774,46 +762,16 @@ export function RetroNavbar({
                   padding: isCompact ? 0 : '0 14px',
                   fontSize: '1.02rem',
                   borderRadius: 12,
-                  background: isActive
-                    ? 'linear-gradient(90deg, rgba(255, 0, 127, 0.95), rgba(157, 0, 255, 0.95))'
-                    : 'rgba(20, 8, 44, 0.85)',
                   color: isActive ? '#ffffff' : 'var(--text-main)',
-                  border: isActive ? '1.5px solid #ff007f' : '1px solid rgba(0, 240, 255, 0.25)',
-                  boxShadow: isActive
-                    ? '0 0 20px rgba(255, 0, 127, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
-                    : 'none',
                   fontWeight: 900,
                   letterSpacing: '1px',
-                  cursor: 'pointer',
-                  opacity: itemOpacity,
-                  transform: `scale(${itemScale})`,
-                  transition: 'all 0.35s ease',
                 }}
                 title={item.label}
                 onClick={() => {
                   retroAudio.playUiBeep(isActive ? 480 : 640, 0.05);
                   navigate(item.path);
                 }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'rgba(0, 240, 255, 0.18)';
-                    e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-                    e.currentTarget.style.color = '#ffffff';
-                    e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.boxShadow = '0 0 14px rgba(0, 240, 255, 0.35)';
-                    e.currentTarget.style.transform = 'translateX(4px)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'rgba(20, 8, 44, 0.85)';
-                    e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.25)';
-                    e.currentTarget.style.color = 'var(--text-main)';
-                    e.currentTarget.style.opacity = String(itemOpacity);
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.transform = `scale(${itemScale})`;
-                  }
-                }}
+                {...railHoverHandlers(isActive)}
               >
                 <div
                   style={{
@@ -886,14 +844,13 @@ export function RetroNavbar({
             id="themeModalBtn"
             aria-label="Toggle Theme Menu"
             style={{
+              ...railButtonStyle(isThemePopoverOpen),
               width: '100%',
               height: 44,
               justifyContent: isCompact ? 'center' : 'space-between',
               padding: isCompact ? 0 : '0 14px',
               fontSize: '0.94rem',
               borderRadius: 10,
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(0, 240, 255, 0.3)',
               color: 'var(--text-main)',
             }}
             onClick={(e) => {
@@ -903,14 +860,7 @@ export function RetroNavbar({
               setIsThemePopoverOpen(next);
               retroAudio.playUiBeep(next ? 960 : 480, 0.05);
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-              e.currentTarget.style.boxShadow = '0 0 14px rgba(0, 240, 255, 0.35)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.3)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+            {...railHoverHandlers(isThemePopoverOpen)}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span

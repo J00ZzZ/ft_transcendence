@@ -8,6 +8,7 @@ import { useApp } from '../store';
 import type { PlayerColor } from '../game/types';
 import { retroAudio } from '../utils/audio';
 import { RETRO_BTN, THEME_TRIGGER_BTN_BASE } from '../styles/tw';
+import { railButtonStyle, railHoverHandlers } from './railButton';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -392,14 +393,14 @@ export function NotificationBell({
           className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${open ? 'active' : ''}`}
           onClick={toggleOpen}
           title={t('notifications.title')}
+          {...railHoverHandlers(open)}
           style={{
+            ...railButtonStyle(open),
             width: '100%',
             height: 44,
             justifyContent: 'center',
             padding: 0,
             borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(0, 240, 255, 0.3)',
             color: 'var(--text-main)',
             ...buttonStyle,
           }}
@@ -427,15 +428,15 @@ export function NotificationBell({
           className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${open ? 'active' : ''}`}
           onClick={toggleOpen}
           title={t('notifications.title')}
+          {...railHoverHandlers(open)}
           style={{
+            ...railButtonStyle(open),
             width: '100%',
             height: 44,
             justifyContent: 'space-between',
             padding: '0 14px',
             fontSize: '0.94rem',
             borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(0, 240, 255, 0.3)',
             color: 'var(--text-main)',
             ...buttonStyle,
           }}
