@@ -24,8 +24,7 @@ image**. The system is built around four requirements:
 4. None of the above may depend on a **mutable identity** — display names are renameable.
 
 The design in one line: **Postgres stores the bytes; a small Redis record stores the facts (does a
-photo exist, which DiceBear style); the browser fetches the bytes over a URL it can revalidate; and a
-stamped URL forces the re-fetch when something changes.**
+photo exist, which DiceBear style); the browser fetches the bytes over a URL it can revalidate; and a URL with a new version marker causes the browser to re-fetch when something changes.**
 
 Three properties make that work:
 
@@ -48,7 +47,7 @@ Three properties make that work:
 | `backend/src/avatar/avatar-meta.service.ts` | The Redis record `avatar:<userId>` → `{ has, style, v }`. `set()` writes it and returns the change stamp; `get()` reads it; `syncFromUser()` repairs it from a row the caller already loaded; `remove()` cleans up. |
 | `backend/src/avatar/avatar-meta.module.ts` | Provides/exports `AvatarMetaService` (the same pattern as `NotificationService`). |
 | `backend/src/avatar/image-signature.util.ts` | Magic-byte check so a mislabelled or truncated upload cannot be stored. |
-| `backend/src/user/user.controller.ts` | `POST /api/user/avatar`, `DELETE /api/user/avatar`, `GET /api/user/id/:userId/avatar`. Owns the cache headers and the upload validation. |
+| `backend/src/user/user.controller.ts` | `POST /api/user/avatar`, `DELETE /api/user/avatar`, `GET /api/user/id/:userId/avatar`. Defines the cache headers and the upload validation. |
 | `backend/src/user/user.service.ts` | `getAvatarById()`; writes the Redis record **after** the Postgres commit in upload/delete; broadcasts `avatar_changed`; repairs the record on public-profile reads. |
 | `backend/src/auth/auth.service.ts` | Seeds the record on register and on the OAuth creation path; repairs it on `/me`; removes it on account deletion. |
 | `backend/src/notification/notification.controller.ts` | Transport for `avatar_changed`: the SSE stream plus its `SSE_HEARTBEAT_MS` keep-alive. |
@@ -58,7 +57,7 @@ Three properties make that work:
 | File | Role |
 | --- | --- |
 | `backend/app/ludo-engine/src/redis.ts` | `getAvatarMeta(userId)` — reads `avatar:<userId>`; `createGame` defaults `hasAvatarPhoto: false`. |
-| `backend/app/ludo-engine/src/types.ts` | `PlayerMeta` carries `userId`, `hasAvatarPhoto`, `avatarStyle`. |
+| `backend/app/ludo-engine/src/types.ts` | `PlayerMeta` includes `userId`, `hasAvatarPhoto`, `avatarStyle`. |
 | `backend/app/ludo-engine/src/socket/join-manager.ts` | Fills those fields at join time (and `false` for bots). |
 | `backend/app/ludo-engine/src/engine.ts` | `emitLobbyUpdate` sends the real values in the lobby roster. |
 
@@ -66,10 +65,10 @@ Three properties make that work:
 
 | File | Role |
 | --- | --- |
-| `frontend/src/components/UserAvatar.tsx` | The render decision: photo vs generated avatar, the bot guard, the `?v=` stamp, the `onError` fallback. |
+| `frontend/src/components/UserAvatar.tsx` | The render decision: photo vs generated avatar, the bot guard, the `?v=` stamp, the `onError` fallback, and the optional `onPhotoError` callback. |
 | `frontend/src/avatarCache.ts` | Client avatar state: live overrides (`{ has, style, v }`), a per-user attempt stamp, and the `broken` set. |
 | `frontend/src/hooks/useNotifications.tsx` | Applies the `avatar_changed` event to the store. |
-| `frontend/src/pages/Profile.tsx` | Stamps the change locally on upload/delete, so the uploader's own view needs no SSE. |
+| `frontend/src/pages/Profile.tsx` | Sets the change locally on upload/delete, so the uploader's own view needs no SSE; shows upload/reset errors and the `photoLoadError` warning in a message area with a fixed height. |
 | every `<UserAvatar>` call site | Passes `userId` (and `isBot` where the seat can be a bot). |
 
 ---
@@ -124,7 +123,7 @@ reuse". `no-store`, which the `404` for a user with no photo uses, means "do not
 3. **Bots are never asked for a photo.** `UserAvatar` takes an explicit `isBot` guard regardless of
    what the flags say.
 4. **Nothing is keyed by a display name.** Avatars use `userId` everywhere.
-5. **A change stamps the URL.** React awareness alone cannot defeat the browser's in-memory image
+5. **A change adds a new version marker to the URL.** React becoming aware of the change alone cannot stop the browser from serving the image from its in-memory image
    cache.
 6. **The flag must be known before the request.** A client that asks anyway logs a 404.
 7. **The SSE keep-alive must stay enabled.** SSE has no replay, so a stream that gets reset loses any
@@ -209,6 +208,14 @@ Only the branch that knows a photo exists issues a request. Every other branch r
 avatar directly and sends nothing, which is what keeps the console clean. A flag the client never
 received is also treated as "no photo": showing the generated avatar is better than a 404 per seat.
 
+`UserAvatar` also accepts an optional **`onPhotoError`** callback. It runs when a photo was
+expected but failed to load: either the server returned 404 for a photo that should exist, or
+the browser could not read the bytes. The callback only reports the failure; it does not change
+what `UserAvatar` renders. `UserAvatar` still shows the DiceBear image and still records the id
+in the `broken` set. The Profile page uses the callback to show a warning translated into the
+selected language (`profile.photoLoadError`) in the reserved message area below the avatar
+buttons.
+
 ### 4. Game seats (waiting room, live game)
 
 ```mermaid
@@ -218,7 +225,7 @@ sequenceDiagram
     participant R as Redis
     participant API as Backend
 
-    B->>E: join_game (the JWT carries the userId)
+    B->>E: join_game (the JWT includes the userId)
     E->>R: HGETALL avatar cache for the user
     alt record present
         R-->>E: has and style
@@ -234,7 +241,7 @@ sequenceDiagram
 The engine has no database access, so this read is its only source of the flag. A record that is
 missing or was evicted falls back to the generated avatar — never to a 404 — and the backend repairs the record the next time it reads that user (`syncFromUser` on `/me` or a public profile).
 
-### 5. Why the URL is stamped
+### 5. Why the URL has a version marker
 
 This is the subtlest part of the system, and the reason `?v=` exists.
 
@@ -270,7 +277,7 @@ revalidated normally — the stamp is only needed once a change happens inside a
 | The Redis record is missing or evicted | the generated avatar | Consumers read a miss as `has: false`, so nothing is requested; the backend repairs the record the next time it loads that user. |
 | The SSE event is missed (stream reset) | the old image until the next mount or reload | The bare URL still revalidates on load, so the client self-corrects. Only the *instant* update is lost. |
 | A stale `has: true` with no bytes behind it | one failed load, then the generated avatar | `onError` marks the id broken for the session, so it is not retried. |
-| A corrupt or mislabelled upload | `400 Bad Request` | Magic-byte validation runs before anything is written, so an undecodable image never becomes the stored truth. |
+| A corrupt or mislabelled upload | `400 Bad Request` | Magic-byte validation runs before anything is written, so an undecodable image is never stored. |
 | An image the browser cannot decode | the generated avatar | Same `onError` path as a 404 — the marker covers both. |
 | Postgres is unavailable | the upload/delete fails with an error | Redis is only written after the Postgres write succeeds, so a `has: true` record with no stored photo cannot be created. |
 
@@ -311,12 +318,12 @@ Then in the browser, with DevTools open:
 
 - **The Redis record can be evicted** (`allkeys-lru`, `appendonly no`). A miss shows the generated
   avatar, never a 404, and is repaired from Postgres on the next `/me` or public-profile read. The
-  record carries no TTL, so repair is the only mechanism that corrects it.
+  record has no TTL, so repair is the only mechanism that corrects it.
 - **`PlayerMeta` stores the flag at join time.** A change made while players sit in the room arrives
   through the SSE event. A client that misses that event shows the old image until the next mount,
   when the plain URL is revalidated. Reading the records again in `emitLobbyUpdate` would reduce that
   window.
-- **`ResultsModal` shows no photos for opponents.** The client-side `LastResult` carries no ids, so
+- **`ResultsModal` shows no photos for opponents.** The client-side `LastResult` does not include ids, so
   opponents render the generated avatar.
 - **Uploads are checked by MIME and magic bytes, not decoded.** An unusual image with a valid
   signature can still fail to decode in the browser; the `broken` marker handles that case instead of

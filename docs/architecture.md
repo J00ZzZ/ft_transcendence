@@ -53,7 +53,7 @@ Images are built from `Dockerfile`s in each service directory. `db` and `redis` 
 their official images with an init script that reads secrets before `exec`ing the
 real process (`backend/app/postgres_16_db/`, `backend/app/redis/`).
 
-> **Note:** There is no separate `ludo-bot` container. The bot AI lives inside the
+> **Note:** There is no separate `ludo-bot` container. The bot AI is inside the
 > `ludo-engine` process (`backend/app/ludo-engine/src/bot.ts`). The engine accepts
 > a `bot` role in the JWT and can auto-fill slots with bot players.
 
@@ -76,7 +76,7 @@ attaches to the `transcendence_network` bridge and reaches the others by service
 | `db` | `…-db` (postgres:16-alpine) | `postgres_16_db-init.sh` validates `POSTGRES_PASSWORD`, then `exec`s the official postgres entrypoint → **PostgreSQL 16** | `127.0.0.1:5432 → 5432` | — |
 | `redis` | `…-redis` (redis:7-alpine) | `redis-init.sh` writes `/tmp/redis.conf` (port 6479, AOF persistence, 256 MB LRU) then `exec redis-server … --requirepass` → **Redis 7** | `127.0.0.1:6479 → 6479` | — |
 | `backend` | `…-backend` (node:22-alpine) | `docker-entrypoint.sh` validates env → `prisma db push --accept-data-loss` → `node dist/main.js` (**NestJS API** on 3000) | `127.0.0.1:3000 → 3000` | db (healthy), redis (healthy) |
-| `studio` | `…-studio` (reuses the backend image) | `npx prisma studio --port 5555 --browser none` — **Prisma DB browser** over the `db` service (skips the backend entrypoint to avoid a `prisma db push` race) | `127.0.0.1:5555 → 5555` | db (healthy) |
+| `studio` | `…-studio` (reuses the backend image) | `npx prisma studio --port 5555 --browser none` — **Prisma DB browser** over the `db` service (skips the backend entrypoint to avoid a `prisma db push` race condition) | `127.0.0.1:5555 → 5555` | db (healthy) |
 | `ludo-engine` | `…-ludo-engine` (node:22-alpine) | `node dist/index.js` — **Socket.IO game engine + inline bot AI** on 3001 (clients reach it same-origin via nginx; the host port exists for local `npm run dev`) | `127.0.0.1:3001 → 3001` | redis (healthy) |
 | `frontend` | `…-frontend` (node:22-alpine) | `publish.sh` — builds the **React SPA**, publishes it into the `spa_dist` volume, then watches the bind-mounted `./frontend/src` (`/app/src` in the container) and `package.json` and republishes on change (long-running build job) | — | — |
 | `frontend-dev` *(profile: dev)* | `…-frontend-dev` (node:22-alpine, `Dockerfile.dev`) | `npm run dev` — **Vite dev server with HMR**, serves source from the bind mount | `8080 → 8080` | backend, ludo-engine |
@@ -148,7 +148,7 @@ so client-side routing works on deep links. `frontend/src/router.tsx` is a custo
 
 **API** — `https://localhost:8443/api/*` → `proxy_pass http://backend:3000`. The `/api`
 prefix is *preserved*, so controllers must include it themselves. There is no global
-prefix in `backend/src/main.ts`; each controller carries `api/` in its own decorator.
+prefix in `backend/src/main.ts`; each controller includes `api/` in its own decorator.
 
 **Auth** — `@Controller('api/auth')` includes the `api/` prefix, so `/api/auth/*`
 is proxied through nginx to backend:3000. OAuth callbacks are **browser-facing**:
@@ -169,20 +169,20 @@ engine process.
 
 ## Connection liveness (two-direction heartbeats)
 
-Long-lived state is kept honest by **two independent heartbeats, one in each direction**. They are
+Long-lived state is verified by **two independent heartbeats, one in each direction**. They are
 deliberately named apart, and neither substitutes for the other.
 
-| Direction | Constant | Where it lives | Why it exists |
+| Direction | Constant | Where it is defined | Why it exists |
 | --- | --- | --- | --- |
 | **client → server** | `PRESENCE_HEARTBEAT_MS` (`sendPresenceHeartbeat()`) | `frontend/src/store.tsx` → `POST /api/presence/heartbeat` every 20 s while signed in (`DELETE` on logout) | Liveness of the **client**: proves the browser is still there. The server keeps a per-user Redis key with a 45 s TTL, so a crashed tab or a dropped network expires on its own and friends' presence dots correct themselves. |
-| **server → client** | `SSE_HEARTBEAT_MS` | `backend/src/notification/notification.controller.ts` → a `ping` frame written into the `/api/notifications/stream` SSE response every 20 s | Liveness of the **connection**: the SSE response is otherwise byte-silent for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`). The periodic frame satisfies the tunnel's socket requirements, so the stream is never treated as dead. |
+| **server → client** | `SSE_HEARTBEAT_MS` | `backend/src/notification/notification.controller.ts` → a `ping` frame written into the `/api/notifications/stream` SSE response every 20 s | Liveness of the **connection**: the SSE response otherwise sends no bytes for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`). The periodic frame satisfies the tunnel's socket requirements, so the stream is never treated as dead. |
 
 **Why both are needed**
 
-- The presence heartbeat is an ordinary **request/response on its own connection**. It carries no
+- The presence heartbeat is an ordinary **request/response on its own connection**. It contains no
   application meaning for the notification stream and writes nothing into it, so it cannot keep that
   stream alive.
-- The SSE keep-alive is **server-pushed** and carries no application meaning for presence; the server
+- The SSE keep-alive is **server-pushed** and has no application meaning for presence; the server
   learns nothing about the client from it.
 
 In short: the client → server beat answers *"is the user still connected?"*, while the
@@ -190,6 +190,15 @@ server → client beat answers *"is our connection to them still usable?"* — t
 specifically because the ngrok tunnel will not tolerate an idle socket. Because SSE has no replay,
 keeping the stream up is also what stops live events (for example `avatar_changed`) from being lost
 during a drop.
+
+**The SSE stream must not be re-created for unrelated state changes.** On the client,
+`useNotifications` opens the stream in a `useEffect` whose dependency array contains the
+**user id**, not the whole `user` object. After a successful avatar upload or reset,
+`Profile.tsx` calls `setUser({ ...user, hasAvatarPhoto })`, which creates a new `user`
+object. If the effect depended on that object, React would close the stream and open a new
+one. Any notification published while the stream is closed (for example the
+`profile_updated` toast) is not delivered, so the toast would appear only some of the
+time. Depending on the user id avoids this, because the id does not change.
 
 ### Client polling cadence
 
@@ -290,7 +299,7 @@ metadata cache. The engine is a separate process, so its `RedisGameStore` and
 See the [README](../README.md) **Configuration (.env)** section for the `.env` layout,
 the `make env` pipeline, and the OAuth setup. This file keeps the implementation notes:
 
-All configuration lives in the root `.env` (one `KEY=VALUE` per line). Containers load
+All configuration is stored in the root `.env` (one `KEY=VALUE` per line). Containers load
 it via compose's `env_file:`; host-side scripts load it through dotenv. `backend/src/secrets.ts`
 is a single lookup point over `process.env`: `secret(name)` returns `undefined` when unset,
 `requireSecret(name)` throws at boot on a missing value. The remaining `${...}` in
@@ -413,7 +422,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   ├── drop-all.sql          # Drop-all script (dev)
 │   │   ├── truncate-all.sql      # Truncate-all script (dev)
 │   │   ├── migrations/           # Prisma migrations (migration_lock.toml)
-│   │   └── ... (generated client output lives in backend/generated, gitignored)
+│   │   └── ... (generated client output is in backend/generated, gitignored)
 │   │
 │   └── scripts/
 │       └── migrate-snapshot.sh
@@ -447,8 +456,8 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       ├── pages/                # Home, Login, Signup, TwoFactor, Forgot/ResetPassword,
 │       │                         # LudoLobby, Lobby, Game, Friends,
 │       │                         # Leaderboard, Profile, LegalPage
-│       ├── components/           # Shell, RetroAuthLayout, RetroNavbar,
-│       │                         # AccountMenu, NotificationBell/Toast, Board, Die,
+│       ├── components/           # RetroAuthLayout, RetroNavbar,
+│       │                         # NotificationBell/Toast, Board, Die,
 │       │                         # JoinByCode, OAuthButtons, ProfileEditModal,
 │       │                         # RankBadge, RulesModal, UserAvatar, CyberModal,
 │       │                         # DeleteAccountModal, LegalModal, MarkdownViewer,

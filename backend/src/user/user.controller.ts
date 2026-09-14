@@ -16,7 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { isImageSignatureValid } from '../avatar/image-signature.util';
+import { isImageValid } from '../avatar/image-signature.util';
 
 // User routes: public profile/history plus authenticated avatar upload, fetch and
 // delete. Avatars are cacheable but revalidated (no-cache + ETag); the full
@@ -54,16 +54,18 @@ export class UserController {
     @UploadedFile() file: UploadedAvatarFile | undefined,
   ) {
     if (!file) {
-      throw new BadRequestException('Avatar file is required');
+      throw new BadRequestException({
+        code: 'AVATAR_FILE_REQUIRED',
+        message: 'Avatar file is required',
+      });
     }
-    const allowedMimes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Invalid file type. Allowed: PNG, JPEG, GIF, WebP');
-    }
-    // The declared mimetype is only the client's claim, so verify the actual bytes
-    // before storing something no browser could decode.
-    if (!isImageSignatureValid(file.buffer, file.mimetype)) {
-      throw new BadRequestException('That file is not a readable image');
+    // The declared mimetype is only the client's claim, so check both the MIME
+    // whitelist and the actual magic bytes before storing anything.
+    if (!isImageValid(file.buffer, file.mimetype)) {
+      throw new BadRequestException({
+        code: 'AVATAR_INVALID_TYPE',
+        message: 'Invalid file type. Allowed: PNG, JPEG, GIF, WebP',
+      });
     }
     return this.userService.uploadAvatar(req.user.id, file.buffer, file.mimetype);
   }

@@ -15,10 +15,10 @@
 
 The app bootstrap layer does four things:
 
-1. **Route categories** — splits pages into `SHELL_ROUTES` (rendered inside the side rail and header) and `FULL_ROUTES` (no side rail).
+1. **Route maps** — `FULL_ROUTES` maps every path to its page; all routes render full-screen.
 2. **Authentication guard** — sends signed-out users to `/login` and signed-in users away from public routes. Account-action routes (email verification, password reset, 2FA (two-factor authentication)) are the exception: they must stay reachable even when another account is signed in.
 3. **Session bootstrap** — `AppProvider` calls `/api/auth/me` on page load to see if the user is already logged in. The probe is skipped on the guest-facing public routes (`/`, `/login`, `/signup`), where there cannot be a session to restore.
-4. **Shell rendering** — wraps shell routes in the `Shell` component; `SHELL_ROUTES` is currently empty, so every page renders full-bleed.
+4. **full-screen rendering** — every route renders directly via `FULL_ROUTES`; there is no shell layout wrapper.
 
 ---
 
@@ -36,11 +36,7 @@ The app bootstrap layer does four things:
 ### Route Categories
 
 ```typescript
-/** Screens that render inside the app shell (side rail + header). Currently none —
- * every screen renders full-bleed. Kept as a map for future shell-wrapped pages. */
-const SHELL_ROUTES: Record<string, () => ReactNode> = {}
-
-/** Full-bleed screens (no shell). */
+/** All routes render full-screen. */
 const FULL_ROUTES: Record<string, () => ReactNode> = {
   '/home': () => <Home />,
   '/leaderboard': () => <Leaderboard />,
@@ -183,4 +179,4 @@ Account-action arrivals (`?verified=...`, `?reset=...`, `?error=...`, `?token=..
 |-----------|---------|
 | `store.tsx` | `AppProvider`, `useApp`, `AuthUser`, all auth and game actions |
 | `router.tsx` | `useRoute`, `navigate` |
-| Full-bleed pages | `Home`, `Leaderboard`, `Friends`, `Profile`, `Login`, `Signup`, `TwoFactor`, `ForgotPassword`, `ResetPassword`, `LudoLobby`, `Lobby`, `Game`, `Results` |
+| full-screen pages | `Home`, `Leaderboard`, `Friends`, `Profile`, `Login`, `Signup`, `TwoFactor`, `ForgotPassword`, `ResetPassword`, `LudoLobby`, `Lobby`, `Game`, `Results` |

@@ -20,7 +20,7 @@ The lobby is at `/gamelobby` (`LudoLobby.tsx`), with a separate table/room scree
 3. **Mode selection** — PvP (player versus player), PvE (player versus environment) or hotseat.
 4. **Match creation** — calls the backend matchmaking API (Application Programming Interface) at `POST /api/match/create` (or the PvP/PvE shortcuts), stores the returned `activeMatch` (gameId and engine token) in the store, then navigates to `/game`, where the Socket.IO connection starts.
 
-> **Note:** The lobby talks to the real backend. Creating a match returns engine credentials (`gameId`, `token`, `engineUrl`), which the Game page uses to connect through Socket.IO.
+> **Note:** The lobby communicates with the real backend. Creating a match returns engine credentials (`gameId`, `token`, `engineUrl`), which the Game page uses to connect through Socket.IO.
 
 ---
 

@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from 'react';
 import i18n from './i18n';
 import { BOT_POOL } from './theme';
-import { apiFetch, refreshOnce } from './api';
+import { apiFetch, refreshOnce, translateErrorCode } from './api';
 import type { PlayerColor } from './game/types';
 
 export type AuthUser = {
@@ -23,9 +23,12 @@ export type AuthUser = {
   hasAvatarPhoto?: boolean;
 };
 
-/** Pulls a readable message out of nestjs error body  */
+/** Pulls a readable, localized message out of nestjs error body  */
 function apiError(body: unknown, fallback: string): string {
-  const message = (body as { message?: string | string[] } | null)?.message;
+  const b = body as { code?: string; message?: string | string[] } | null;
+  const localized = translateErrorCode(b?.code);
+  if (localized) return localized;
+  const message = b?.message;
   if (Array.isArray(message)) return message.join('. ');
   return typeof message === 'string' ? message : fallback;
 }
@@ -257,8 +260,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password }),
       }).catch(() => null);
-      if (!res) return { error: 'Could not reach the server' };
-      if (!res.ok) return { error: apiError(await res.json().catch(() => null), 'Login failed') };
+      if (!res) return { error: i18n.t('common.couldNotReachServer') };
+      if (!res.ok)
+        return { error: apiError(await res.json().catch(() => null), i18n.t('auth.loginFailed')) };
       const data = await res.json();
       // 2FA off: the backend already set the session cookies, so there's no
       // code step — record the user and let the caller route straight home.
@@ -281,8 +285,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, email }),
       }).catch(() => null);
-      if (!res) return 'Could not reach the server';
-      if (!res.ok) return apiError(await res.json().catch(() => null), 'Sign up failed');
+      if (!res) return i18n.t('common.couldNotReachServer');
+      if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.signupFailed'));
       return null;
     },
     [],
@@ -296,8 +300,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pendingToken, code }),
       }).catch(() => null);
-      if (!res) return 'Could not reach the server';
-      if (!res.ok) return apiError(await res.json().catch(() => null), 'Code rejected');
+      if (!res) return i18n.t('common.couldNotReachServer');
+      if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.codeRejected'));
       setUser((await res.json()).user);
       return null;
     },
@@ -313,8 +317,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     }).catch(() => null);
-    if (!res) return 'Could not reach the server';
-    if (!res.ok) return apiError(await res.json().catch(() => null), 'Something went wrong');
+    if (!res) return i18n.t('common.couldNotReachServer');
+    if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.forgotFailed'));
     return null;
   }, []);
 
@@ -326,8 +330,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
       }).catch(() => null);
-      if (!res) return 'Could not reach the server';
-      if (!res.ok) return apiError(await res.json().catch(() => null), 'Could not reset password');
+      if (!res) return i18n.t('common.couldNotReachServer');
+      if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.resetFailed'));
       return null;
     },
     [],

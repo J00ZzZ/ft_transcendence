@@ -251,12 +251,12 @@ sequenceDiagram
 ### Send Friend Request Path
 ```
 POST /api/friends/request/{userId} (JWT required)
-  ├── Check target is self → 400 Bad Request
-  ├── Check target exists → 404 Not Found
+  ├── Check target is self → 400 FRIEND_REQUEST_SELF
+  ├── Check target exists → 404 USER_NOT_FOUND
   ├── Check existing friendship:
-  │   ├── Accepted → 400 Already friends
-  │   ├── Pending → 400 Request already pending
-  │   └── Blocked → 403 Cannot send
+  │   ├── Accepted → 400 FRIEND_ALREADY
+  │   ├── Pending → 400 FRIEND_REQUEST_PENDING
+  │   └── Blocked → 403 FRIEND_BLOCKED
   ├── friendship.create({ userId, friendId, status: 'pending' })
   └── 201 (friendship object)
 ```

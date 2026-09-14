@@ -58,7 +58,7 @@ The registry (`achievements.registry.ts`) defines two rule types:
 | 12 | `achSpeedDemon` | Speed Demon | per-game | Win in under 30 minutes | rank 1 + game duration (`Game.startedAt` / `Game.endedAt`) |
 | 13 | `achUnstoppable` | Unstoppable | per-game | Capture ≥ 3 pieces in one game | `GameParticipant.piecesCaptured` |
 
-> **Lifetime rule sources** (`wins`, `botWins`, `humanWins`) come from `LifecycleCounts`, computed once per evaluation from the user's `COMPLETED` PVP/PVE participations (`rank === 1`). The streak inputs (`winStreak`, `pveGameStreak`) live on the **`User`** model, not on `Achievement` — the `Achievement` row stores only the 13 unlocked flags. In-app display copy for each name/description lives in `frontend/src/locales/en.ts` (`achXxx` / `achXxxDesc` keys).
+> **Lifetime rule sources** (`wins`, `botWins`, `humanWins`) come from `LifecycleCounts`, computed once per evaluation from the user's `COMPLETED` PVP/PVE participations (`rank === 1`). The streak inputs (`winStreak`, `pveGameStreak`) are stored on the **`User`** model, not on `Achievement` — the `Achievement` row stores only the 13 unlocked flags. In-app display copy for each name/description is defined in `frontend/src/locales/en.ts` (`achXxx` / `achXxxDesc` keys).
 
 To add or tweak an achievement, edit `ACHIEVEMENT_KEYS` / `ACHIEVEMENT_RULES` in `achievements.registry.ts` — no new endpoints or logic are needed.
 
@@ -150,7 +150,7 @@ POST /api/achievements/check (JWT)
 
 ---
 
-## Notes / Gotchas
+## Notes / Common Issues
 
 - **Only `COMPLETED` PVP/PVE games count.** `computeLifecycleCounts` filters participations to `game.status === 'COMPLETED'` and `gameType` PVP/PVE. ABANDONED games have no definitive result and are excluded; hotseat never reaches the backend (demo-and-forget).
 - **Fire-once semantics.** Once an `Achievement` flag is `true` it is never re-evaluated — `evaluateRule` skips already-unlocked rules, and `unlock()` returns `false` for an already-true flag, so no duplicate notifications.

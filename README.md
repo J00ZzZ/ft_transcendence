@@ -18,7 +18,7 @@ achievement system, and the whole interface is available in multiple languages.
 - **User management** — profiles, avatars, friends, live online status
 - **Authentication** — local accounts, OAuth 2.0 sign-in (Google, GitHub, 42), email verification, and two-factor authentication (email code)
 - **Progression** — match history, statistics, leaderboard, and achievements
-- **Multilingual UI** — English, Malay, and French
+- **Multilingual UI** — English, Malay, and French, including error messages and notices that are translated into the selected language
 - **Notifications, game customization, and extended browser support**
 
 ## Instructions
@@ -29,12 +29,12 @@ achievement system, and the whole interface is available in multiple languages.
 - **make** (to use the provided build commands).
 - A `.env` file at the repo root (see [Configuration (.env)](#configuration-env) below). The stack refuses to start if required values are missing.
 - OAuth client IDs and secrets for Google, GitHub, and 42 — **optional**. Local sign-up and login work without them.
-- At least one free port: `8443` (HTTPS). Ports `3000`, `3001`, `5432`, `5555`, `6479` are used inside/for debugging.
+- At least one free port: `8443` (HTTPS) was chosen for our project.
 
 ### Running
 
 ```bash
-git clone https://github.com/JaxzTan/ft_transcendence.git
+git clone https://github.com/J00ZzZ/ft_transcendence.git
 cd ft_transcendence
 make
 ```
@@ -57,7 +57,7 @@ make dev
 | `make` or `make all`              | Build images and start the stack                         |
 | `make build`                      | Build images only (runs `make env` first)                |
 | `make start`                      | Start the stack (detached)                               |
-| `make dev`                        | Vite HMR dev + prod SPA (`compose watch`)                |
+| `make dev`                        | Vite HMR dev + prod SPA (`compose watch`). ⚠️ Running `make dev` will stop any running prod containers. |
 | `make stop` / `make down`         | Stop services / remove containers                        |
 | `make logs`                       | Tail service logs                                        |
 | `make clean` / `make prune`       | Remove all Docker data / `docker system prune`           |
@@ -78,19 +78,24 @@ make dev
 | `http://localhost:3000`   | Backend API (direct, host-only)                                 | default | Loopback-only publish; JWT/2FA/bcrypt, throttling, no CORS headers (same-origin via nginx only)                             |
 | `http://localhost:5555`   | Prisma Studio (database browser)                                | default | Loopback-only publish; no app-level auth — interactive host use only                                                        |
 | `wss://<host>/socket.io/` | Game engine connection (same-origin through nginx / Vite proxy) | default | Same-origin `wss` only; engine verifies the Socket.IO handshake JWT before joining rooms                                    |
+| `https://derived-sassy-amniotic.ngrok-free.dev` | Ngrok tunnel (online multiplayer) | tunnel | Public entry exposed via ngrok — same nginx TLS/security setup as `localhost:8443`. Fixed URL provided by ngrok |
 
-**Hardening notes**
+**Security Hardening measures taken**
 
 - **`8443` (nginx)** is the only intentionally public-facing port (published on all host interfaces). It runs **TLS 1.2/1.3 only** with a self-signed cert and **no plain-HTTP listener**, sets HSTS + security headers + a CSP, disables `server_tokens`, denies hidden-file access, and applies per-IP rate limits (login `5r/m`, auth `60r/m`, refresh `30r/m`, leaderboard `30r/m`) in front of the API.
-- **`8080` (Vite)** exists only under the `dev` compose profile (`make dev`). It serves the SPA and proxies `/api` and `/socket.io` without TLS.
+- **`8080` (Vite)** is active only under the `dev` compose profile (`make dev`). It serves the SPA and proxies `/api` and `/socket.io` without TLS. Disabled in production.
 - **`3000` (backend)** is published loopback-only; clients reach it exclusively through nginx's `/api` proxy. Backend hardening: JWT auth in httpOnly cookies, bcrypt password hashes, class-validator on DTOs, and NestJS rate throttling. CORS is intentionally not enabled — every call the SPA makes is same-origin through nginx, so the backend emits no cross-origin headers.
+- **Avatar uploads** are checked twice before they are stored. First, the MIME type must be one of a fixed list (PNG, JPEG, GIF or WebP, with a 2 MB limit). Second, the first bytes of the file are compared against the signature of that format (for example `89 50 4E 47` for PNG, `FF D8 FF` for JPEG, `52 49 46 46…57 45 42 50` for WebP). The second check is needed because the MIME type is only what the client claims; a file with the wrong name, or a file that was cut off, is rejected before any data is written. The bytes are then stored in Postgres in a `Bytes` column through Prisma, and Prisma reads them back as raw bytes and sends them to the browser with the stored `Content-Type`. The database does not run or open the file; it only stores the bytes.
 - **`5555` (Prisma Studio)** is a raw database browser with no application-level authentication — its protection is the loopback-only binding plus the Postgres credentials. Used on the host only.
 - **`/socket.io/`** is reachable only same-origin: over TLS via nginx (`wss://`) or through the Vite dev proxy — never on a raw `ws://` port. The engine validates the Socket.IO handshake JWT (game-scoped, with role/color) before the socket can join a room.
-- **Infrastructure ports not listed** — Postgres (`127.0.0.1:5432`), Redis (`127.0.0.1:6479`) and the engine (`127.0.0.1:3001`) — are all published loopback-only. Redis requires a password, Postgres requires credentials, and cross-container traffic rides the private `transcendence_network`.
+- **Infrastructure ports not listed** — all published loopback-only; cross-container traffic rides the private `transcendence_network`:
+  - **Postgres** (`127.0.0.1:5432`) — requires credentials.
+  - **Redis** (`127.0.0.1:6479`) — requires a password.
+  - **Engine** (`127.0.0.1:3001`) — additionally gated by JWT token verification: the Socket.IO handshake JWT (game-scoped, with role/color, signed with `JWT_SECRET` and verified in constant time) must be valid before a socket can join a room, so a loopback connection alone is not enough to interact with any game.
 
 ### Configuration (.env)
 
-All config lives in the root `.env` (`KEY=VALUE` per line), loaded into containers via compose's `env_file:`. It is gitignored and shared between the team only (via Discord) — copy `.env.example` to start, then fill in the real values from a teammate. `make` validates it and **fails early** if `.env` is missing or any required field is empty. OAuth credentials are added manually from the provider consoles (Google, GitHub, 42).
+All config lives in the root `.env` (`KEY=VALUE` per line), loaded into containers via compose's `env_file:`. It is gitignored and shared between the team only (via Discord) — `.env.example` is a template we used. `make` validates it and **fails early** if `.env` is missing or any required field is empty. OAuth credentials are added manually from the provider consoles (Google, GitHub, 42).
 
 ## Team Information
 
@@ -138,9 +143,9 @@ All config lives in the root `.env` (`KEY=VALUE` per line), loaded into containe
 
 ### Justification for major technical choices
 
-**Why React + NestJS + PostgreSQL.** They are the stack the team is most comfortable with
-and they are explicitly allowed by the subject (as opposed to, e.g., Django or Spring), so
-the team could move fast and defend every choice in review.
+**Why React + NestJS + PostgreSQL.** The stack the team is most comfortable with, and
+explicitly allowed by the subject (unlike Django or Spring), so the team could move fast
+and defend every choice in review.
 
 **Why Redis alongside it.** A running match is high-frequency, short-lived state — board
 position, current dice value, whose turn it is, who is queued for matchmaking. Writing that
@@ -158,13 +163,23 @@ merely functional.
 **Why Socket.IO over plain WebSockets.** It provides automatic reconnection, rooms, and
 broadcasting out of the box, which the live board, presence, and reconnect flows build on.
 
-**Why Passport + JWT in httpOnly cookies + bcrypt.** Passport handles the OAuth 2.0 flows
-for Google, GitHub, and 42, so the provider callbacks are handled by a well-known library.
-Sessions use a short-lived JWT access token (15 minutes) stored in an httpOnly cookie, so
-page scripts cannot read it and XSS cannot steal it. The refresh token (7 days) is stored
-hashed in Redis and rotated on every use, so a leaked token stops working once it is reused,
-and can be revoked on logout or password reset. Passwords are hashed with bcrypt, so a
-database leak does not expose usable credentials.
+**Why SSE and client-to-server heartbeats.** The notification system uses Server-Sent
+Events (SSE) instead of WebSockets. The reason is one behaviour of ngrok: it closes a
+tunnel that carries no traffic for a short time. A WebSocket that stays open for a long
+time would be closed with no error message, and the client would stop receiving
+notifications. An SSE connection is a normal HTTP response that stays open, and the
+client sends a small heartbeat request to the server at a fixed interval, so the tunnel
+always carries traffic. This keeps the connection open and still lets the server push
+messages to the client as they happen. The heartbeat also tells the server that the client
+is still there; if the heartbeat stops, the client reconnects before the user notices that
+notifications are missing.
+
+**Why Passport + JWT in httpOnly cookies + bcrypt.** Passport handles OAuth 2.0 callbacks
+for Google, GitHub, and 42 — a well-known library, no custom flow. Sessions use a
+short-lived JWT (15 minutes) in an httpOnly cookie, so page scripts cannot read it and XSS
+cannot steal it. Refresh tokens (7 days) are stored hashed in Redis and rotated on every use
+— a leaked token stops working once reused, and can be revoked on logout. Passwords are
+hashed with bcrypt, so a database leak does not expose usable credentials.
 
 **Why Prisma.** Prisma keeps the database schema in one place and generates a type-safe
 client from it, so queries are checked at compile time and no SQL is written by hand. Schema
@@ -221,7 +236,7 @@ consistently on any machine.
 ### `bleow`
 
 - **Built:** Real-time features (Socket.IO gateway with Redis adapter for cross-instance broadcast, live board updates, presence, reconnect); AI opponent (heuristic move selection, no external model); web-based game (server-authoritative Ludo — dice RNG, turn order, captures, safe squares, exact-count home entry); game statistics and match history (wins/losses, rating, leaderboard); gamification (achievements, badges, leaderboards); multiplayer module (four-seat, server-enforced turn order);
-- **Challenges:** Debugging and smoothly integrating backend with frontend. Numerous small guards to include to patch problems. Timely and clear communication with team.
+- **Challenges:** Debugging and smoothly integrating backend with frontend. Learning new web development languages in a short period of time since no prior background (Typescript and basic CSS). Timely and clear communication with team.
 
 ### `hang`
 
@@ -276,10 +291,9 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 
 | Document                                                                                         | Responsibility                                             |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| [docs/frontend/frontend-app-bootstrap-system.md](docs/frontend/frontend-app-bootstrap-system.md) | App bootstrap, route categories, auth guard                |
+| [docs/frontend/frontend-app-bootstrap-system.md](docs/frontend/frontend-app-bootstrap-system.md) | App bootstrap, route maps, auth guard                      |
 | [docs/frontend/frontend-router-system.md](docs/frontend/frontend-router-system.md)               | Custom client-side router                                  |
 | [docs/frontend/frontend-store-system.md](docs/frontend/frontend-store-system.md)                 | Global state (auth, game setup, settings, real-time match) |
-| [docs/frontend/frontend-shell-system.md](docs/frontend/frontend-shell-system.md)                 | Shell layout wrapper (side rail + header)                  |
 | [docs/frontend/frontend-auth-pages-module.md](docs/frontend/frontend-auth-pages-module.md)       | Login and signup pages                                     |
 | [docs/frontend/frontend-auth-extras-module.md](docs/frontend/frontend-auth-extras-module.md)     | 2FA, forgot/reset password pages                           |
 | [docs/frontend/frontend-home-module.md](docs/frontend/frontend-home-module.md)                   | Home page — stats, rank, friends, notifications            |
@@ -289,9 +303,11 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/frontend/frontend-results-module.md](docs/frontend/frontend-results-module.md)             | Post-game results card                                     |
 | [docs/frontend/frontend-friends-module.md](docs/frontend/frontend-friends-module.md)             | Friends page — list, requests, blocked, invites            |
 | [docs/frontend/frontend-leaderboard-module.md](docs/frontend/frontend-leaderboard-module.md)     | Leaderboard page                                           |
-| [docs/frontend/frontend-settings-module.md](docs/frontend/frontend-settings-module.md)           | Settings (AccountMenu, game preferences)                   |
+| [docs/frontend/frontend-settings-module.md](docs/frontend/frontend-settings-module.md)           | Settings (language, 2FA, game preferences)                 |
 | [docs/frontend/frontend-profile-module.md](docs/frontend/frontend-profile-module.md)             | Profile page — stats, history, friends                     |
 | [docs/frontend/frontend-components-system.md](docs/frontend/frontend-components-system.md)       | Shared UI components                                       |
+| [docs/frontend/frontend-styles-system.md](docs/frontend/frontend-styles-system.md)               | Stylesheets and the three-theme design system              |
+| [docs/frontend/frontend-i18n-utilities-system.md](docs/frontend/frontend-i18n-utilities-system.md) | i18n/translations, audio, bot names, legal pages          |
 
 #### Ludo Engine (real-time game engine)
 
@@ -303,11 +319,68 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/ludo-engine/ludo-engine-socket-system.md](docs/ludo-engine/ludo-engine-socket-system.md) | Socket.IO connection and event protocol            |
 | [docs/ludo-engine/ludo-engine-redis-system.md](docs/ludo-engine/ludo-engine-redis-system.md)   | Redis persistence + pub/sub                        |
 
-### Classic references
+### Linting and Formatting
+
+The codebase uses **ESLint** to check the code and **Prettier** to format it. Both are
+configured to follow common standards. A lint failure is meant to point to a real problem
+in the code, not to a difference in style.
+
+#### ESLint
+
+ESLint 10 with a `typescript-eslint` flat config (`eslint.config.mjs`). It extends
+`eslint:recommended` and `typescript-eslint:recommended`, and then adds a set of strict
+rules. The rules were chosen so that a lint failure points to a real problem in the code
+rather than to a difference in style.
+
+- **Plugins:** `typescript-eslint` (rules that read the TypeScript types) and
+  `eslint-plugin-react-hooks` (`rules-of-hooks` as an error and `exhaustive-deps` as a
+  warning, both applied to the frontend only).
+- **Key rules:**
+  - `eqeqeq: ['error', 'smart']` — requires `===` and `!==`, but allows `x != null`.
+  - `consistent-type-imports` — requires `import type` for imports that are only types.
+  - `no-explicit-any: warn` — reports `any`, but does not fail the build for it.
+  - `no-floating-promises`, `require-await` — report promises that are never awaited.
+  - `no-non-null-assertion`, `no-unnecessary-type-assertion`,
+    `no-redundant-type-constituents`, `no-unnecessary-type-arguments` — report type
+    assertions and type arguments that do nothing.
+  - `prefer-optional-chain`, `no-unnecessary-template-expression` — report an older way
+    of writing something when a shorter way does the same thing.
+  - `prefer-nullish-coalescing`, `no-unnecessary-condition` — report a check for `null`
+    or `undefined` that is written incorrectly, or a condition that can never be true or
+    false. Both rules are enabled for the frontend and the backend, because both use
+    strict TypeScript.
+- **Which rules are enabled where:** the `no-unsafe-*` rules are left out, because they
+  report correct code as well as incorrect code. The rule set is not the same for the
+  frontend and the backend. For example, `no-confusing-void-expression` is disabled for
+  the frontend, because a React event handler normally returns the result of `setState`,
+  and `prefer-nullish-coalescing` is only enabled when `strictNullChecks` is turned on.
+
+#### Prettier
+
+Prettier 3 via `.prettierrc`, with the `prettier-plugin-tailwindcss` plugin for auto-sorting
+Tailwind classes.
+
+| Setting           | Value     | Why                                                                                      |
+| ----------------- | --------- | ---------------------------------------------------------------------------------------- |
+| `semi`            | `true`    | Prevents bugs that a missing semicolon can cause.                                        |
+| `singleQuote`     | `true`    | The usual convention in JavaScript and TypeScript projects.                              |
+| `tabWidth`        | `2`       | Indents with two spaces, which is the common choice in web projects.                     |
+| `useTabs`         | `false`   | Uses spaces, so the indentation looks the same in every editor.                          |
+| `printWidth`      | `100`     | Wraps lines at 100 characters, which stays readable on a wide screen.                    |
+| `trailingComma`   | `all`     | Adds a comma after the last item, so diffs are smaller and reordering items is safer.    |
+| `bracketSpacing`  | `true`    | Adds spaces inside braces, as in `{ foo: bar }`.                                         |
+| `bracketSameLine` | `false`   | Puts the closing bracket of a JSX element on its own line.                               |
+| `arrowParens`     | `always`  | Always puts parentheses around arrow-function parameters, so none are ever left out.     |
+| `endOfLine`       | `lf`      | Uses the same line endings for everyone, so diffs do not show changes that are not real. |
+
+### Assorted References
 
 - Ludo rules: [docs/Ludo_Rules.md](docs/Ludo_Rules.md) — the full ruleset the engine enforces (57-step piece journey, star squares, blockades, captures, exact-count home entry)
 - Ludo background: [Wikipedia — Ludo](https://en.wikipedia.org/wiki/Ludo)
+- File signatures: [Wikipedia — List of file signatures](https://en.wikipedia.org/wiki/List_of_file_signatures) — the magic-byte values used to check uploaded avatar images
 - React: [react.dev](https://react.dev)
+- TypeScript: [typescriptlang.org/docs](https://www.typescriptlang.org/docs/handbook/intro.html)
+- Tailwind CSS: [tailwindcss.com/docs](https://tailwindcss.com/docs/installation/using-vite)
 - NestJS: [docs.nestjs.com](https://docs.nestjs.com)
 - Socket.IO: [socket.io/docs](https://socket.io/docs)
 - Prisma: [prisma.io/docs](https://www.prisma.io/docs)
@@ -329,8 +402,8 @@ material was reviewed and adapted by the team member responsible for that area.
 
 ## Known Limitations
 
-- The self-signed certificate triggers a browser warning on first visit (expected — it is a local development setup).
-- Ngrok's free tier shows an interstitial page for new visitors.
+- The self-signed certificate triggers a browser warning on first visit (expected for localhost).
+- Ngrok's free tier shows an intermediate page for new visitors similar to the issue with localhost.
 
 ## License
 

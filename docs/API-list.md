@@ -1,6 +1,6 @@
 # **API List**
 
-Complete reference of all HTTP and WebSocket APIs in the project. Updated 30 Aug 2026
+Complete reference of all HTTP and WebSocket APIs in the project. Updated 14 Sep 2026
 
 ---
 
@@ -13,6 +13,102 @@ Complete reference of all HTTP and WebSocket APIs in the project. Updated 30 Aug
 | 🤖 | Called by ludo-engine (backend-to-backend) |
 
 > **Auth note:** All 🔒 endpoints authenticate via the `token` httpOnly cookie. No `Authorization: Bearer` header is used.
+
+---
+
+## **Error responses**
+
+An error response has one of two shapes:
+
+| Shape | When | Body |
+|---|---|---|
+| **Default** | NestJS's own exceptions (anything not listed below) | `{ "statusCode": 400, "message": "…", "error": "Bad Request" }` |
+| **With a code** | An error or notice that the user reads in their own language | `{ "code": "SOME_CODE", "message": "…" }` |
+
+- **`code`** is a fixed identifier. The frontend uses it to find a translation named `errors.<CODE>` (in `frontend/src/locales/*`) and shows that text in the user's language. If a code has no translation yet, the English `message` is shown instead. `translateErrorCode()` in `api.ts` does the translation, and both the `apiFetch` helpers and the auth store call it.
+- **`message`** is always plain English, so a code with no translation never shows a technical identifier to the user.
+- **Validation errors** are built by the `ValidationPipe` `exceptionFactory` in `main.ts`. For the fields listed in that file it adds a `VALIDATION_*` code; for every other field it returns the default NestJS body.
+
+**Error codes:**
+
+*Auth*
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `AUTH_USERNAME_TAKEN` | 409 | Username already registered |
+| `AUTH_EMAIL_TAKEN` | 409 | Email already registered |
+| `AUTH_INVALID_CREDENTIALS` | 401 | Wrong username/email or password |
+| `AUTH_RESET_LINK_INVALID` | 401 | Reset link invalid or expired |
+| `AUTH_CODE_INVALID` | 401 | 2FA code invalid or expired |
+| `AUTH_NOT_AUTHENTICATED` | 401 | No valid session |
+| `AUTH_SESSION_EXPIRED` | 401 | Session expired — log in again |
+| `AUTH_DISPLAY_NAME_TAKEN` | 409 | Display name already taken |
+| `AUTH_CURRENT_PASSWORD_INCORRECT` | 401 | Current password wrong |
+| `AUTH_DELETE_CONFIRM_REQUIRED` | 400 | Deletion not confirmed |
+| `AUTH_DELETE_SET_PASSWORD` | 403 | Set a password before deleting |
+| `AUTH_PROVIDER_LINKED` | 409 | Provider linked to another user |
+| `AUTH_PROVIDER_NOT_LINKED` | 404 | Provider not linked to this account |
+| `AUTH_KEEP_ONE_SIGNIN` | 403 | Must keep at least one sign-in method |
+| `AUTH_PASSWORD_UPDATED` | 200 | Notice: password changed, other devices signed out |
+
+*Validation (400)*
+
+| Code | Field |
+|---|---|
+| `VALIDATION_USERNAME_FORMAT` | `username` — 3-20 chars, letters/numbers/underscore |
+| `VALIDATION_CODE_FORMAT` | `code` — 6 digits |
+| `VALIDATION_DISPLAY_NAME_LENGTH` | `displayName` — 1-30 characters |
+| `VALIDATION_DISPLAY_NAME_CHARS` | `displayName` — contains a character that is not allowed |
+
+*User / Avatar*
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `USER_NOT_FOUND` | 404 | User does not exist |
+| `AVATAR_FILE_REQUIRED` | 400 | No file in the upload |
+| `AVATAR_INVALID_TYPE` | 400 | File is not a valid image (mapped to `profile.fileTypeError`) |
+
+*Friends*
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `FRIEND_INVITE_SELF` | 400 | Cannot invite yourself |
+| `NOT_FRIENDS_WITH_USER` | 403 | Not friends with that user |
+| `FRIEND_REQUEST_SELF` | 400 | Cannot send a request to yourself |
+| `FRIEND_ALREADY` | 400 | Already friends |
+| `FRIEND_REQUEST_PENDING` | 400 | Request already pending |
+| `FRIEND_BLOCKED` | 403 | Cannot send — user is blocked |
+| `FRIEND_REQUEST_NOT_FOUND` | 404 | Friend request not found |
+| `FRIEND_NOT_FOUND` | 404 | Friendship not found |
+| `FRIEND_BLOCK_SELF` | 400 | Cannot block yourself |
+| `FRIEND_BLOCK_NOT_FOUND` | 404 | Blocked record not found |
+
+*Match / Lobby*
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `MATCH_MODE_REQUIRED` | 400 | `mode` must be pvp, pve, or hotseat |
+| `MATCH_BOTS_PVE_ONLY` | 400 | Bots only in PvE games |
+| `MATCH_PLAYER_COUNT_RANGE` | 400 | Player count must be 2, 3 or 4 |
+| `MATCH_BOT_COUNT_RANGE` | 400 | Bot count must be from 0 to playerCount - 1 |
+| `MATCH_PVP_NO_BOTS` | 400 | PvP mode cannot have bots |
+| `MATCH_PVE_NEEDS_BOT` | 400 | PvE mode needs at least 1 bot |
+| `MATCH_HOTSEAT_NO_BOTS` | 400 | Hot seat mode cannot have bots |
+| `MATCH_PVP_MIN_PLAYERS` | 400 | PvP mode needs at least 2 players |
+| `MATCH_SEAT_COLORS_LENGTH` | 400 | `seatColors` has the wrong number of items |
+| `MATCH_HOST_BLUE` | 400 | Host (first seat) must be blue |
+| `MATCH_BOT_COLORS` | 400 | `botColors` must match `botCount` |
+| `MATCH_PLAYER_COUNT_2_4` | 400 | Player count must be 2 or 4 |
+| `MATCH_OWN_INVITE` | 400 | Cannot join your own invite |
+| `MATCH_INVITE_INVALID` | 404 | Invite code not found or expired |
+| `MATCH_GAME_NOT_FOUND` | 404 | Game not found |
+| `MATCH_ALREADY_STARTED` | 403 | Game already started |
+| `MATCH_PVP_ONLY_JOIN` | 403 | Only PvP rooms can be joined |
+| `MATCH_ROOM_FULL` | 403 | Room is full |
+| `MATCH_NOT_PLAYER` | 403 | You are not a player in this game |
+| `MATCH_PVP_ONLY_INVITE` | 403 | Only PvP rooms can be invited to |
+
+> Not every backend error has a code yet. When an error has no `code`, the frontend shows its English `message` instead.
 
 ---
 
@@ -169,7 +265,7 @@ Create a new user account. Sends a verification email; no session is set until t
 
 ```
 
-**Errors:** 409 if username or email exists, 400 if validation fails.
+**Errors:** 409 `AUTH_USERNAME_TAKEN` / `AUTH_EMAIL_TAKEN` if the username or email exists; 400 with a `VALIDATION_*` code if the body fails validation. See [Error responses](#error-responses).
 
 ---
 
@@ -252,7 +348,7 @@ Redeem a 2FA code emailed during login. Sets session cookies on success.
 
 ```
 
-**Errors:** 401 if invalid/expired code or too many attempts.
+**Errors:** 401 `AUTH_CODE_INVALID` if the code is invalid/expired or there were too many attempts; 400 `VALIDATION_CODE_FORMAT` if the code is not 6 digits.
 
 ---
 
@@ -427,7 +523,7 @@ Update the logged-in user's profile (display name / username, email, etc.).
 
 ```
 
-**Response:** the updated profile / success message.
+**Response:** the updated profile / success message. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` or `VALIDATION_DISPLAY_NAME_CHARS`.
 
 ---
 
@@ -448,10 +544,13 @@ Change the password while logged in (requires the current password).
 
 ```
 
-**Response:**
+**Response:** a localized notice; changing the password also signs out every other device.
 
 ```json
-{ "message": "Password updated — you can log in with it now." }
+{
+  "code": "AUTH_PASSWORD_UPDATED",
+  "message": "Password updated — other devices were signed out."
+}
 
 ```
 
@@ -722,7 +821,7 @@ Upload an avatar image (max 2 MB, PNG/JPEG/GIF/WebP).
 
 ```
 
-**Errors:** 400 if no file, wrong type, or too large.
+**Errors:** 400 `AVATAR_FILE_REQUIRED` (no file) or `AVATAR_INVALID_TYPE` (not a PNG/JPEG/GIF/WebP); 400 if the file exceeds 2 MB.
 
 ---
 
@@ -839,7 +938,7 @@ Join a PvP game by invite code.
 
 ```
 
-**Errors:** 404 if code not found/expired, 403 if game already started, 400 if joining own invite.
+**Errors:** 404 `MATCH_INVITE_INVALID` if the code is not found/expired; 403 `MATCH_ALREADY_STARTED` if the game started; 400 `MATCH_OWN_INVITE` if joining your own invite.
 
 ---
 
@@ -1319,7 +1418,7 @@ Send a friend request.
 **Body:** None  
 **Response:** Returns the full friendship object with user and friend details.
 
-**Errors:** 400 if already friends, request pending, or blocked; 403 if blocked by target; 404 if target user not found.
+**Errors:** 400 `FRIEND_ALREADY` / `FRIEND_REQUEST_PENDING` / `FRIEND_BLOCKED`; 403 `NOT_FRIENDS_WITH_USER`; 404 `USER_NOT_FOUND`.
 
 ---
 
@@ -1636,7 +1735,7 @@ SSE stream — pushes new notifications to the browser in real time.
 
 Types: `friend_request` | `friend_accepted` | `friend_removed` | `friend_declined` | `game_invite` | `achievement` | `match_finished` | `match_cancelled` | `profile_updated` | `display_name_changed` | `friend_online` | `friend_offline` | `avatar_changed`
 
-**Keep-alive (server → client):** the server writes a `ping` frame into the stream every 20 s (`SSE_HEARTBEAT_MS`). Between notifications this response is byte-silent for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the frame exists to satisfy the tunnel's socket requirements and stop the stream being treated as dead. It is unrelated to the **client → server** presence heartbeat ([`POST /api/presence/heartbeat`](#post-apipresenceheartbeat)), which is a separate request that writes nothing into this stream. See [architecture.md](architecture.md) → Connection liveness (two-direction heartbeats).
+**Keep-alive (server → client):** the server writes a `ping` frame into the stream every 20 s (`SSE_HEARTBEAT_MS`). Between notifications this response sends no bytes for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the frame exists to satisfy the tunnel's socket requirements and stop the stream being treated as dead. It is unrelated to the **client → server** presence heartbeat ([`POST /api/presence/heartbeat`](#post-apipresenceheartbeat)), which is a separate request that writes nothing into this stream. See [architecture.md](architecture.md) → Connection liveness (two-direction heartbeats).
 
 ---
 

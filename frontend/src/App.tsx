@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Shell } from './components/Shell';
 import { Friends } from './pages/Friends';
 import { Game } from './pages/Game';
 import { Home } from './pages/Home';
@@ -19,10 +18,7 @@ import { AppProvider, useApp } from './store';
 import { NotificationsProvider, useNotifications } from './hooks/useNotifications';
 import { NotificationToasts } from './components/NotificationToast';
 
-/** Screens that render inside the app shell (rail + header). */
-const SHELL_ROUTES: Record<string, () => ReactNode> = {};
-
-/** Full-bleed screens (no shell). */
+/** All routes render full-screen. */
 const FULL_ROUTES: Record<string, () => ReactNode> = {
   '/home': () => <Home />,
   '/leaderboard': () => <Leaderboard />,
@@ -56,7 +52,7 @@ function Screen() {
   const { path, query } = useRoute();
   const { user, authReady } = useApp();
   const { toasts, dismissToast } = useNotifications();
-  const known = path in SHELL_ROUTES || path in FULL_ROUTES;
+  const known = path in FULL_ROUTES;
   const isPublic = PUBLIC_ROUTES.has(path);
   // Account-action arrivals (verified/reset/error/token) belong to a specific
   // account action, not the session, so a logged-in user must still see them.
@@ -76,7 +72,7 @@ function Screen() {
 
   return (
     <>
-      {path in SHELL_ROUTES ? <Shell>{SHELL_ROUTES[path]()}</Shell> : FULL_ROUTES[path]()}
+      {FULL_ROUTES[path]()}
       {user && <NotificationToasts toasts={toasts} onDismiss={dismissToast} />}
     </>
   );

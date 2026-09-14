@@ -54,10 +54,16 @@ export class MatchController {
     @Body('seatColors') seatColors?: string[],
   ) {
     if (mode !== 'pvp' && mode !== 'pve' && mode !== 'hotseat') {
-      throw new BadRequestException('mode is required and must be pvp, pve, or hotseat');
+      throw new BadRequestException({
+        code: 'MATCH_MODE_REQUIRED',
+        message: 'mode is required and must be pvp, pve, or hotseat',
+      });
     }
     if (mode !== 'pve' && (botCount ?? 0) > 0) {
-      throw new BadRequestException('Bots are only allowed in PvE games');
+      throw new BadRequestException({
+        code: 'MATCH_BOTS_PVE_ONLY',
+        message: 'Bots are only allowed in PvE games',
+      });
     }
     return this.match.createMatch(
       req.user.id,

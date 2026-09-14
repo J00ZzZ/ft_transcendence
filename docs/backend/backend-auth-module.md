@@ -174,7 +174,7 @@ Edit these module-level constants to tweak auth behaviour (all defined in `backe
 | `RESET_TOKEN_TTL_S` | `twofactor.service.ts` | 1 h | Password-reset link lifetime |
 | `CODE_TTL_S` | `twofactor.service.ts` | 5 min | 2FA login-code lifetime |
 | `MAX_ATTEMPTS` | `twofactor.service.ts` | 5 | 2FA / reset attempt limit |
-| `PASSWORD_MIN` / `PASSWORD_MAX` | `auth/dto/password.rules.ts` | 12 / 72 | Password length bounds (mirrored in `frontend/src/validatePassword.ts`) |
+| `PASSWORD_MIN` / `PASSWORD_MAX` | `auth/dto/password.rules.ts` | 12 / 72 | Password length bounds (the same values are used in `frontend/src/validatePassword.ts`) |
 
 ---
 
@@ -365,6 +365,8 @@ sequenceDiagram
 ## Logic Paths Summary
 
 Concise decision trees showing every code path through each auth operation, including error branches.
+
+> Every error that the user can see includes a `code` (for example `AUTH_USERNAME_TAKEN`), and the frontend translates it into the selected language. See [API-list.md](../API-list.md) → Error responses for the full list. The HTTP status codes below are unchanged.
 
 ### Registration Path
 

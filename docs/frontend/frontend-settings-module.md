@@ -5,21 +5,21 @@
 - [Overview](#overview) — Account settings and game preferences
 - [Files](#files) — Source file inventory
 - [Key Types / Interfaces](#key-types--interfaces) — Setting keys and defaults
-- [Core Logic / Flow](#core-logic--flow) — AccountMenu settings flow
-- [Logic Paths Summary](#logic-paths-summary) — Decision trees for toggling settings
+- [Core Logic / Flow](#core-logic--flow) — Where each setting is toggled
 - [Dependencies](#dependencies) — Internal and external dependencies
 
 ---
 
 ## Overview
 
-Settings live in the `AccountMenu` component, which `Shell` renders. No route currently uses `Shell`, so there is no `/settings` page. The AccountMenu has:
+There is **no dedicated settings page** — account settings are distributed across the surfaces that need them:
 
-1. **Language selector** — switch between the supported languages.
-2. **2FA (two-factor authentication) toggle** — turn it on or off by calling `PATCH /api/auth/2fa`.
-3. **Sign out** — calls `POST /api/auth/logout`, then navigates to `/login`.
+1. **Language selector** — in the `RetroNavbar` account popover and on `LegalPage`; switches between `en`, `ms` and `fr` via `setLang` from the store.
+2. **2FA (two-factor authentication) toggle** — in the `ProfileEditModal` on the Profile page; saves through the profile update request (`PATCH /api/auth/profile` with `twoFactorEnabled`).
+3. **Sign out** — in the `RetroNavbar` account popover; calls `POST /api/auth/logout`, then navigates to `/login`.
+4. **Game preference toggles** (sound, music, auto-roll, fast animations, move hints, friend invites, weekly recap) live in `store.tsx` as `SETTING_DEFAULTS`; no dedicated settings page exposes them yet.
 
-The game preference toggles (sound, music, auto-roll and others) still live in `store.tsx` as `SETTING_DEFAULTS`, and no dedicated settings page exposes them yet.
+> **Note:** There is no `src/pages/Settings.tsx` and no `AccountMenu` — the former Shell/AccountMenu layout was removed; the account popover is now part of `RetroNavbar`, and the 2FA toggle moved to the Profile page's edit modal.
 
 ---
 
@@ -27,9 +27,10 @@ The game preference toggles (sound, music, auto-roll and others) still live in `
 
 | File | Role |
 |------|------|
-| `src/components/AccountMenu.tsx` | Account menu dropdown (language, 2FA, sign out) |
-
-> **Note:** There is no `src/pages/Settings.tsx` — settings live in the `AccountMenu`, and the game preference toggles live in `store.tsx`.
+| `src/components/RetroNavbar.tsx` | Account popover — language selector and sign out |
+| `src/components/ProfileEditModal.tsx` | 2FA on/off toggle (saved with the profile update) |
+| `src/pages/Profile.tsx` | Opens the edit modal on the Profile page |
+| `src/store.tsx` | `lang` / `setLang`, `SETTING_DEFAULTS`, `logout` |
 
 ---
 
@@ -59,57 +60,27 @@ settings: Record<string, boolean>  // Stored values; anything missing uses SETTI
 
 ## Core Logic / Flow
 
-### AccountMenu Settings (current)
-
-Sequence of steps when the AccountMenu is used.
 ```mermaid
 sequenceDiagram
     participant User
-    participant Shell as Shell.tsx
-    participant Menu as AccountMenu.tsx
-    participant Store as useApp()
+    participant Navbar as RetroNavbar.tsx
+    participant Store as store.tsx
+    participant API as Backend API
 
-    User->>Shell: Click avatar button
-    Shell->>Menu: Toggle dropdown
-    Menu->>Store: useApp() → user, lang, twoFactor
-    Menu->>Menu: Render language selector
-    Menu->>Menu: Render 2FA toggle (current state from /api/auth/2fa)
-    Menu->>Menu: Render sign out button
-
-    alt Language change
-        User->>Menu: Select language
-        Menu->>Store: setLang(lang)
-    else 2FA toggle
-        User->>Menu: Click 2FA toggle
-        Menu->>Store: toggleTwoFactor() → PATCH /api/auth/2fa
-    else Sign out
-        User->>Menu: Click Sign out
-        Menu->>Store: logout() → POST /api/auth/logout
-        Menu->>Menu: navigate('/login')
-    end
+    User->>Navbar: Open account popover
+    User->>Navbar: Pick language
+    Navbar->>Store: setLang(lang)
+    Store->>Store: i18next.changeLanguage + persist 'lr.lang'
+    User->>Navbar: Sign out
+    Navbar->>API: POST /api/auth/logout
+    Navbar->>Store: logout() clears session
+    Store-->>User: navigate('/login')
 ```
 
----
+Game preference toggles are read with a fallback:
 
-## Logic Paths Summary
-
-### AccountMenu Path
-```
-<AccountMenu />
-  ├── Render the avatar button with initials
-  ├── onClick → toggle dropdown
-  ├── Language option → setLang(lang)
-  ├── 2FA option → toggleTwoFactor() → PATCH /api/auth/2fa
-  └── Sign out → logout() → POST /api/auth/logout → navigate('/login')
-```
-
-### Game Settings Path (in store.tsx)
-```
-settingOn(key)
-  └── Return settings[key] ?? SETTING_DEFAULTS[key] ?? false
-
-toggleSetting(key)
-  └── Flip current value (settings or default)
+```typescript
+(key: string) => (key in settings ? settings[key] : (SETTING_DEFAULTS[key] ?? false))
 ```
 
 ---
@@ -118,5 +89,7 @@ toggleSetting(key)
 
 | Dependency | Purpose |
 |-----------|---------|
-| `store.tsx` | `useApp` for `settings`, `settingOn`, `toggleSetting`, `lang`, `setLang`, `toggleTwoFactor`, `logout` |
-| `theme.ts` | Inline styles for toggle switches |
+| `store.tsx` | `useApp` for `user`, `lang`, `setLang`, `settings`, `logout` |
+| `i18n.ts` | `changeLanguage` on switch |
+| `api.ts` | `postApi` for `/api/auth/logout` |
+| `router.tsx` | `navigate('/login')` after sign out |

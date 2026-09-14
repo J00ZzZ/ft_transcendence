@@ -33,7 +33,8 @@ export class MatchPlayerService {
   // Join an existing WAITING match by filling the next empty slot.
   async joinMatch(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
     // If player already in game, then hand back the same seat instead of allocating another
     const seatedSlot = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].indexOf(
@@ -41,16 +42,25 @@ export class MatchPlayerService {
     );
     if (seatedSlot !== -1) return this.rejoin(gameId, userId);
 
-    if (data.status !== 'WAITING') throw new ForbiddenException('Game already started');
+    if (data.status !== 'WAITING')
+      throw new ForbiddenException({
+        code: 'MATCH_ALREADY_STARTED',
+        message: 'Game already started',
+      });
     // Humans can only join human rooms : PvE/hotseat rooms are auto-started
     // and never accept a second human via this endpoint.
-    if (data.gameType !== 'PVP') throw new ForbiddenException('Only PvP rooms can be joined');
+    if (data.gameType !== 'PVP')
+      throw new ForbiddenException({
+        code: 'MATCH_PVP_ONLY_JOIN',
+        message: 'Only PvP rooms can be joined',
+      });
 
     const maxSeats = parseInt(data.playerCount || '4', 10);
     const occupiedIds = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].filter(
       Boolean,
     );
-    if (occupiedIds.length >= maxSeats) throw new ForbiddenException('Room is full');
+    if (occupiedIds.length >= maxSeats)
+      throw new ForbiddenException({ code: 'MATCH_ROOM_FULL', message: 'Room is full' });
 
     const slotIndex = !data.player2_id ? 1 : !data.player3_id ? 2 : 3;
     const slotKey = `player${slotIndex + 1}`;
@@ -92,12 +102,17 @@ export class MatchPlayerService {
   // Rejoin a match the user is already seated in (fresh token, no new slot).
   async rejoin(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
     const slotIndex = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].indexOf(
       userId,
     );
-    if (slotIndex === -1) throw new ForbiddenException('You are not a player in this game');
+    if (slotIndex === -1)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
     // Reclaiming the seat makes it PRESENT again: clear the reservation flag a
     // "returned to lobby" leave set, so the room counts this player and the
@@ -134,16 +149,29 @@ export class MatchPlayerService {
   // `invite:{friendId}` record for their client's next poll.
   async inviteFriendToGame(gameId: string, hostId: string, friendId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
-    if (data.gameType !== 'PVP') throw new ForbiddenException('Only PvP rooms can be invited to');
-    if (data.status !== 'WAITING') throw new ForbiddenException('Game already started');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
+    if (data.gameType !== 'PVP')
+      throw new ForbiddenException({
+        code: 'MATCH_PVP_ONLY_INVITE',
+        message: 'Only PvP rooms can be invited to',
+      });
+    if (data.status !== 'WAITING')
+      throw new ForbiddenException({
+        code: 'MATCH_ALREADY_STARTED',
+        message: 'Game already started',
+      });
 
     const isHost =
       data.player1_id === hostId ||
       data.player2_id === hostId ||
       data.player3_id === hostId ||
       data.player4_id === hostId;
-    if (!isHost) throw new ForbiddenException('You are not a player in this game');
+    if (!isHost)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
     const friendship = await this.prisma.db.friendship.findFirst({
       where: {
@@ -153,7 +181,11 @@ export class MatchPlayerService {
         ],
       },
     });
-    if (!friendship) throw new ForbiddenException('You are not friends with this user');
+    if (!friendship)
+      throw new ForbiddenException({
+        code: 'NOT_FRIENDS_WITH_USER',
+        message: 'You are not friends with this user',
+      });
 
     const friendSeat = await this.joinMatch(gameId, friendId);
     const fromUsername = (await this.resolveUsername(hostId)) ?? 'A friend';
@@ -190,14 +222,19 @@ export class MatchPlayerService {
   // Toggle the ready flag for a player in a WAITING match.
   async readyGame(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
     const isPlayer =
       data.player1_id === userId ||
       data.player2_id === userId ||
       data.player3_id === userId ||
       data.player4_id === userId;
-    if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
     const readyKey = `ready:${gameId}`;
     const current = new Set<string>(JSON.parse((await this.redis.get(readyKey)) ?? '[]'));
@@ -228,14 +265,19 @@ export class MatchPlayerService {
   // Remove a player from a match room and clear their ready state.
   async exitGame(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
     const isPlayer =
       data.player1_id === userId ||
       data.player2_id === userId ||
       data.player3_id === userId ||
       data.player4_id === userId;
-    if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
     const slotMap: Record<string, string> = {
       [data.player1_id]: 'player1_id',
@@ -259,14 +301,19 @@ export class MatchPlayerService {
   // Cancel (abort) a match, setting its status to ABORTED.
   async cancelGame(gameId: string, userId: string, reason: 'cancel' | 'resign' = 'cancel') {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
     const isPlayer =
       data.player1_id === userId ||
       data.player2_id === userId ||
       data.player3_id === userId ||
       data.player4_id === userId;
-    if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
     await this.redis.hset(`match:${gameId}`, 'status', 'ABORTED');
     await this.redis.expire(`match:${gameId}`, 3600);
@@ -326,14 +373,19 @@ export class MatchPlayerService {
   // Mark a match as ENDED (called when the game is finished).
   async gameEnd(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
-    if (!data.id) throw new NotFoundException('Game not found');
+    if (!data.id)
+      throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
 
     const isPlayer =
       data.player1_id === userId ||
       data.player2_id === userId ||
       data.player3_id === userId ||
       data.player4_id === userId;
-    if (!isPlayer) throw new ForbiddenException('You are not a player in this game');
+    if (!isPlayer)
+      throw new ForbiddenException({
+        code: 'MATCH_NOT_PLAYER',
+        message: 'You are not a player in this game',
+      });
 
     await this.redis.hset(`match:${gameId}`, 'status', 'ENDED');
     await this.redis.expire(`match:${gameId}`, 3600);

@@ -13,7 +13,7 @@
 
 ## Overview
 
-The Friends page (`/friends`, full-bleed) manages friendships. It has:
+The Friends page (`/friends`, full-screen) manages friendships. It has:
 
 1. **Friends list** — accepted friends with avatar, username, rating, and live presence status.
 2. **Friend requests** — requests you have received and not yet answered, each with accept and decline actions; you can also send a request by username.

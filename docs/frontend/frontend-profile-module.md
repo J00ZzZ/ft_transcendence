@@ -12,12 +12,13 @@
 
 ## Overview
 
-The Profile page (`/profile`) shows a user's public profile with statistics, recent match history and a friends panel. It is a full-bleed route (rendered directly, with no `Shell` container); the page renders its own `RetroNavbar`.
+The Profile page (`/profile`) shows a user's public profile with statistics, recent match history and a friends panel. It is a full-screen route (rendered directly by the router); the page renders its own `RetroNavbar`.
 
 1. **Profile header** — username, status indicator, avatar initials, rating and the date the account was created.
 2. **Stats grid** — wins, losses, win rate, best streak.
 3. **Recent matches** — each game with the opponent names, the result (victory, defeat or draw), pieces in goal and the date.
 4. **Friends panel** — friends with their online status and a rating badge; shown only on your own profile.
+5. **Avatar actions (own profile)** — the `EDIT AVATAR`, `RESET` and `EDIT PROFILE` buttons, and below them a **message area with a fixed height**. The area shows upload and reset errors in red, and the photo-load warning (`profile.photoLoadError`) in amber. Because the height is fixed, a longer translation in Malay or French wraps onto more lines without moving the content below it.
 
 When the page loads it reads the profile, game history, achievements, friends and leaderboard rank. It reads them again when the username changes or when the edit modal closes. It does **not** repeat on a timer.
 
@@ -28,7 +29,7 @@ When the page loads it reads the profile, game history, achievements, friends an
 | File | Role |
 |------|------|
 | `src/pages/Profile.tsx` | Profile page component |
-| `src/components/RetroNavbar.tsx` | Top navigation bar (profile page is full-bleed) |
+| `src/components/RetroNavbar.tsx` | Top navigation bar (profile page is full-screen) |
 | `src/store.tsx` | `useApp` for authentication state, presence and API (Application Programming Interface) calls |
 | `src/theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` styles |
 
@@ -108,7 +109,7 @@ sequenceDiagram
     participant API as Backend
     participant Store as useApp
 
-    App->>Profile: Mount (full-bleed route)
+    App->>Profile: Mount (full-screen route)
     Profile->>Profile: Read ?u= query or use logged-in user
     Profile->>API: GET /api/user/:username
     Profile->>API: GET /api/user/:username/games
@@ -171,3 +172,5 @@ Hotseat games never count towards any achievement. The badge/tab counter shows `
 | `store.tsx` | `useApp()` for `user` and navigation |
 | `router.tsx` | `useRoute()` to read the `?u=` query parameter |
 | `theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` |
+| `api.ts` | `translateErrorCode()`, which turns an error code from a `fetch` response into text in the user's language |
+| `components/UserAvatar.tsx` | Renders the avatar; `onPhotoError` runs when a photo fails to load |

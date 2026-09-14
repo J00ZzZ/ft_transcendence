@@ -2,7 +2,7 @@
 
 ---
 
-## 1. The Journey in One Number: 57
+## 1. The Track Length in One Number: 57
 
 In Ludo, it takes **57 exact moves** for each piece to go from the starting
 position to the final home triangle. This distance is split into two parts:

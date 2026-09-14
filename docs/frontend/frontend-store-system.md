@@ -20,7 +20,7 @@ The store is one React Context provider (`AppProvider`) that holds all global UI
 3. **Settings** — on/off switches (sound, music, auto-roll and others), each with a string key and a default value.
 4. **Real-time match** — `activeMatch` (the engine credentials from `POST /api/match/create`) and `lastResult` (the finished-match data for the Results view).
 5. **Helpers** — `addBot`, `removeBot`, `addPlayer`, `removePlayer`, `startGame`, `roll`, `endTurn`, `settingOn`, `toggleSetting`.
-6. **Session keep-alive** — a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is in flight. This is the **client → server** direction only, proving the browser is still here; keeping the notification SSE stream alive runs the other way and lives server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
+6. **Session keep-alive** — a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is still waiting for a response. This is the **client → server** direction only, and it shows that the browser session is still active; keeping the notification SSE stream alive runs the other way and is handled server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
 ---
 
@@ -292,6 +292,7 @@ toggleSetting(key)
 - On a **401** it refreshes once through `POST /api/auth/refresh`, then retries the original request. All callers share one in-flight refresh request, so two 401s arriving at the same time can never rotate the refresh token twice.
 - If the refresh **fails**, the two cases are kept apart: a missing or expired refresh token means the user is really signed out, while a *blocked* refresh (for example, rate-limited) returns its own status instead of pretending the user signed out.
 - It adds the `ngrok-skip-browser-warning` header so the ngrok interstitial page never intercepts an API (Application Programming Interface) call (other hosts ignore the header), and it builds headers with the `Headers` constructor, so headers passed by the caller are merged instead of overwritten.
+- **Errors are translated using their code.** When a response fails, `request()` reads the `code` field from the body and translates it with `translateErrorCode()` (`errors.<CODE>`). If the body has no `code`, or the code has no translation, it uses the English `message` instead; if there is no message either, it uses a generic message. The auth store's `apiError()` works the same way. See [API-list.md](../API-list.md) → Error responses.
 
 `store.tsx` also refreshes **early**, every 14 minutes: access tokens expire after 15 minutes (`JwtModule` `expiresIn: '15m'`), so refreshing one minute ahead keeps the presence heartbeat (and any other call) from arriving with an expired token. The 401 retry path above would still recover, but the browser logs the 401 first.
 
@@ -303,6 +304,6 @@ toggleSetting(key)
 |-----------|---------|
 | `theme.ts` | `BOT_POOL` for bot seat names |
 | `i18n.ts` | `i18n.changeLanguage` and `i18n.t` for default player names |
-| `api.ts` | `apiFetch` (refresh-and-retry) and `refreshOnce` for the proactive 14-minute token refresh |
+| `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` for the 14-minute token refresh that runs before the token expires, and `translateErrorCode`, which turns an error code into text in the user's language |
 | `game/types.ts` | `PlayerColor` for `ActiveMatch` |
 | API (Application Programming Interface) | `/api/auth/me`, `/api/auth/login`, `/api/auth/register`, `/api/auth/logout`, `/api/auth/2fa/verify`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/2fa`, `/api/presence/heartbeat` |

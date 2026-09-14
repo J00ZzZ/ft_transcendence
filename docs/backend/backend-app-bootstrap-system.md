@@ -166,7 +166,8 @@ npm run start:dev (or node main.js)
   │   └── Register PrismaService as provider + export
   ├── app.set('trust proxy', 1)
   ├── app.use(cookieParser())
-  ├── app.useGlobalPipes(ValidationPipe { whitelist, transform })
+  ├── app.useGlobalPipes(ValidationPipe { whitelist, transform, exceptionFactory })
+  │       # exceptionFactory adds a VALIDATION_* code to the DTO errors listed in main.ts
   ├── Register GET /health handler
   └── app.listen(3000)
 ```

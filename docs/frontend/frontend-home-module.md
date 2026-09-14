@@ -13,7 +13,7 @@
 
 ## Overview
 
-The Home page is the main landing page after login (`/home`, full-bleed). It also acts as the player dashboard, and shows:
+The Home page is the main landing page after login (`/home`, full-screen). It also acts as the player dashboard, and shows:
 
 1. **Player stats widget** — read from the backend API (Application Programming Interface) at `GET /api/stats` (rating, games, wins, losses, captures).
 2. **Leaderboard rank widget** — read from `GET /api/leaderboard?mode=global&limit=50`, using `myRank` plus a username-to-rank map.
@@ -79,7 +79,7 @@ sequenceDiagram
     participant API as Backend
     participant Notif as useNotifications()
 
-    App->>Home: <Home /> (full-bleed route)
+    App->>Home: <Home /> (full-screen route)
     Home->>Notif: useNotifications() → bell + toasts
     Home->>API: getApi('/api/stats')
     Home->>API: getApi('/api/leaderboard?mode=global&limit=50')

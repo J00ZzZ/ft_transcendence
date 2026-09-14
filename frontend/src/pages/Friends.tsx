@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { postApi } from '../api';
+import { postApi, translateErrorCode } from '../api';
 import { UserAvatar } from '../components/UserAvatar';
 import { RetroNavbar } from '../components/RetroNavbar';
 import { RankBadge } from '../components/RankBadge';
@@ -175,10 +175,13 @@ export function Friends() {
         credentials: 'include',
       });
       if (!reqRes.ok) {
-        let errorMsg = t('friends.couldNotSendRequest');
-        // Best-effort: surface the backend's message when the error body is JSON.
-        const errorData: { message?: string } | null = await reqRes.json().catch(() => null);
-        errorMsg = errorData?.message ?? errorMsg;
+        const errorData: { code?: string; message?: string } | null = await reqRes
+          .json()
+          .catch(() => null);
+        const errorMsg =
+          translateErrorCode(errorData?.code) ??
+          errorData?.message ??
+          t('friends.couldNotSendRequest');
         retroAudio.playUiBeep(320, 0.08);
         setMsg({ text: errorMsg, type: 'error' });
         return;

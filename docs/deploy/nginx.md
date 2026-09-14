@@ -7,12 +7,12 @@ knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
 `nginx/conf/app.inc`, `compose.yaml`) rather than copied from older docs —
-see [Known gotcha](#known-gotcha) at the bottom for one place where a comment
+see [Known issue](#known-issue) at the bottom for one place where a comment
 in the code no longer matches what actually runs.
 
 ## The one idea that makes this simple
 
-nginx is the **only** thing any client ever talks to. Browsers — local or
+nginx is the **only** server that any client communicates with. Browsers — local or
 tunnelled — hit `nginx` on port `443` (published on the host as `8443`)
 and nothing else. `nginx` then proxies to `backend:3000` and
 `ludo-engine:3001` over the internal Docker network. The frontend SPA only
@@ -96,16 +96,16 @@ Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.c
 
 ---
 
-## Known gotcha
+## Known issue
 
-**`nginx/conf/app.inc` is dead config.** It's copied into the nginx image
+**`nginx/conf/app.inc` is unused configuration.** It is copied into the nginx image
 and bind-mounted by `compose.yaml`, and `nginx.conf`'s own comment claims
 *"See conf/app.inc for the actual routing (shared so the local and
 ngrok-tunnelled paths ... can't drift)"* — but `nginx.conf` never actually
 `include`s it anywhere. The real, active routing is the inline `server {}`
-block described above. `app.inc` looks like a leftover from an earlier
+block described above. `app.inc` appears to be a file left over from an earlier
 refactor (it's missing the rate-limiting locations that `nginx.conf` has,
 for instance) that was never wired up, or was replaced and never deleted.
 
-Not fixed here — flagging it rather than silently editing the config, since
-that wasn't asked for.
+Not fixed here — this is reported rather than changed, because editing the
+configuration was outside the scope of the documentation update.
