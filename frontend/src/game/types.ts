@@ -1,7 +1,9 @@
 // Mirror of the ludo-engine TypeScript types; the engine defines them, this copy matches.
+// (Keep 'resigned' in PlayerStatus — handlePlayerResign parks a seat there, and it reaches
+// the SPA through game_joined / state_update.)
 
 export type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
-export type PlayerStatus = 'active' | 'exited' | 'inactive' | 'disconnected';
+export type PlayerStatus = 'active' | 'exited' | 'resigned' | 'inactive' | 'disconnected';
 export type TurnPhase = 'WAITING_FOR_ROLL' | 'WAITING_FOR_MOVE';
 export type PieceId = string;
 

@@ -1988,7 +1988,7 @@ socket.emit('resign');
 
 **Source:** `backend/app/ludo-engine/src/socket/socket-handlers.ts` (`handleDisconnect`)
 
-Automatically handled when the WebSocket connection drops. Marks player as disconnected and broadcasts `player_exited` after a timeout.
+Automatically handled when the WebSocket connection drops. Opens a reconnect grace window (45 s in PvP, 1 h in bot modes) for a **live, unfinished** seat and broadcasts `player_disconnected`; no window is opened for an exited/resigned/finished seat. `player_reconnected` fires if the player returns inside the window, carrying the name the client reports so a rename survives the reconnect. If the window expires the seat is pruned for good (`player_exited`, pieces parked at `step = -1`), and a later `join_game` for it is answered with `seat_expired` instead of being treated as a reconnect.
 
 ```js
 // Socket.IO handles this automatically on connection loss
@@ -2013,10 +2013,11 @@ Automatically handled when the WebSocket connection drops. Marks player as disco
 | `player_exited` | `{ color }` | Player disconnected/resigned |
 | `player_aborted` | `{ color, username }` | A player aborted the game |
 | `player_disconnected` | `{ color }` | A player's connection dropped |
-| `player_reconnected` | `{ color }` | A player reconnected |
+| `player_reconnected` | `{ color, displayName? }` | A player reconnected inside the grace window |
+| `seat_expired` | `{ gameId, color }` | Your `join_game` was refused because the seat was already removed (left, or the grace window expired) — sent to that socket only |
 | `lobby_update` | `{ players: [{ username, color, ready }] }` | Lobby seats changed (join/leave/ready) |
 | `color_selected` | `{ color }` | A player selected a color in the lobby |
-| `state_update` | `any` (parsed JSON) | Generic catch-all for any Redis pub/sub message |
+| `state_update` | full `GameState` | After a live exit/resign moved the turn (also the SPA's catch-all for any other pub/sub frame) |
 | `error` | `string` | On invalid action |
 
 ---

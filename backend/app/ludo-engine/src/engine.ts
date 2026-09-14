@@ -9,6 +9,7 @@ import {
   handlePlayerReady,
   handlePlayerExit,
   handlePlayerResign,
+  expireDisconnectedPlayer,
 } from './player-handler';
 import { LobbyManager } from './lobby';
 
@@ -273,8 +274,17 @@ export class LudoEngine {
     );
   }
 
-  async handlePlayerReconnect(gameId: string, color: PlayerColor): Promise<void> {
-    return this.withGameLock(gameId, () => handlePlayerReconnect(this.store, gameId, color));
+  // Returns true only when the seat was genuinely restored (see
+  // player-handler.ts) : false means the grace window outlived the seat, so the
+  // caller must reject the join rather than revive a seat with no pieces.
+  async handlePlayerReconnect(
+    gameId: string,
+    color: PlayerColor,
+    displayName?: string,
+  ): Promise<boolean> {
+    return this.withGameLock(gameId, () =>
+      handlePlayerReconnect(this.store, gameId, color, displayName),
+    );
   }
 
   async handlePlayerReady(gameId: string, color: PlayerColor): Promise<void> {
@@ -293,6 +303,20 @@ export class LudoEngine {
   async handlePlayerResign(gameId: string, color: PlayerColor): Promise<void> {
     return this.withGameLock(gameId, () =>
       handlePlayerResign(this.store, (e) => this.emit(e), gameId, color),
+    );
+  }
+
+  // Replay a grace window's expiry under the game lock. The disconnect handler
+  // arms an in-process timer for this, which a restart loses — the server's
+  // periodic sweep calls this instead so an expired window can never leave a
+  // seat parked as 'disconnected' with the turn held on it.
+  async expireDisconnectedPlayer(
+    gameId: string,
+    color: PlayerColor,
+    notifyAbort?: (gameId: string) => void,
+  ): Promise<void> {
+    return this.withGameLock(gameId, () =>
+      expireDisconnectedPlayer(this.store, (e) => this.emit(e), gameId, color, notifyAbort),
     );
   }
 

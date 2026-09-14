@@ -129,8 +129,13 @@ export class SocketServer {
       console.log(`Ludo engine listening on port ${port}`);
     });
 
-    // Periodic check for expired lobbies
+    // Periodic checks: expired lobbies, plus grace windows whose in-process
+    // timer was lost. The grace sweep also runs once now, so windows that
+    // expired while this process was down are settled as soon as it comes back
+    // up instead of holding those seats' turns forever.
     setInterval(() => this.checkExpiredLobbies(), 60 * 1000);
+    setInterval(() => this.checkExpiredGraceWindows(), 60 * 1000);
+    void this.checkExpiredGraceWindows();
   }
 
   async stop(): Promise<void> {
@@ -175,6 +180,29 @@ export class SocketServer {
         this.cleanupGame(match.id);
         await this.store.abortMatch(match.id);
         await this.store.deleteGame(match.id);
+      }
+    }
+  }
+  // Sweep for grace windows that have already expired. The disconnect handler's
+  // in-process timer normally prunes them; this covers the case where that timer
+  // was lost (an engine restart, or a crash between disconnect and expiry),
+  // which would otherwise leave the seat 'disconnected' and the turn held on it
+  // forever. expireDisconnectedPlayer re-checks the window, so racing the timer
+  // is safe.
+  private async checkExpiredGraceWindows(): Promise<void> {
+    const now = Date.now();
+    const gameKeys = await this.store.scanGameKeys();
+    for (const key of gameKeys) {
+      const gameId = key.slice('game:'.length);
+      const state = await this.store.loadGameState(gameId);
+      if (!state || state.disconnectedPlayers.length === 0) continue;
+
+      for (const disc of state.disconnectedPlayers) {
+        if (now < disc.reconnectDeadline) continue;
+        await this.engine.expireDisconnectedPlayer(gameId, disc.color, (id) => {
+          this.io.to(id).emit('game_expired');
+          this.cleanupGame(id);
+        });
       }
     }
   }

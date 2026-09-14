@@ -120,7 +120,11 @@ export type GameEvent =
   | { type: 'player_resigned'; gameId: string; color: PlayerColor }
   | { type: 'player_aborted'; gameId: string; color: PlayerColor; username: string }
   | { type: 'player_disconnected'; gameId: string; color: PlayerColor }
-  | { type: 'player_reconnected'; gameId: string; color: PlayerColor }
+  | { type: 'player_reconnected'; gameId: string; color: PlayerColor; displayName?: string }
+  // Full-state frame: the engine changed something the event-specific payloads
+  // do not carry (a prune/resign moves the turn and clears the departed
+  // player's pieces). The SPA's reducer merges it field by field.
+  | { type: 'state_update'; gameId: string; state: GameState }
   | { type: 'color_selected'; gameId: string; userId: string; color: PlayerColor }
   | {
       type: 'lobby_update';

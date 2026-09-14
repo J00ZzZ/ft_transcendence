@@ -90,22 +90,47 @@ export class JoinManager {
           // progress : only a player reconnecting to their own seat may re-enter.
           // Hotseat is exempt — only 1 socket used in this game mode.
           if (state.status !== 'waiting' && !isReconnectingPlayer && !isHotseat) {
+            // A seat left as exited/resigned belongs to a player who was removed
+            // from this live match (they left, or their reconnect window expired
+            // and the prune is final). Tell its owner the seat is gone so the
+            // client can leave, instead of the generic rejection that only
+            // reaches the console and strands them on a board they cannot use.
+            const seat = state.players.find((p) => p.color === effectiveColor);
+            if (seat?.status === 'exited' || seat?.status === 'resigned') {
+              socket.leave(effectiveGameId);
+              socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
+              return;
+            }
             socket.emit('error', 'Game already in progress');
             return;
           }
 
           if (isReconnectingPlayer) {
-            await this.engine.handlePlayerReconnect(effectiveGameId, effectiveColor);
+            const revived = await this.engine.handlePlayerReconnect(
+              effectiveGameId,
+              effectiveColor,
+              displayName,
+            );
             state = await this.store.loadGameState(effectiveGameId);
-            // The player is back on their old seat, so tell the room: every client
-            // switches that seat from "Reconnecting…" back to active.
-            if (state && !state.disconnectedPlayers.some((d) => d.color === effectiveColor)) {
-              this.engine.emitEvent({
-                type: 'player_reconnected',
-                gameId: effectiveGameId,
-                color: effectiveColor,
-              });
+            if (!revived) {
+              // The grace window outlived the seat: it was pruned (or left, or
+              // the match finished) while the window was open, so every piece is
+              // parked at step -1 and there is nothing to resume. Removal is
+              // final — leave the room and tell the client its seat is gone,
+              // rather than seating a player who can never make a legal move.
+              socket.leave(effectiveGameId);
+              socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
+              return;
             }
+            // The player is back on their old seat, so tell the room: every client
+            // switches that seat from "Reconnecting…" back to active. The name
+            // rides along because they may have renamed while they were away.
+            this.engine.emitEvent({
+              type: 'player_reconnected',
+              gameId: effectiveGameId,
+              color: effectiveColor,
+              displayName: displayName || socket.data.displayName,
+            });
           } else {
             const player = state.players.find((p) => p.color === effectiveColor);
             if (player) player.status = 'active';

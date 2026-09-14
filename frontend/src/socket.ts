@@ -17,7 +17,10 @@ export type ServerEvents = {
   player_exited: (e: { color: PlayerColor }) => void;
   player_aborted: (e: { color: PlayerColor; username: string }) => void;
   player_disconnected: (e: { color: PlayerColor }) => void;
-  player_reconnected: (e: { color: PlayerColor }) => void;
+  player_reconnected: (e: { color: PlayerColor; displayName?: string }) => void;
+  // Sent to a single socket whose join was refused because the grace window had
+  // already expired: the seat is gone for good, so that client must leave.
+  seat_expired: (e: { gameId: string; color: PlayerColor }) => void;
   lobby_update: (e: {
     players: Array<{ username: string; color: PlayerColor; ready: boolean }>;
   }) => void;

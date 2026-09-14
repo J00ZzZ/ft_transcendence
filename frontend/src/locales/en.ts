@@ -581,6 +581,8 @@ export const en = {
     emptySeat: 'Waiting for player…',
     lastRolled: 'Last Rolled',
     reconnecting: 'Reconnecting…',
+    pilotLeft: 'LEFT',
+    pilotResigned: 'RESIGNED',
     rolledValue: 'Rolled a {{value}}',
     bonusSuffix: ' (bonus)',
     capturedPiece: 'Captured a {{color}} piece!',

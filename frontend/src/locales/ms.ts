@@ -580,6 +580,8 @@ export const ms = {
     emptySeat: 'Menunggu pemain…',
     lastRolled: 'Gulingan Terakhir',
     reconnecting: 'Menyambung semula…',
+    pilotLeft: 'KELUAR',
+    pilotResigned: 'BERUNDUR',
     rolledValue: 'Mendapat nilai {{value}}',
     bonusSuffix: ' (bonus)',
     capturedPiece: 'Menangkap buah {{color}}!',

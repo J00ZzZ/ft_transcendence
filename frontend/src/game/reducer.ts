@@ -159,7 +159,15 @@ export function applyEvent(
       return {
         ...state,
         players: state.players.map((p) =>
-          p.color === (event.color as PlayerColor) ? { ...p, status: 'active' } : p,
+          p.color === (event.color as PlayerColor)
+            ? {
+                ...p,
+                status: 'active',
+                // The reconnecting client reports the name it has now, which can
+                // differ from the one the seat was created with.
+                ...(event.displayName ? { displayName: event.displayName as string } : {}),
+              }
+            : p,
         ),
       };
     default:

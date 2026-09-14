@@ -581,6 +581,8 @@ export const fr = {
     emptySeat: 'En attente d\'un joueur…',
     lastRolled: 'Dernier Lancer',
     reconnecting: 'Reconnexion…',
+    pilotLeft: 'PARTI',
+    pilotResigned: 'DÉMISSION',
     rolledValue: 'A obtenu un {{value}}',
     bonusSuffix: ' (bonus)',
     capturedPiece: 'A capturé une pièce {{color}} !',

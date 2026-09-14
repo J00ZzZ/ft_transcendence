@@ -102,6 +102,11 @@ export function Game() {
   // still see those patches (see the game docs, Implementation Notes).
   const activeMatchRef = useRef(activeMatch);
   activeMatchRef.current = activeMatch;
+  // The same trap applies to the identity: the socket handlers below outlive the
+  // render that created the socket, so a mid-match rename would have the OLD
+  // display name resent on a reconnect (and written back onto the seat).
+  const userRef = useRef(user);
+  userRef.current = user;
 
   // ------------------------------------------------------------------------
   // CRT & AUDIO CONTROLS
@@ -299,6 +304,7 @@ export function Game() {
     socket.on('connect', () => {
       const current = activeMatchRef.current;
       if (!current) return;
+      const me = userRef.current;
       // Hotseat: one physical device controls every seat — the engine has no
       // separate accounts to join with, so this single socket must join_game
       // for every local color up front.
@@ -307,7 +313,7 @@ export function Game() {
           socket.emit('join_game', current.gameId, ck, undefined, localNames[ck]);
         }
       }
-      socket.emit('join_game', current.gameId, current.color, user?.id, user?.displayName);
+      socket.emit('join_game', current.gameId, current.color, me?.id, me?.displayName);
     });
 
     socket.on('connect_error', (err: Error) => {
@@ -442,15 +448,16 @@ export function Game() {
         }
       } else if (type === 'lobby_update') {
         const e = state as { players: Array<{ username: string; color: PlayerColor }> };
-        const mine = e.players.find((p) => p.username === user?.username);
+        const me = userRef.current;
+        const mine = e.players.find((p) => p.username === me?.username);
         if (mine && mine.color !== viewRef.current.myColor && activeMatchRef.current) {
           dispatch({ type: 'my_color_changed', color: mine.color });
           socket.emit(
             'join_game',
             activeMatchRef.current.gameId,
             mine.color,
-            user?.id,
-            user?.displayName,
+            me?.id,
+            me?.displayName,
           );
           setActiveMatch({ ...activeMatchRef.current, color: mine.color });
         }
@@ -581,6 +588,14 @@ export function Game() {
       setShowResultsModal(true);
     });
     socket.on('game_expired', () => {
+      setLastResult(buildAbandonedResult());
+      setShowResultsModal(true);
+    });
+    // Our seat's grace window expired before this join reached the engine, so
+    // the engine refused to seat us (there are no pieces left on the board).
+    // Show the same end-of-match card the other teardown paths use instead of
+    // leaving a board we can never act on.
+    socket.on('seat_expired', () => {
       setLastResult(buildAbandonedResult());
       setShowResultsModal(true);
     });
@@ -1260,6 +1275,15 @@ export function Game() {
                     // Active game pilot card — only render participating pilots
                     if (!playerMeta || playerMeta.status === 'inactive') return null;
                     const isDisconnected = playerMeta.status === 'disconnected';
+                    // Removal is final and has to read that way: an 'exited' seat (left, or
+                    // the reconnect window expired) and a 'resigned' one have no pieces left
+                    // on the board. The engine keeps the row — the results card needs it — so
+                    // it is marked as gone here rather than dropped from the list.
+                    const isOut =
+                      playerMeta.status === 'exited' || playerMeta.status === 'resigned';
+                    // An out seat can never hold the turn (the engine skips it when it
+                    // advances), so never advertise it as the pilot in control.
+                    const isActiveSeat = isActive && !isOut;
                     const isHotseat = activeMatch.mode === 'hotseat';
                     const isYou = isHotseat
                       ? ck === view.myColor
@@ -1285,18 +1309,22 @@ export function Game() {
                           gap: 10,
                           padding: '10px 12px',
                           borderRadius: 4,
-                          border: isActive
+                          border: isActiveSeat
                             ? `1.5px solid ${colorAccent}`
                             : occupied
                               ? `1.5px solid ${colorAccent}44`
                               : '1.5px dashed rgba(255, 255, 255, 0.12)',
-                          background: isActive
+                          background: isActiveSeat
                             ? `rgba(35, 12, 70, 0.95)`
                             : 'rgba(25, 10, 56, 0.65)',
-                          boxShadow: isActive
+                          boxShadow: isActiveSeat
                             ? `0 0 20px ${colorAccent}aa, inset 0 0 12px ${colorAccent}44`
                             : 'none',
-                          opacity: isDisconnected ? 0.55 : 1,
+                          // Three levels of presence: in the match (full), temporarily
+                          // away (dimmed), or out of the match for good (faded out and
+                          // desaturated, so it reads as removed rather than present).
+                          opacity: isOut ? 0.3 : isDisconnected ? 0.55 : 1,
+                          filter: isOut ? 'grayscale(1)' : 'none',
                           position: 'relative',
                           transition:
                             'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
@@ -1304,7 +1332,7 @@ export function Game() {
                         }}
                       >
                         {/* Active Turn Top-Right Badge */}
-                        {isActive && (
+                        {isActiveSeat && (
                           <span
                             style={{
                               position: 'absolute',
@@ -1377,7 +1405,7 @@ export function Game() {
                               gap: 6,
                             }}
                           >
-                            {isActive && (
+                            {isActiveSeat && (
                               <span
                                 style={{
                                   color: colorAccent,
@@ -1393,10 +1421,35 @@ export function Game() {
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
+                                // The badge below is `flex: none`, so the callsign has to be
+                                // allowed to shrink for its ellipsis to actually kick in.
+                                flex: '1 1 auto',
+                                minWidth: 0,
+                                color: isOut ? 'var(--text-muted)' : undefined,
+                                textDecoration: isOut ? 'line-through' : 'none',
                               }}
                             >
                               {name}
                             </span>
+                            {/* Seat presence: away for now, or out of the match for good. */}
+                            {(isOut || isDisconnected) && (
+                              <span
+                                className={RETRO_BADGE}
+                                style={{
+                                  flex: 'none',
+                                  padding: '1px 5px',
+                                  fontSize: '0.55rem',
+                                  border: `1px solid ${isOut ? '#ff0055' : '#ffb300'}`,
+                                  color: isOut ? '#ff0055' : '#ffb300',
+                                }}
+                              >
+                                {playerMeta.status === 'resigned'
+                                  ? t('game.pilotResigned')
+                                  : isOut
+                                    ? t('game.pilotLeft')
+                                    : t('game.reconnecting')}
+                              </span>
+                            )}
                           </div>
                         </div>
 

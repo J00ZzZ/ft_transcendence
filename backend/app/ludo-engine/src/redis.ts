@@ -149,6 +149,19 @@ export class RedisGameStore {
     return keys;
   }
 
+  // SCAN all game state hashes. The `:moves` lists share the `game:` prefix and
+  // are filtered out: they are lists, and HGET on a list is a type error.
+  async scanGameKeys(): Promise<string[]> {
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [nextCursor, batch] = await this.client.scan(cursor, 'MATCH', 'game:*', 'COUNT', 100);
+      cursor = nextCursor;
+      keys.push(...batch.filter((k) => !k.endsWith(':moves')));
+    } while (cursor !== '0');
+    return keys;
+  }
+
   // Stamp the moment a room became idle (< 2 seated), without overwriting an existing stamp.
   async setIdleSince(gameId: string, now: number): Promise<void> {
     await this.client.hsetnx(this.matchKey(gameId), 'idleSince', now.toString());

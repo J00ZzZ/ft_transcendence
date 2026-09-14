@@ -121,12 +121,25 @@ export class EventPublisher {
         );
         break;
 
+      case 'state_update':
+        this.store.publish(
+          gameId,
+          JSON.stringify({
+            type: 'state_update',
+            ...event.state,
+          }),
+        );
+        break;
+
       case 'player_reconnected':
         this.store.publish(
           gameId,
           JSON.stringify({
             type: 'player_reconnected',
             color: event.color,
+            // The name the reconnecting client reported : it may have renamed
+            // while it was away, and the other clients only see this event.
+            displayName: event.displayName,
           }),
         );
         break;
