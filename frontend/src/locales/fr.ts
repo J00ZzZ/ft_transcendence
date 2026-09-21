@@ -373,7 +373,7 @@ export const fr = {
     winRatioStat: 'TAUX DE VICTOIRE',
     bestStreakStat: 'MEILLEURE SÉRIE',
     currentStreakCount: 'ACTUELLE : {{count}}',
-    flightLogsTab: 'JOURNAUX DE VOL ({{count}})',
+    flightLogsTab: 'JOURNAUX DE VOL',
     achievementsTab: 'SUCCÈS ({{unlocked}}/{{total}})',
     cyberLudoTelemetry: 'TÉLÉMÉTRIE CYBER LUDO \'84',
     synchronizedPercent: 'SYNCHRONISÉ {{percent}}%',

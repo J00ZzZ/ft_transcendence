@@ -1165,7 +1165,7 @@ export function Profile() {
                                 mainTab === 'history' ? '0 0 10px rgba(0, 240, 255, 0.35)' : 'none',
                             }}
                           >
-                            {t('profile.flightLogsTab', { count: gamesData?.total ?? 0 })}
+                            {t('profile.flightLogsTab')}
                           </button>
                           <button
                             className={RETRO_BTN}
