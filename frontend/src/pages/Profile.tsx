@@ -1586,21 +1586,23 @@ export function Profile() {
                           >
                             {t('profile.friendsBoxTitle', { count: friendsData?.length ?? 0 })}
                           </span>
-                          <button
-                            className={RETRO_BTN}
-                            onClick={() => navigate('/friends')}
-                            style={{
-                              padding: '3px 9px',
-                              fontSize: '0.68rem',
-                              fontFamily: 'var(--font-display)',
-                              fontWeight: 900,
-                              color: 'var(--accent-cyan)',
-                              borderColor: 'rgba(0, 240, 255, 0.4)',
-                              borderRadius: 4,
-                            }}
-                          >
-                            {t('profile.manageBtn')}
-                          </button>
+                          {isOwnProfile && (
+                            <button
+                              className={RETRO_BTN}
+                              onClick={() => navigate('/friends')}
+                              style={{
+                                padding: '3px 9px',
+                                fontSize: '0.68rem',
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 900,
+                                color: 'var(--accent-cyan)',
+                                borderColor: 'rgba(0, 240, 255, 0.4)',
+                                borderRadius: 4,
+                              }}
+                            >
+                              {t('profile.manageBtn')}
+                            </button>
+                          )}
                         </div>
 
                         <div
