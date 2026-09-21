@@ -372,7 +372,7 @@ export const en = {
     winRatioStat: 'WIN RATIO',
     bestStreakStat: 'BEST STREAK',
     currentStreakCount: 'CURRENT: {{count}}',
-    flightLogsTab: 'FLIGHT LOGS ({{count}})',
+    flightLogsTab: 'FLIGHT LOGS',
     achievementsTab: 'ACHIEVEMENTS ({{unlocked}}/{{total}})',
     cyberLudoTelemetry: "CYBER LUDO '84 TELEMETRY",
     synchronizedPercent: 'SYNCHRONIZED {{percent}}%',

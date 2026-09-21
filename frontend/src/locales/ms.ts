@@ -372,7 +372,7 @@ export const ms = {
     winRatioStat: 'NISBAH KEMENANGAN',
     bestStreakStat: 'RENTETAN TERBAIK',
     currentStreakCount: 'SEMASA: {{count}}',
-    flightLogsTab: 'LOG PENERBANGAN ({{count}})',
+    flightLogsTab: 'LOG PENERBANGAN',
     achievementsTab: 'PENCAPAIAN ({{unlocked}}/{{total}})',
     cyberLudoTelemetry: 'TELEMETRI CYBER LUDO \'84',
     synchronizedPercent: 'DISENKRONISASIKAN {{percent}}%',
