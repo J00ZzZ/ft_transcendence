@@ -148,11 +148,7 @@ function renderNotificationBody(
         </span>
       );
     case 'match_cancelled':
-      return payload.reason === 'resign' ? (
-        <span>{t('notifications.matchResignedText', { username: from })}</span>
-      ) : (
-        <span>{t('notifications.matchCancelledText', { username: from })}</span>
-      );
+      return <span>{t('notifications.matchCancelledText', { username: from })}</span>;
     case 'match_finished': {
       const rank = payload.rank;
       const winner = payload.winnerUsername ? String(payload.winnerUsername) : 'A rival';

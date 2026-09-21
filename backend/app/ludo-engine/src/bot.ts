@@ -142,7 +142,7 @@ export class LudoBot {
       await new Promise((resolve) => setTimeout(resolve, 1200));
 
       // Re-validate once more: the game can end or the turn can move on
-      // during the delay above (e.g. the other player resigns/times out).
+      // during the delay above (e.g. the other player times out).
       const beforeMove = await this.store.loadGameState(this.gameId);
       if (!beforeMove || beforeMove.status !== 'active' || beforeMove.currentTurn !== this.color)
         return false;

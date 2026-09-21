@@ -7,14 +7,12 @@ import {
   handlePlayerDisconnect,
   handlePlayerReconnect,
   handlePlayerReady,
-  handlePlayerExit,
-  handlePlayerResign,
   expireDisconnectedPlayer,
 } from './player-handler';
 import { LobbyManager } from './lobby';
 
 // The game engine core: roll/move handling, per-game operation locking,
-// player lifecycle (disconnect/ready/exit/resign), and event emission to the
+// player lifecycle (disconnect/ready/exit), and event emission to the
 // socket layer. Instantiated by socket/server.ts.
 export class LudoEngine {
   // Redis-backed persistence for game states and move history.
@@ -103,6 +101,14 @@ export class LudoEngine {
       const currentPlayer = state.players.find((p) => p.color === state.currentTurn);
       if (!currentPlayer || currentPlayer.status === 'exited') {
         throw new Error('Current player has exited');
+      }
+
+      // Paused for a disconnect grace window: no rolls until the paused seat
+      // reconnects (reconnect clears the pause) or is pruned (prune advances
+      // the turn). Without this gate a crafted client could act while the
+      // game is frozen for everyone else.
+      if (state.paused) {
+        throw new Error('Game is paused — waiting for player to reconnect');
       }
 
       // Math.random() cannot be seeded directly, so it seeds the per-roll stream.
@@ -194,6 +200,12 @@ export class LudoEngine {
       const state = await this.store.loadGameState(gameId);
       if (!state || state.status !== 'active') {
         throw new Error('Game not active');
+      }
+
+      // Paused for a disconnect grace window: no moves either. The paused seat
+      // keeps its pending dice/moves; a reconnect resumes exactly here.
+      if (state.paused) {
+        throw new Error('Game is paused — waiting for player to reconnect');
       }
 
       // Validate: must be in WAITING_FOR_MOVE phase
@@ -292,18 +304,6 @@ export class LudoEngine {
       handlePlayerReady(this.store, (e) => this.emit(e), gameId, color),
     );
     await this.emitLobbyUpdate(gameId);
-  }
-
-  async handlePlayerExit(gameId: string, color: PlayerColor, freeSeat = false): Promise<void> {
-    return this.withGameLock(gameId, () =>
-      handlePlayerExit(this.store, (e) => this.emit(e), gameId, color, freeSeat),
-    );
-  }
-
-  async handlePlayerResign(gameId: string, color: PlayerColor): Promise<void> {
-    return this.withGameLock(gameId, () =>
-      handlePlayerResign(this.store, (e) => this.emit(e), gameId, color),
-    );
   }
 
   // Replay a grace window's expiry under the game lock. The disconnect handler

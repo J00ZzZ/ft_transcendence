@@ -94,23 +94,14 @@ function getToastInfo(
       };
     }
     case 'match_cancelled':
-      return payload.reason === 'resign'
-        ? {
-            tag: t('notifications.matchCancelledTag'),
-            badgeLabel: 'ABRT',
-            badgeColor: 'var(--accent-yellow, #ffe600)',
-            badgeBg: 'rgba(255, 230, 0, 0.18)',
-            fromUser: from,
-            actionMessage: t('notifications.actionMatchResigned'),
-          }
-        : {
-            tag: t('notifications.matchCancelledTag'),
-            badgeLabel: 'ABRT',
-            badgeColor: 'var(--accent-yellow, #ffe600)',
-            badgeBg: 'rgba(255, 230, 0, 0.18)',
-            fromUser: from,
-            actionMessage: t('notifications.actionMatchCancelled'),
-          };
+      return {
+        tag: t('notifications.matchCancelledTag'),
+        badgeLabel: 'ABRT',
+        badgeColor: 'var(--accent-yellow, #ffe600)',
+        badgeBg: 'rgba(255, 230, 0, 0.18)',
+        fromUser: from,
+        actionMessage: t('notifications.actionMatchCancelled'),
+      };
     case 'friend_removed':
       return {
         tag: t('notifications.friendRemovedTag'),

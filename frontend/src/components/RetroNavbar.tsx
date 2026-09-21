@@ -85,6 +85,7 @@ export function RetroNavbar({
     gameType: string;
   } | null>(null);
   const [isRejoining, setIsRejoining] = useState(false);
+  const [rejoinError, setRejoinError] = useState<string | null>(null);
 
   const navItems = [
     { path: '/home', label: t('nav.home').toUpperCase(), icon: '⌂' },
@@ -163,7 +164,19 @@ export function RetroNavbar({
       }
     } catch (err) {
       console.error('Failed to rejoin active game:', err);
-      fetchActiveGame();
+      // Show the localized error message inline (e.g. MATCH_SEAT_EXPIRED).
+      setRejoinError(
+        typeof err === 'object' && err !== null && 'message' in err
+          ? String(err.message)
+          : (err as Error).message ?? t('common.requestFailed', { status: 0 }),
+      );
+      // Only refresh the active-game poll when the seat is genuinely expired;
+      // otherwise the poll itself will clear the banner within ≤10 s anyway.
+      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'MATCH_SEAT_EXPIRED') {
+        setActiveGame(null);
+      } else {
+        fetchActiveGame();
+      }
     } finally {
       setIsRejoining(false);
     }
@@ -632,11 +645,30 @@ export function RetroNavbar({
       {/* Active Match In Progress - Instant Rejoin Button */}
       {activeGame && currentPath !== '/game' && (
         <div style={{ width: '100%', padding: '0 0 2px', flexShrink: 0 }}>
+          {/* Rejoin error message */}
+          {rejoinError && (
+            <div
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                background: 'rgba(255, 0, 85, 0.12)',
+                border: '1px solid #ff0055',
+                color: '#ff0055',
+                fontSize: '0.7rem',
+                textAlign: 'center',
+                fontFamily: 'var(--font-mono)',
+                marginBottom: 4,
+              }}
+            >
+              {rejoinError}
+            </div>
+          )}
           <button
             type="button"
             className={RETRO_BTN}
             id="navRejoinActiveGameBtn"
             onClick={() => {
+              setRejoinError(null);
               void handleRejoinActive();
             }}
             disabled={isRejoining}

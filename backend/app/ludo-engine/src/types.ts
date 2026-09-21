@@ -1,5 +1,5 @@
 export type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
-export type PlayerStatus = 'active' | 'exited' | 'resigned' | 'inactive' | 'disconnected';
+export type PlayerStatus = 'active' | 'exited' | 'inactive' | 'disconnected';
 export type TurnPhase = 'WAITING_FOR_ROLL' | 'WAITING_FOR_MOVE';
 
 export type PieceId = string; // Format: "{color}-{index}" e.g., "red-0", "blue-3"
@@ -16,7 +16,7 @@ export interface Piece {
 // Per-seat metadata for one player (human or bot) in a game.
 export interface PlayerMeta {
   color: PlayerColor; // seat color
-  status: PlayerStatus; // active/exited/resigned/inactive/disconnected
+  status: PlayerStatus; // active/exited/inactive/disconnected
   username: string; // immutable account name (bots: bot-<color>)
   displayName?: string; // shown name
   isBot: boolean; // AI seat flag
@@ -65,12 +65,13 @@ export interface GameState {
   disconnectedPlayers: DisconnectState[]; // Players temporarily disconnected (grace period)
   status: 'waiting' | 'active' | 'finished';
   winner?: PlayerColor;
-  resultDetail?: string; // why the game ended (e.g. four_pieces, resign)
+  resultDetail?: string; // why the game ended (e.g. four_pieces)
   resultSubmitted?: boolean; // Prevents duplicate backend submissions
   botBusy?: boolean; // Prevents overlapping bot turns
   readyPlayers: PlayerColor[]; // Players who have clicked "ready"
   paused?: boolean; // game paused (e.g. disconnect grace period)
   pauseTurnOwner?: PlayerColor; // whose turn it was when paused
+  pausedReason?: string; // rationale for the pause (e.g. 'disconnect_grace')
 }
 
 // The outcome of one applied move, recorded in history and broadcast to clients.
@@ -116,13 +117,13 @@ export type GameEvent =
   | { type: 'piece_moved'; gameId: string; result: MoveResult }
   | { type: 'game_ended'; gameId: string; winner: PlayerColor; resultDetail: string }
   | { type: 'game_started'; gameId: string }
+  | { type: 'game_expired'; gameId: string }
   | { type: 'player_exited'; gameId: string; color: PlayerColor }
-  | { type: 'player_resigned'; gameId: string; color: PlayerColor }
   | { type: 'player_aborted'; gameId: string; color: PlayerColor; username: string }
   | { type: 'player_disconnected'; gameId: string; color: PlayerColor }
   | { type: 'player_reconnected'; gameId: string; color: PlayerColor; displayName?: string }
   // Full-state frame: the engine changed something the event-specific payloads
-  // do not carry (a prune/resign moves the turn and clears the departed
+  // do not carry (a prune moves the turn and clears the departed
   // player's pieces). The SPA's reducer merges it field by field.
   | { type: 'state_update'; gameId: string; state: GameState }
   | { type: 'color_selected'; gameId: string; userId: string; color: PlayerColor }

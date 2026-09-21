@@ -37,7 +37,6 @@ export type ClientEvents = {
   player_ready: () => void;
   select_color: (color: PlayerColor) => void;
   leave_game: () => void;
-  resign: () => void;
   end_game: () => void;
 };
 

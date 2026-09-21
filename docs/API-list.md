@@ -106,6 +106,7 @@ An error response has one of two shapes:
 | `MATCH_PVP_ONLY_JOIN` | 403 | Only PvP rooms can be joined |
 | `MATCH_ROOM_FULL` | 403 | Room is full |
 | `MATCH_NOT_PLAYER` | 403 | You are not a player in this game |
+| `MATCH_SEAT_EXPIRED` | 403 | The seat is finalized (grace expired / End Game) — the player can never rejoin it |
 | `MATCH_PVP_ONLY_INVITE` | 403 | Only PvP rooms can be invited to |
 
 > Not every backend error has a code yet. When an error has no `code`, the frontend shows its English `message` instead.
@@ -158,9 +159,8 @@ An error response has one of two shapes:
    - [`POST /api/match/pve`](#post-apimatchpve) — Start a single-player game against bots
    - [`POST /api/match/create`](#post-apimatchcreate) — Create any game (PvP / PvE / hotseat) with full options
 
-7. **[Game Actions — Room](#7-game-actions--room)** — Ready, resign, exit, abort, rejoin, invite
+7. **[Game Actions — Room](#7-game-actions--room)** — Ready, exit, abort, rejoin, invite
    - [`POST /api/game/:id/ready`](#post-apigameidready) — Mark yourself ready in a room so the game can start
-   - [`POST /api/game/:id/resign`](#post-apigameidresign) — Forfeit / give up the current game
    - [`POST /api/game/:id/exit`](#post-apigameidexit) — Leave the post-game lobby
    - [`POST /api/game/:id/abort`](#post-apigameidabort) — Cancel a game that hasn't started yet
    - [`POST /api/game/:id/rejoin`](#post-apigameidrejoin) — Reconnect to a room you're seated in (e.g. after a page refresh)
@@ -1046,24 +1046,7 @@ Signal that the current player is ready.
 
 ---
 
-#### `POST /api/game/:id/resign`
 
-**Source:** `backend/src/match/match.controller.ts` — MatchModule
-
-Forfeit the game.
-
-**Headers:** 🔒 (requires `token` cookie)  
-**Path:** `:id` = gameId  
-**Body:** None  
-**Response:**
-
-```json
-{
-  "message": "Game cancelled",
-  "gameId": "uuid"
-}
-
-```
 
 ---
 
@@ -1111,28 +1094,6 @@ Cancel an unstarted game (while still in WAITING state).
 
 ---
 
-#### `POST /api/game/:id/rejoin`
-
-**Source:** `backend/src/match/match.controller.ts` — MatchModule
-
-Rejoin a room the user is seated in (after a refresh).
-
-**Headers:** 🔒 (requires `token` cookie)  
-**Path:** `:id` = gameId  
-**Body:** None  
-**Response:**
-
-```json
-{
-  "gameId": "uuid",
-  "token": "jwt-string",
-  "engineUrl": "ws://localhost:8443"
-}
-
-```
-
----
-
 #### `POST /api/game/:id/invite`
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
@@ -1169,14 +1130,38 @@ List open (WAITING PvP) rooms that can be joined.
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
 
-List rooms (WAITING/ACTIVE) the current user is seated in — used to rejoin after a refresh.
+List rooms (WAITING/ACTIVE) the current user is seated in — used to rejoin after a refresh. An
+ACTIVE room whose seat the engine has **finalized** (grace expired / End Game — `PlayerMeta.status`
+is `exited`) is filtered out via `isSeatFinalized()`, so a departed player is not offered a REJOIN
+MATCH button they can no longer use.
 
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** Array of the user's room summaries.
 
 ---
 
----
+#### `POST /api/game/:id/rejoin`
+
+**Source:** `backend/src/match/match.controller.ts` — MatchModule
+
+Rejoin a room the user is seated in (after a refresh).
+
+**Headers:** 🔒 (requires `token` cookie)  
+**Path:** `:id` = gameId  
+**Body:** None  
+**Response:**
+
+```json
+{
+  "gameId": "uuid",
+  "token": "jwt-string",
+  "engineUrl": "ws://localhost:8443"
+}
+```
+
+**Errors:** 404 if game not found, 403 `MATCH_NOT_PLAYER` if the caller holds no seat, and 403
+`MATCH_SEAT_EXPIRED` when the seat has been finalized (the engine parked every piece at `step = -1`),
+so no fresh token is minted for a seat that can never move again.
 
 ### 9. Game End (engine callback)
 
@@ -1969,18 +1954,7 @@ socket.emit('end_game');
 
 ---
 
-#### `resign`
 
-**Source:** `backend/app/ludo-engine/src/socket/socket-handlers.ts` (`handleResign`)
-
-Forfeit the game voluntarily.
-
-```js
-socket.emit('resign');
-
-```
-
-**Response:** `player_exited` event (broadcast to all)
 
 ---
 
@@ -1988,7 +1962,7 @@ socket.emit('resign');
 
 **Source:** `backend/app/ludo-engine/src/socket/socket-handlers.ts` (`handleDisconnect`)
 
-Automatically handled when the WebSocket connection drops. Opens a reconnect grace window (45 s in PvP, 1 h in bot modes) for a **live, unfinished** seat and broadcasts `player_disconnected`; no window is opened for an exited/resigned/finished seat. `player_reconnected` fires if the player returns inside the window, carrying the name the client reports so a rename survives the reconnect. If the window expires the seat is pruned for good (`player_exited`, pieces parked at `step = -1`), and a later `join_game` for it is answered with `seat_expired` instead of being treated as a reconnect.
+Automatically handled when the WebSocket connection drops. Opens a reconnect grace window (45 s in PvP, 1 h in single-instance modes) for a **live, unfinished** seat and broadcasts `player_disconnected`; no window is opened for an exited/finished seat. `player_reconnected` fires if the player returns inside the window, carrying the name the client reports so a rename survives the reconnect. If the window expires the seat is pruned for good (`player_exited`, pieces parked at `step = -1`), and a later `join_game` for it is answered with `seat_expired` instead of being treated as a reconnect.
 
 ```js
 // Socket.IO handles this automatically on connection loss
@@ -2010,14 +1984,14 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 | `game_ended` | `{ winner, resultDetail }` | Game finished |
 | `game_timeout` | none | Post-game lobby expired (60s) — room torn down |
 | `game_expired` | none | Idle lobby expired (5 min, < 2 seated) |
-| `player_exited` | `{ color }` | Player disconnected/resigned |
+| `player_exited` | `{ color }` | Player disconnected (exited) |
 | `player_aborted` | `{ color, username }` | A player aborted the game |
 | `player_disconnected` | `{ color }` | A player's connection dropped |
 | `player_reconnected` | `{ color, displayName? }` | A player reconnected inside the grace window |
 | `seat_expired` | `{ gameId, color }` | Your `join_game` was refused because the seat was already removed (left, or the grace window expired) — sent to that socket only |
 | `lobby_update` | `{ players: [{ username, color, ready }] }` | Lobby seats changed (join/leave/ready) |
 | `color_selected` | `{ color }` | A player selected a color in the lobby |
-| `state_update` | full `GameState` | After a live exit/resign moved the turn (also the SPA's catch-all for any other pub/sub frame) |
+| `state_update` | full `GameState` | After a live exit moved the turn (also the SPA's catch-all for any other pub/sub frame) |
 | `error` | `string` | On invalid action |
 
 ---

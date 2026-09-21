@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
+import { isSeatFinalized } from './seat-finalization';
 
 @Injectable()
 // Read-only match queries over Redis match:* hashes, enriched with host
@@ -98,6 +99,15 @@ export class MatchQueryService {
         const seatIds = [data.player1_id, data.player2_id, data.player3_id, data.player4_id];
         if (!seatIds.includes(userId)) continue;
         if (data.status !== 'WAITING' && data.status !== 'ACTIVE') continue;
+
+        // A seat the engine finalized (grace expired / End Game) is terminal:
+        // stop advertising this match to a player who can no longer rejoin.
+        // Checked only for ACTIVE matches — a WAITING room has no live game
+        // state, so the extra read would always come back empty.
+        if (data.status === 'ACTIVE') {
+          const color = data[`player${seatIds.indexOf(userId) + 1}_color`];
+          if (color && (await isSeatFinalized(this.redis, data.id, color))) continue;
+        }
         rooms.push({
           id: data.id,
           roomCode: data.inviteCode || null,

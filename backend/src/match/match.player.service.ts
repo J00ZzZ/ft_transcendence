@@ -5,13 +5,14 @@ import { NotificationService } from '../notification/notification.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
 import { isBotUserId } from '../common/bot';
+import { isSeatFinalized } from './seat-finalization';
 
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 
 @Injectable()
 // Per-player match actions: joining, rejoining, inviting friends, ready
-// checks, exiting, resigning, and marking matches started/ended. Edits the
-// match:* hashes in Redis. Used by MatchService.
+// checks, exiting, and marking matches started/ended. Edits the match:* hashes
+// in Redis. Used by MatchService.
 export class MatchPlayerService {
   // Redis client for match:* game hashes and ready:<gameId> sets.
   private redis: Redis;
@@ -113,6 +114,18 @@ export class MatchPlayerService {
         code: 'MATCH_NOT_PLAYER',
         message: 'You are not a player in this game',
       });
+
+    // A seat the engine finalized (grace expired / End Game) is terminal: no
+    // fresh token may be minted for it, even from a cached tab or a crafted
+    // POST. Without this the /api/games/mine filter could be bypassed.
+    const seatColor =
+      data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
+    if (data.status === 'ACTIVE' && (await isSeatFinalized(this.redis, gameId, seatColor))) {
+      throw new ForbiddenException({
+        code: 'MATCH_SEAT_EXPIRED',
+        message: 'Your seat in this game is gone and cannot be reclaimed',
+      });
+    }
 
     // Reclaiming the seat makes it PRESENT again: clear the reservation flag a
     // "returned to lobby" leave set, so the room counts this player and the
@@ -299,7 +312,10 @@ export class MatchPlayerService {
   }
 
   // Cancel (abort) a match, setting its status to ABORTED.
-  async cancelGame(gameId: string, userId: string, reason: 'cancel' | 'resign' = 'cancel') {
+  // The 'resign' alias and its REST route were removed: the concede path was
+  // unreachable from the UI, and removing it forecloses a scored concede —
+  // quitting via End Game is free and unscored, by design.)
+  async cancelGame(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
     if (!data.id)
       throw new NotFoundException({ code: 'MATCH_GAME_NOT_FOUND', message: 'Game not found' });
@@ -318,23 +334,18 @@ export class MatchPlayerService {
     await this.redis.hset(`match:${gameId}`, 'status', 'ABORTED');
     await this.redis.expire(`match:${gameId}`, 3600);
 
-    // Notify the other human players that the match was aborted/resigned.
-    await this.notifyMatchAbort(gameId, data, userId, reason);
+    // Notify the other human players that the match was aborted.
+    await this.notifyMatchAbort(gameId, data, userId);
 
     return { message: 'Game cancelled', gameId };
   }
 
-  // Alias for cancelGame : player resigns from the match.
-  async resign(gameId: string, userId: string) {
-    return this.cancelGame(gameId, userId, 'resign');
-  }
-
-  // Notify the other human players when a match is aborted or a player resigns.
+  // Notify the other human players when a match is aborted. The payload keeps
+  // the `reason` field ('cancel') for wire stability with older clients.
   private async notifyMatchAbort(
     gameId: string,
     data: Record<string, string>,
     actorId: string,
-    reason: 'cancel' | 'resign',
   ) {
     const actor = await this.prisma.db.user.findUnique({
       where: { id: actorId },
@@ -348,7 +359,7 @@ export class MatchPlayerService {
       try {
         await this.notificationService.notify(targetId, 'match_cancelled', {
           gameId,
-          reason,
+          reason: 'cancel',
           fromUserId: actorId,
           fromUsername: actor?.username ?? 'A player',
         });

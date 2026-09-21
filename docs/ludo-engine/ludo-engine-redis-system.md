@@ -353,7 +353,7 @@ model already *is* the occupancy map: **16 nodes with a `step` field answer
 |---------|------|-----|-------------|
 | `game:{gameId}` | Hash | 86400s (24h) | One field `state` = serialized GameState JSON |
 | `game:{gameId}:moves` | List | — | Move history, trimmed to 200 entries |
-| `match:{gameId}` | Hash | 3600s (aborted) | Match metadata: `player{1-4}_id`, `player{1-4}_color`, `status`, `gameType`, `inviteCode`, `idleSince` |
+| `match:{gameId}` | Hash | 3600s (aborted) | Match metadata: `player{1-4}_id`, `player{1-4}_color`, `status`, `gameType`, `inviteCode`, `idleSince`. **Co-owned** — mutated by both the engine (via `RedisGameStore` helpers) and Nest (via `match/*.service.ts`). The backend reads `game:{gameId}` state via `isSeatFinalization()` only to check seat liveness; it never writes to `game:*`. |
 
 ### Value Format
 

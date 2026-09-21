@@ -36,10 +36,10 @@ input/output. Each event is documented in full below; see
 | `move_piece` | Current player, phase `WAITING_FOR_MOVE` | `(pieceId: string)` | Validate and apply the move | `piece_moved` |
 | `player_ready` | Seated player in the waiting lobby | `()` | Mark ready; when every active player is ready the game starts | `game_started` |
 | `select_color` | Seated player during color selection | `(color: 'red'/'green'/'yellow'/'blue')` | Move the player to the requested seat color; clears Ready on both colors involved | `color_selected` + `lobby_update` |
-| `leave_game` | Player leaving a room (e.g. after a match) | `()` | Mark the seat exited, clear its pieces, advance the turn | `player_exited` |
-| `resign` | Player forfeiting an active match | `()` | Record the resignation as a loss and finish the player | `player_resigned` (+ `game_ended` if no active players remain) |
+| `leave_game` | Player leaving a room (e.g. after a match) | `()` | Waiting room: seat parked `inactive` and reserved. Live game: seat parked `exited`, pieces cleared, turn advances | `player_exited` (+ `state_update` live) |
+
 | `end_game` | Host presses "End Game" | `()` | PvE/hotseat: abort the whole game. PvP: prune this player, abort the room if fewer than 2 humans remain | `game_expired` or `player_aborted` |
-| `disconnect` | Socket drops (automatic) | — | Start the reconnect grace period, but only for a live, unfinished **active** seat — an exited/resigned/finished seat has no pieces left and must not be revivable | `player_disconnected`, then `player_reconnected` or `player_exited` |
+| `disconnect` | Socket drops (automatic) | — | Start the reconnect grace period, but only for a live, unfinished **active** seat — an exited/finished seat has no pieces left and must not be revivable. In **PvP**, dropping during your own turn also pauses the game (`paused` + `pauseTurnOwner`); dropping during someone else's turn lets play continue until the turn reaches the departed seat, which then simply waits | `player_disconnected`, then `player_reconnected` or `player_exited` |
 
 ### Server → Client
 
@@ -49,18 +49,17 @@ input/output. Each event is documented in full below; see
 | `dice_rolled` | A die roll | `{ value, legalMoves, bonusRoll, currentTurn, forfeited? }` | Room-wide |
 | `piece_moved` | A legal move applied | `MoveResult` | Room-wide |
 | `game_started` | All players ready / PvE or hotseat auto-start | `{ gameId }` | Room-wide |
-| `game_ended` | A match finishes (all pieces home / forfeit / resignation) | `{ winner, resultDetail }` | Room-wide |
+| `game_ended` | A match finishes (all pieces home / forfeit) | `{ winner, resultDetail }` | Room-wide |
 | `game_timeout` | 60 s after `game_ended` — the finished room is torn down | — | Room-wide |
-| `game_expired` | Idle lobby expired (5 min, < 2 seated) or a bot-mode abort | — | Room-wide |
-| `player_exited` | Permanent exit — leaving the room or disconnect grace expired (not a resignation) | `{ color }` | Room-wide |
-| `player_resigned` | A player resigned / conceded the match | `{ color }` | Room-wide |
+| `game_expired` | Room teardown: idle lobby (5 min, < 2 seated), single-instance disconnect window expired, or quorum lost after an exit | `{ gameId }` | Room-wide, emitted by `teardownRoom` through the engine event → publisher → broadcaster path |
+| `player_exited` | Permanent exit — leaving the room or disconnect grace expired | `{ color }` | Room-wide |
 | `player_aborted` | Host ended a PvP game / room aborted | `{ color, username }` | Room-wide |
 | `player_disconnected` | A socket dropped (temporary) | `{ color }` | Room-wide |
 | `player_reconnected` | Reconnect inside the grace window | `{ color, displayName? }` | Room-wide. Sent only when the seat really was restored, and carries the name the client reports (a rename while away rides along) |
 | `seat_expired` | A `join_game` for a seat already removed (left, or its grace window expired) | `{ gameId, color }` | Sent to that socket only — the seat is gone for good, so the client shows the end-of-match card and leaves |
 | `lobby_update` | Lobby seats / ready state changed | `{ players: [{ userId, username, avatarStyle, color, ready }] }` | Room-wide |
 | `color_selected` | A seat color change | `{ gameId, userId, color }` | Room-wide |
-| `state_update` | A live exit/resign moved the turn (and cleared the departed seat's pieces) | full `GameState` | Room-wide. The SPA's reducer merges it field by field; it is also the fallback for any other pub/sub frame |
+| `state_update` | A live exit moved the turn (and cleared the departed seat's pieces), or a PvP disconnect set/cleared the reconnect pause | full `GameState` (includes `paused` / `pauseTurnOwner`) | Room-wide. The SPA's reducer merges it field by field; it is also the fallback for any other pub/sub frame |
 | `error` | Invalid action / failed authentication | `string` | Sent to the offending socket |
 
 ---
@@ -247,16 +246,6 @@ socket.emit('leave_game');
 
 ---
 
-### `resign`
-
-Forfeit the game voluntarily.
-
-```js
-socket.emit('resign');
-```
-
-**Response:** `player_resigned` event (broadcast to all). If the resignation ends the match (no other active players remain), `game_ended` follows.
-
 ---
 
 ### `disconnect`
@@ -269,15 +258,15 @@ Automatically handled by Socket.IO on connection drop.
 
 **Response:** `player_disconnected` is broadcast immediately; `player_reconnected` fires if the player returns inside the grace window; `player_exited` (and possible room teardown) only if the grace window expires without a reconnect.
 
-The window is only opened for a **live** seat (`status === 'active'` and not finished). Expiry is final: `handlePlayerExit` parks every one of that colour's pieces at `step = -1` and marks the seat `exited`, and `handlePlayerDisconnect` refuses to open a new window for a seat in that state. A later `join_game` for such a seat is therefore rejected instead of being treated as a reconnect — otherwise the seat would come back `active` with all four pieces at `-1`, which `MoveValidator` skips, leaving a player who can never produce a legal move and whose turn auto-passes forever. The rejected client gets `seat_expired` (that socket only).
+The window is only opened for a **live** seat (`status === 'active'` and not finished). Expiry is final: `finalizeDeparture(..., 'timeout')` parks every one of that colour's pieces at `step = -1` and marks the seat `exited`, and `handlePlayerDisconnect` refuses to open a new window for a seat in that state. A later `join_game` for such a seat is therefore rejected instead of being treated as a reconnect — otherwise the seat would come back `active` with all four pieces at `-1`, which `MoveValidator` skips, leaving a player who can never produce a legal move and whose turn auto-passes forever. The rejected client gets `seat_expired` (that socket only).
 
 A rename rides along with a reconnect: the `join_game` payload's `displayName` is persisted and republished on `player_reconnected`, because the rest of the room only sees that event — a live game never re-broadcasts the whole lobby roster.
 
 Expiry is not tied to the in-process timer: the window itself lives in Redis (`disconnectedPlayers[].reconnectDeadline`), so `expireDisconnectedPlayer` is also replayed by a 1-minute server sweep and once at startup. A restart between disconnect and expiry therefore still kicks the seat out, instead of leaving it `disconnected` with the turn held on it forever.
 
-Advancing a turn always resets the turn-scoped snapshot (`turnPhase` → `WAITING_FOR_ROLL`, and `pendingLegalMoves` / `pendingDiceValue` / `pendingIsFirstRoll` cleared) plus the new player's `consecutiveSixes` / `hasRolled` / `bonusRoll`, so whoever inherits the turn can roll immediately. Without that, a prune or resignation landing mid-`WAITING_FOR_MOVE` kept the *departed* player's pending moves: the next player could neither roll (`Invalid turn phase`) nor move, freezing the game.
+Advancing a turn always resets the turn-scoped snapshot (`turnPhase` → `WAITING_FOR_ROLL`, and `pendingLegalMoves` / `pendingDiceValue` / `pendingIsFirstRoll` cleared) plus the new player's `consecutiveSixes` / `hasRolled` / `bonusRoll`, so whoever inherits the turn can roll immediately. Without that, a prune landing mid-`WAITING_FOR_MOVE` kept the *departed* player's pending moves: the next player could neither roll (`Invalid turn phase`) nor move, freezing the game.
 
-Because `player_exited` / `player_resigned` carry only `{ color }`, a live exit and a continuing resignation also republish the full state as `state_update` — otherwise every client keeps rendering the departed player's turn (and their pieces) until some unrelated event happens to carry `currentTurn`.
+Because `player_exited` carries only `{ color }`, a live exit also republishes the full state as `state_update` — otherwise every client keeps rendering the departed player's turn (and their pieces) until some unrelated event happens to carry `currentTurn`.
 
 ---
 
@@ -293,14 +282,13 @@ Because `player_exited` / `player_resigned` carry only `{ color }`, a live exit 
 | `game_timeout` | none | Post-game lobby expired (60s) — finished room torn down |
 | `game_expired` | none | Idle lobby expired (5 min, < 2 seated) |
 | `player_exited` | `{ color }` | Permanent exit — left the room or the disconnect grace window expired |
-| `player_resigned` | `{ color }` | A player resigned / conceded the match |
 | `player_aborted` | `{ color, username }` | A player aborted the game |
 | `player_disconnected` | `{ color }` | A player's connection dropped |
 | `player_reconnected` | `{ color, displayName? }` | A player reconnected (name included in case they renamed while away) |
 | `seat_expired` | `{ gameId, color }` | Your `join_game` was refused: that seat was already removed (left, or its grace window expired) — this socket only |
 | `lobby_update` | `{ players: [{ userId, username, avatarStyle, color, ready }] }` | Lobby seats changed |
 | `color_selected` | `{ gameId, userId, color }` | A player picked a color |
-| `state_update` | full `GameState` | A live exit/resign moved the turn — the other events don't carry it |
+| `state_update` | full `GameState` | A live exit moved the turn — the other events don't carry it |
 | `error` | `string` | On invalid action |
 
 ---

@@ -69,9 +69,6 @@ export class MatchService {
   async cancelGame(gameId: string, userId: string) {
     return this.player.cancelGame(gameId, userId);
   }
-  async resign(gameId: string, userId: string) {
-    return this.player.resign(gameId, userId);
-  }
 
   // Queries
   async listOpenRooms() {

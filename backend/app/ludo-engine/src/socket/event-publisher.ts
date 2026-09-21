@@ -57,21 +57,24 @@ export class EventPublisher {
         );
         break;
 
-      case 'player_resigned':
-        this.store.publish(
-          gameId,
-          JSON.stringify({
-            type: 'player_resigned',
-            color: event.color,
-          }),
-        );
-        break;
-
       case 'game_started':
         this.store.publish(
           gameId,
           JSON.stringify({
             type: 'game_started',
+            gameId: event.gameId,
+          }),
+        );
+        break;
+
+      // Room teardown (quorum lost, single-instance disconnect expiry, idle
+      // lobby). Emitted by teardownRoom so every surviving client leaves the
+      // dead room cleanly.
+      case 'game_expired':
+        this.store.publish(
+          gameId,
+          JSON.stringify({
+            type: 'game_expired',
             gameId: event.gameId,
           }),
         );

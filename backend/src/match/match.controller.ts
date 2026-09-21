@@ -16,7 +16,7 @@ import { requireSecret } from '../secrets';
 
 @Controller()
 // HTTP routes for the match lifecycle: creating/joining games (PvP, PvE,
-// hotseat), ready/resign/exit/abort actions, room browsing, and the engine
+// hotseat), ready/exit/abort actions, room browsing, and the engine
 // callbacks (game end / game started). Delegates to MatchService.
 export class MatchController {
   constructor(private readonly match: MatchService) {}
@@ -80,12 +80,6 @@ export class MatchController {
   @Post('api/game/:id/ready')
   ready(@Request() req: { user: { id: string } }, @Param('id') gameId: string) {
     return this.match.readyGame(gameId, req.user.id);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('api/game/:id/resign')
-  resign(@Request() req: { user: { id: string } }, @Param('id') gameId: string) {
-    return this.match.resign(gameId, req.user.id);
   }
 
   // Browse Open Rooms (WAITING PvP games : joinable)

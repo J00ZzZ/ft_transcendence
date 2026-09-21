@@ -3,6 +3,7 @@ import { RedisGameStore } from '../redis';
 import { LudoBot } from '../bot';
 import { GameSocket } from './auth';
 import { JoinManager } from './join-manager';
+import { finalizeDeparture } from '../player-handler';
 import type { PlayerColor, PieceId } from '../types';
 
 // SocketHandlers maps socket events to engine actions; the join_game flow
@@ -151,29 +152,30 @@ export class SocketHandlers {
 
         if (state.status === 'finished') {
           socket.leave(gameId);
-        } else if (state.status === 'waiting' || state.status === 'active') {
-          await this.engine.handlePlayerExit(gameId, color);
+        } else if (state.status === 'waiting') {
+          // Waiting room: reversible leave via the unified chokepoint. The seat
+          // is reserved (not freed) so rejoin returns the same colour.
+          await finalizeDeparture(
+            this.store,
+            this.engine.emitEvent.bind(this.engine),
+            gameId,
+            color,
+            'waiting_leave',
+          );
+          socket.leave(gameId);
+        } else if (state.status === 'active') {
+          // Live game: per-player exit via the unified chokepoint.
+          await finalizeDeparture(
+            this.store,
+            this.engine.emitEvent.bind(this.engine),
+            gameId,
+            color,
+            'leave',
+          );
           socket.leave(gameId);
         }
       } catch (error) {
         console.error('Leave game error:', error);
-      }
-    })();
-  }
-
-  handleResign(socket: GameSocket): void {
-    const gameId = socket.data.gameId;
-    const color = socket.data.playerColor;
-    if (!gameId || !color) return;
-
-    (async () => {
-      try {
-        // Resign is NOT exit: conceding has to be recorded as a loss, which
-        // means ending the game and emitting game_ended so the result actually
-        // reaches the backend. handlePlayerExit does neither.
-        await this.engine.handlePlayerResign(gameId, color);
-      } catch (error) {
-        socket.emit('error', `Resign failed: ${error}`);
       }
     })();
   }

@@ -91,7 +91,25 @@ export interface PlayerMeta {
 client with the roster. The full pipeline is in [`avatar-system.md`](../avatar-system.md).
 
 **Seat statuses.** `active` = playing; `disconnected` = in the reconnect grace window;
-`inactive` = left a waiting room; `exited` = left a live game; `resigned` = conceded a live game.
+`inactive` = left a waiting room; `exited` = left a live game.
+
+**Turn order is derived from `state.players[]` (players-as-truth).** `advanceTurnInState` scans the
+array forward from `currentTurn` and picks the next seat that can play: `active` seats take the
+turn, `exited`/`inactive` seats are skipped, and a `disconnected` seat whose grace window is still
+open **holds the turn** — `currentTurn` parks on it and nobody else can act (turn ownership gates
+roll/move/bot actions) until that seat reconnects or is pruned. Disconnecting during another
+player's turn does not freeze anything — play continues, and the wait only lands when the turn
+reaches the departed seat.
+
+**The explicit pause flag is PvP-only.** When a PvP player drops during their *own* turn
+(`handlePlayerDisconnect`), the game also sets `state.paused` / `state.pauseTurnOwner` so clients can
+render a "waiting to reconnect" banner immediately. PvE and hotseat never pause: they are
+single-instance games with one remote-less human, so the only two states are *running* and
+*aborted* — their disconnect still arms the long (1h) single-instance window, and expiry tears the
+room down. The pause is cleared in three places: `handlePlayerReconnect` (seat restored, same turn
+resumes with its pending dice/moves), `finalizeDeparture` (seat pruned, turn advances to the next
+playable seat), and the re-arm check in `join-manager` (defensive, owner-only). While paused,
+`rollDice`, `movePiece`, and bot turns are all rejected, so nobody can act on a frozen board.
 
 A player who leaves a **waiting room** keeps their seat. It is parked as `inactive`, which the lobby
 roster (`emitLobbyUpdate`) and the client's pilot list both filter out, and its Redis seat row is
@@ -99,8 +117,7 @@ flagged as reserved rather than deleted, so `joinMatch` sends the player back to
 Aborting frees the seat outright instead. Either way the room's idle-abort timer is restarted, and
 the host's seat is never touched. Because the seat is restored to `active` on rejoin, `isFinished`
 is deliberately left untouched on this path : a stale "finished" flag would make the player look
-already done at game start (`handlePlayerResign` only counts seats that are `active` and not
-`isFinished`).
+already done at game start.
 
 A player who leaves a **live game** is parked as `exited` with `isFinished` set, because the
 post-game result logic prunes on that status.
@@ -127,8 +144,9 @@ export interface GameState {
   resultSubmitted?: boolean;       // prevents duplicate backend submissions
   botBusy?: boolean;               // prevents overlapping bot turns
   readyPlayers: PlayerColor[];     // Colors whose seat is ready (cleared when seats swap)
-  paused?: boolean;                // Whether the game is paused
-  pauseTurnOwner?: PlayerColor;    // Whose turn it was when paused
+  paused?: boolean;                // True while frozen on a disconnected seat's turn
+  pauseTurnOwner?: PlayerColor;    // The seat the paused turn is waiting on
+  pausedReason?: string;           // e.g. 'disconnect_grace'
 }
 ```
 
@@ -302,7 +320,7 @@ Module-level constants in the engine's support files — edit at the top of each
 | Constant | File | Default | What it controls |
 |----------|------|---------|------------------|
 | `DISCONNECT_GRACE_MS` | `player-handler.ts` | 45 s | PvP reconnect window before a disconnected player is pruned |
-| `BOT_DISCONNECT_GRACE_MS` | `player-handler.ts` | 1 h | Bot-mode reconnect window before the game auto-aborts |
+| `SINGLE_SOCKET_DISCONNECT_GRACE_MS` | `player-handler.ts` | 1 h | Bot-mode reconnect window before the game auto-aborts |
 
 > `player-handler.ts` adds a hardcoded `+1000` ms buffer to the PvP grace
 > period so the prune timer fires just after the reconnect deadline.

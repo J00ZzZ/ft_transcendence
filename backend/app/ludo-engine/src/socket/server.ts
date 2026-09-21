@@ -11,6 +11,7 @@ import { BotTurnScheduler } from './bot-scheduler';
 import { PostGameManager } from './post-game';
 import { verifyToken, GameSocket } from './auth';
 import { LobbyManager } from '../lobby';
+import { teardownRoom } from '../player-handler';
 import type { PlayerColor } from '../types';
 
 // A WAITING PvP room with fewer than 2 seated players is idle; once it has
@@ -71,9 +72,10 @@ export class SocketServer {
       (gameId) => this.botScheduler.schedule(gameId, BOT_THINK_MS),
       (gameId) => {
         // A grace timeout dropped the room below the minimum human count
-        // (or a bot-mode disconnect window fully expired): tell any
-        // surviving client the room is gone so they leave cleanly.
-        this.io.to(gameId).emit('game_expired');
+        // (or a single-instance disconnect window fully expired). The
+        // game_expired broadcast already went out through teardownRoom's
+        // engine event -> publisher -> broadcaster path; this callback only
+        // clears the engine's in-memory state (userIdMap, bots, locks).
         this.cleanupGame(gameId);
       },
     );
@@ -176,10 +178,14 @@ export class SocketServer {
       await this.store.setIdleSince(match.id, now);
       const idleSinceMs = match.idleSince ? parseInt(match.idleSince, 10) : now;
       if (now - idleSinceMs > IDLE_LOBBY_TIMEOUT_MS) {
-        this.io.to(match.id).emit('game_expired');
-        this.cleanupGame(match.id);
-        await this.store.abortMatch(match.id);
-        await this.store.deleteGame(match.id);
+        // teardownRoom broadcasts game_expired (engine event -> publisher ->
+        // broadcaster) and runs cleanupGame through its notify callback.
+        await teardownRoom(
+          this.store,
+          (event) => this.engine.emitEvent(event),
+          match.id,
+          this.cleanupGame,
+        );
       }
     }
   }
@@ -200,7 +206,8 @@ export class SocketServer {
       for (const disc of state.disconnectedPlayers) {
         if (now < disc.reconnectDeadline) continue;
         await this.engine.expireDisconnectedPlayer(gameId, disc.color, (id) => {
-          this.io.to(id).emit('game_expired');
+          // teardownRoom already broadcast game_expired; this clears in-memory
+          // state for the dead room.
           this.cleanupGame(id);
         });
       }
@@ -247,8 +254,6 @@ export class SocketServer {
       socket.on('select_color', (color: string) => this.handlers.handleSelectColor(socket, color));
 
       socket.on('leave_game', () => this.handlers.handleLeaveGame(socket));
-
-      socket.on('resign', () => this.handlers.handleResign(socket));
 
       socket.on('end_game', () => this.postGame.handleEndGame(socket));
 

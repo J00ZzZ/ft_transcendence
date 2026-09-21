@@ -17,6 +17,10 @@ export type GameViewState = {
   readyPlayers: PlayerColor[];
   /** Last dice value rolled by each color (populated from dice_rolled events). */
   lastRolls: Partial<Record<PlayerColor, number>>;
+  /** True when the game is paused waiting for a disconnected player. */
+  paused: boolean;
+  /** Whose turn the paused game is waiting on. Undefined when not paused. */
+  pauseTurnOwner?: PlayerColor;
 };
 
 export function initialView(myColor: PlayerColor): GameViewState {
@@ -32,6 +36,8 @@ export function initialView(myColor: PlayerColor): GameViewState {
     myColor,
     readyPlayers: [],
     lastRolls: {},
+    paused: false,
+    pauseTurnOwner: undefined,
   };
 }
 
@@ -71,6 +77,8 @@ export function applyEvent(
         legalMoves: s.pendingLegalMoves ?? state.legalMoves,
         diceValue: s.pendingDiceValue ?? state.diceValue,
         readyPlayers: s.readyPlayers ?? state.readyPlayers,
+        paused: s.paused ?? false,
+        pauseTurnOwner: s.pauseTurnOwner ?? undefined,
       };
     }
     case 'lobby_update': {
@@ -204,12 +212,16 @@ function applyMove(state: GameViewState, move: MoveResult): GameViewState {
 }
 
 function nextTurn(players: GameState['players'], from: PlayerColor): PlayerColor {
-  const order: PlayerColor[] = ['blue', 'red', 'green', 'yellow'];
-  const idx = order.indexOf(from);
-  for (let i = 1; i <= 4; i++) {
-    const c = order[(idx + i) % 4];
-    const p = players.find((x) => x.color === c);
-    if (p?.status === 'active') return c;
+  const idx = players.findIndex((x) => x.color === from);
+  if (idx === -1) return from;
+  // Mirror the engine's advanceTurnInState (players-as-truth): the next seat
+  // in players[] order takes the turn unless it has left. A DISCONNECTED seat
+  // with a running grace window HOLDS the turn — the engine parks currentTurn
+  // there until it reconnects or is pruned, so the optimistic prediction must
+  // not skip past it or the board would show the wrong pilot in control.
+  for (let i = 1; i <= players.length; i++) {
+    const p = players[(idx + i) % players.length];
+    if (p?.status === 'active' || p?.status === 'disconnected') return p.color;
   }
   return from;
 }

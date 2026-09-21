@@ -32,7 +32,7 @@ The module uses Redis for short-lived match data (queues, active games) and lets
 | `match.controller.ts` | HTTP routes: matchmaking, game actions, room browsing, engine callbacks |
 | `match.service.ts` | Facade — composes the four split services (`MatchCreatorService`, `MatchPlayerService`, `MatchQueryService`, `MatchPostgameService`) and re-exports `ENGINE_WS_URL` |
 | `match.creator.service.ts` | Match creation: PvP/PvE/hotseat, invite codes, room joining, bot seeding |
-| `match.player.service.ts` | In-game actions: join, rejoin, invite friend, ready, exit, cancel, resign |
+| `match.player.service.ts` | In-game actions: join, rejoin, invite friend, ready, exit, cancel |
 | `match.query.service.ts` | Browse queries: open rooms, my rooms |
 | `match.postgame.service.ts` | `POST /api/game/end` processing (scoring, ratings, achievements) |
 | `match.module.ts` | NestJS module — registers all services, PrismaService |
@@ -84,7 +84,6 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 | `POST` | `/api/match/pve` | JWT | Start PvE (vs bot) game |
 | `POST` | `/api/match/create` | JWT | Unified match creation (mode required: pvp/pve/hotseat) |
 | `POST` | `/api/game/:id/ready` | JWT | Signal player is ready |
-| `POST` | `/api/game/:id/resign` | JWT | Forfeit the game |
 | `POST` | `/api/game/:id/exit` | JWT | Acknowledge leaving post-game |
 | `POST` | `/api/game/:id/abort` | JWT | Cancel unstarted game |
 | `POST` | `/api/game/:id/rejoin` | JWT | Rejoin a room after refresh |
@@ -204,9 +203,6 @@ POST /api/match/pve
 ```
 POST /api/game/:id/ready
   └── Mark player ready → return { message, gameId }
-
-POST /api/game/:id/resign
-  └── Mark player resigned, notify engine → return { message, gameId }
 
 POST /api/game/:id/exit
   └── Acknowledge post-game exit → return { message, gameId }

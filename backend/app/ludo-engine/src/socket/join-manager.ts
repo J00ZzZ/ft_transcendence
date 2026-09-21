@@ -90,13 +90,13 @@ export class JoinManager {
           // progress : only a player reconnecting to their own seat may re-enter.
           // Hotseat is exempt — only 1 socket used in this game mode.
           if (state.status !== 'waiting' && !isReconnectingPlayer && !isHotseat) {
-            // A seat left as exited/resigned belongs to a player who was removed
+            // A seat left as exited belongs to a player who was removed
             // from this live match (they left, or their reconnect window expired
             // and the prune is final). Tell its owner the seat is gone so the
             // client can leave, instead of the generic rejection that only
             // reaches the console and strands them on a board they cannot use.
             const seat = state.players.find((p) => p.color === effectiveColor);
-            if (seat?.status === 'exited' || seat?.status === 'resigned') {
+            if (seat?.status === 'exited') {
               socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
@@ -131,6 +131,12 @@ export class JoinManager {
               color: effectiveColor,
               displayName: displayName || socket.data.displayName,
             });
+            // If the game was paused waiting for this seat, the revive cleared
+            // the pause — push the fresh state so every client drops the pause
+            // banner and resumes rendering live play.
+            if (state.status === 'active' && !state.paused) {
+              this.engine.emitEvent({ type: 'state_update', gameId: effectiveGameId, state });
+            }
           } else {
             const player = state.players.find((p) => p.color === effectiveColor);
             if (player) player.status = 'active';
@@ -182,12 +188,19 @@ export class JoinManager {
           state = await this.store.loadGameState(effectiveGameId);
         }
 
-        // Resume re-arm: a join into an ACTIVE game clears the pause flag and
-        // re-kicks the bot trigger : this unfreezes a bot-mode game the player
-        // left mid-game or refreshed.
-        if (state?.status === 'active' && state.paused) {
+        // Resume re-arm: unfreeze a paused PvP game only when the seat it is
+        // frozen on is the one (re)joining. PvE/hotseat never pause, and any
+        // OTHER player's reconnect must not clear a pause that belongs to a
+        // seat still inside its grace window (the owner's own revive in
+        // handlePlayerReconnect already cleared it, so this is defensive).
+        if (
+          state?.status === 'active' &&
+          state.paused &&
+          state.pauseTurnOwner === effectiveColor
+        ) {
           delete state.paused;
           delete state.pauseTurnOwner;
+          delete state.pausedReason;
           await this.store.saveGameState(effectiveGameId, state);
         }
         if (

@@ -644,6 +644,9 @@ export function Game() {
         return;
       const v = viewRef.current;
       if (v.status !== 'active') return;
+      // Paused for a reconnect: block the dice shortcut so no action can slip
+      // in while the engine holds the turn.
+      if (v.paused) return;
       const isHotseatMode = activeMatch?.mode === 'hotseat';
       const activeHumanTurn = v.players.some(
         (p) => p.color === v.currentTurn && p.status === 'active' && !p.isBot,
@@ -852,20 +855,45 @@ export function Game() {
   }
 
   const isHotseat = activeMatch.mode === 'hotseat';
+  // Waiting-for-reconnect banner. Two triggers:
+  //  1. The engine set `paused` (a PvP player dropped during their OWN turn —
+  //     pending dice/moves are frozen until they return).
+  //  2. The turn is parked on a disconnected seat (they dropped during another
+  //     player's turn; play continued and now the turn waits on them).
+  // PvE/hotseat never pause: their human is the only remote-less participant,
+  // and the 1h single-instance window aborts the room if they never return.
+  const pausedSeat =
+    view.players.find((p) => p.color === view.pauseTurnOwner) ??
+    view.players.find((p) => p.color === effectiveTurn && p.status === 'disconnected');
+  const isPausedForReconnect = Boolean(view.paused) || Boolean(pausedSeat);
+  const pausedOwnerName = (() => {
+    if (!isPausedForReconnect) return null;
+    const color = view.pauseTurnOwner ?? effectiveTurn;
+    return (
+      localNames[color] ||
+      pausedSeat?.displayName ||
+      pausedSeat?.username ||
+      color?.toUpperCase() ||
+      'player'
+    );
+  })();
   const activeHumanTurn = view.players.some(
     (p) => p.color === effectiveTurn && p.status === 'active' && !p.isBot,
   );
   const seatNameMatches = view.players.some(
     (p) => p.color === effectiveTurn && p.username === user?.username,
   );
-  const isMyTurn = isHotseat
-    ? activeHumanTurn
-    : effectiveTurn === view.myColor || (user != null && seatNameMatches);
+  const isMyTurn =
+    !isPausedForReconnect &&
+    (isHotseat
+      ? activeHumanTurn
+      : effectiveTurn === view.myColor || (user != null && seatNameMatches));
   // `status === 'active'` closes a game-end race: the winning move can leave
   // the other canRoll inputs looking rollable for one render, letting a click
   // slip through as a "Game not active" rejection.
   const canRoll =
     view.status === 'active' &&
+    !isPausedForReconnect &&
     isMyTurn &&
     view.turnPhase !== 'WAITING_FOR_MOVE' &&
     view.legalMoves.length === 0 &&
@@ -875,9 +903,11 @@ export function Game() {
   const turnLabel =
     view.status === 'waiting'
       ? t('game.waitingRoomTitle').toUpperCase()
-      : isMyTurn
-        ? t('game.yourTurnShort').toUpperCase()
-        : `${effectiveTurn.toUpperCase()}'S TURN`;
+      : isPausedForReconnect && pausedOwnerName
+        ? t('game.pausedForReconnectTitle', { name: pausedOwnerName.toUpperCase() })
+        : isMyTurn
+          ? t('game.yourTurnShort').toUpperCase()
+          : `${effectiveTurn.toUpperCase()}'S TURN`;
   const turnAccent =
     view.status === 'waiting' ? 'var(--accent-cyan)' : SEAT_HUES[effectiveTurn] || '#00f0ff';
 
@@ -981,13 +1011,15 @@ export function Game() {
                 {turnSwapNotice ??
                   (view.status === 'waiting'
                     ? t('game.readyNeedsOpponent')
-                    : isRolling
-                      ? t('game.statusRolling')
-                      : isMyTurn && view.turnPhase === 'WAITING_FOR_ROLL'
-                        ? t('game.statusRollNow')
-                        : isMyTurn && view.turnPhase === 'WAITING_FOR_MOVE'
-                          ? t('game.statusSelectPiece')
-                          : t('game.statusRivalTurn', { name: effectiveTurn.toUpperCase() }))}
+                    : isPausedForReconnect && pausedOwnerName
+                      ? t('game.pausedForReconnectDetail', { name: pausedOwnerName })
+                      : isRolling
+                        ? t('game.statusRolling')
+                        : isMyTurn && view.turnPhase === 'WAITING_FOR_ROLL'
+                          ? t('game.statusRollNow')
+                          : isMyTurn && view.turnPhase === 'WAITING_FOR_MOVE'
+                            ? t('game.statusSelectPiece')
+                            : t('game.statusRivalTurn', { name: effectiveTurn.toUpperCase() }))}
               </div>
             </div>
 
@@ -1275,12 +1307,11 @@ export function Game() {
                     // Active game pilot card — only render participating pilots
                     if (!playerMeta || playerMeta.status === 'inactive') return null;
                     const isDisconnected = playerMeta.status === 'disconnected';
-                    // Removal is final and has to read that way: an 'exited' seat (left, or
-                    // the reconnect window expired) and a 'resigned' one have no pieces left
+                    // Removal is final and has to read that way: an 'exited' seat (left,
+                    // or the reconnect window expired) has no pieces left
                     // on the board. The engine keeps the row — the results card needs it — so
                     // it is marked as gone here rather than dropped from the list.
-                    const isOut =
-                      playerMeta.status === 'exited' || playerMeta.status === 'resigned';
+                    const isOut = playerMeta.status === 'exited';
                     // An out seat can never hold the turn (the engine skips it when it
                     // advances), so never advertise it as the pilot in control.
                     const isActiveSeat = isActive && !isOut;
@@ -1443,11 +1474,7 @@ export function Game() {
                                   color: isOut ? '#ff0055' : '#ffb300',
                                 }}
                               >
-                                {playerMeta.status === 'resigned'
-                                  ? t('game.pilotResigned')
-                                  : isOut
-                                    ? t('game.pilotLeft')
-                                    : t('game.reconnecting')}
+                                {isOut ? t('game.pilotLeft') : t('game.reconnecting')}
                               </span>
                             )}
                           </div>
