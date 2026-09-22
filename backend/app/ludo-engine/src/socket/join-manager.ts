@@ -1,8 +1,9 @@
-import { LudoEngine } from '../engine';
-import { RedisGameStore } from '../redis';
-import { LudoBot } from '../bot';
+import type { LudoEngine } from '../engine';
+import type { RedisGameStore } from '../redis';
+import type { LudoBot } from '../bot';
 import { firstActiveColor } from '../player-handler';
-import { GameSocket, isBotUserId, BOT_PREFIX } from './auth';
+import type { GameSocket } from './auth';
+import { isBotUserId, BOT_PREFIX } from './auth';
 import type { PlayerColor } from '../types';
 
 // Shared seat order : used by the join flow to map slots to colors and to
@@ -56,9 +57,9 @@ export class JoinManager {
     const isHotseat = socket.data.mode === 'hotseat';
     const effectiveColor = (!isHotseat && socket.data.tokenColor) || playerColor;
 
-    this.withGameLock(effectiveGameId, async () => {
+    void this.withGameLock(effectiveGameId, async () => {
       try {
-        socket.join(effectiveGameId);
+        void socket.join(effectiveGameId);
         socket.data.gameId = effectiveGameId;
         socket.data.playerColor = effectiveColor;
 
@@ -66,7 +67,7 @@ export class JoinManager {
           if (!this.userIdMap.has(effectiveGameId)) {
             this.userIdMap.set(effectiveGameId, new Map());
           }
-          this.userIdMap.get(effectiveGameId)!.set(effectiveColor, effectiveUserId);
+          this.userIdMap.get(effectiveGameId).set(effectiveColor, effectiveUserId);
         }
 
         let state = await this.store.loadGameState(effectiveGameId);
@@ -95,7 +96,7 @@ export class JoinManager {
             // of being stranded on a board it cannot use.
             const seat = state.players.find((p) => p.color === effectiveColor);
             if (seat?.status === 'exited') {
-              socket.leave(effectiveGameId);
+              void socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
             }
@@ -113,7 +114,7 @@ export class JoinManager {
             if (!revived) {
               // The grace window outlived the seat: nothing is left to resume,
               // so leave the room and tell the client its seat is gone.
-              socket.leave(effectiveGameId);
+              void socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
             }
@@ -186,11 +187,7 @@ export class JoinManager {
         // Unfreeze a paused game only when the seat it is frozen on rejoins.
         // Another player's reconnect must not clear a pause that belongs to a
         // seat still inside its grace window.
-        if (
-          state?.status === 'active' &&
-          state.paused &&
-          state.pauseTurnOwner === effectiveColor
-        ) {
+        if (state?.status === 'active' && state.paused && state.pauseTurnOwner === effectiveColor) {
           delete state.paused;
           delete state.pauseTurnOwner;
           delete state.pausedReason;
@@ -244,7 +241,7 @@ export class JoinManager {
         if (!this.userIdMap.has(gameId)) {
           this.userIdMap.set(gameId, new Map());
         }
-        this.userIdMap.get(gameId)!.set(slotColor, botUserId);
+        this.userIdMap.get(gameId).set(slotColor, botUserId);
 
         // Instantiate bot
         this.getOrCreateBot(gameId, slotColor, this.engine, this.store);

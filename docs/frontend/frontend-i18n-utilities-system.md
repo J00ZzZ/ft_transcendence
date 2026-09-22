@@ -8,7 +8,10 @@
 - [Core Logic / Flow](#core-logic--flow) — Language selection and legal documents
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,7 +23,10 @@ Supporting modules shared by every screen:
 4. **Legal pages** — `LegalPage` renders the Privacy Policy and Terms of Service (public routes `/privacy` and `/terms`) from markdown files bundled with Vite's `?raw` imports, one variant per language.
 5. **Entry point** — `main.tsx` mounts `<App />` in `StrictMode` and imports the CSS plus `./i18n` so translations are ready before the first render.
 
+
 ---
+---
+
 
 ## Files
 
@@ -35,7 +41,10 @@ Supporting modules shared by every screen:
 | `src/utils/botName.ts` | `localizedBotName()` — `bot-<color>` → translated bot name |
 | `src/pages/LegalPage.tsx` | Privacy / Terms pages (`/privacy`, `/terms`) — markdown viewer per language |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -52,7 +61,10 @@ interface LegalPageProps {
 // content/docs/Terms-of-Service-{en,fr,my}.md   (?raw Vite imports)
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -69,7 +81,10 @@ flowchart LR
 2. Components call `useTranslation()`; the language selector (in `RetroNavbar`, `LegalPage`, and others) switches language at runtime via `setLang` from the store, which updates both i18next and `lr.lang`.
 3. `LegalPage` reads the route (`/privacy` or `/terms`), picks the markdown document for the current language, and renders it through `MarkdownViewer`.
 
+
 ---
+---
+
 
 ## Dependencies
 

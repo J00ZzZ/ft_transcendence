@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for dice roll and piece selection
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Game page (`/game`) is the real-time gameplay screen. It has:
 
 > **Note:** The Game page is fully real-time. It connects to the engine on the page's own origin (`/socket.io/`), sends `join_game`, `roll_dice` and `move_piece`, and renders state updates from the engine (`game_joined`, `dice_rolled`, `piece_moved`, `game_ended` and others). Game state is dispatched into `game/reducer.ts`; see `socket.ts` for the complete event contract.
 
+
 ---
+---
+
 
 ## Files
 
@@ -35,7 +41,10 @@ The Game page (`/game`) is the real-time gameplay screen. It has:
 | `src/game/types.ts` | GameState, PlayerColor, LegalMove, MoveResult and others |
 | `src/socket.ts` | Socket.IO client — `connectSocket()`, typed Server/Client event maps |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -67,7 +76,10 @@ type Seat =
 type PlayerColor = 'red' | 'green' | 'yellow' | 'blue'
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -125,7 +137,10 @@ sequenceDiagram
     end
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -164,7 +179,10 @@ on 'game_ended' { winner, resultDetail }
   └── Open the ResultsModal overlay in-game
 ```
 
+
 ---
+---
+
 
 ## Implementation Notes
 
@@ -179,7 +197,10 @@ on 'game_ended' { winner, resultDetail }
 - **The waiting-for-reconnect banner has two triggers** (`pages/Game.tsx`). Either the engine set `paused` (a PvP player dropped during their own turn, so the pending dice and moves are frozen), or the turn is parked on a disconnected seat (they dropped during another player's turn and play continued until the turn reached them). While either holds, `isMyTurn` is false and `canRoll` is blocked, so no action can be sent on a frozen board. PvE and hotseat never pause.
 - **An exited seat renders as gone but stays in the list.** Its pieces are off the board and it can never hold the turn, so the pilot card greys it out and never marks it as in control. The row itself is kept because the results card needs the full roster.
 
+
 ---
+---
+
 
 ## Dependencies
 

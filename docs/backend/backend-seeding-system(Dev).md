@@ -9,7 +9,10 @@
 - [Idempotency](#idempotency) — How the seed scripts handle re-runs
 - [Usage](#usage) — Commands
 
+
 ---
+---
+
 
 ## Overview
 
@@ -23,7 +26,10 @@ The seed pipeline populates the database with a full test roster for development
 
 Seeding is a **manual** step — run `npm run db:seed` (or `npm run db:reset` for a clean reseed) after the stack is up. `make all` only builds and starts the containers: the backend container's entrypoint runs `prisma db push` to sync the schema automatically, but nothing seeds the database by itself.
 
+
 ---
+---
+
 
 ## Files
 
@@ -37,7 +43,10 @@ Seeding is a **manual** step — run `npm run db:seed` (or `npm run db:reset` fo
 | `prisma/truncate-all.sql` | SQL script to truncate all tables (clean reseed) |
 | `prisma.config.ts` | Prisma 7 config — declares the seed command (`ts-node ... prisma/seed.ts`) |
 
+
 ---
+---
+
 
 ## Seed Data
 
@@ -91,7 +100,10 @@ Sample game history is created for a subset of the roster so profile history pag
 
 `seed_friends.ts` builds a connected social graph — accepted friendships plus pending incoming requests — so the Friends pages and notification flows have realistic data.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -120,7 +132,10 @@ sequenceDiagram
 - `seed_user_profile.ts` — applies per-user profile extras.
 - `sync_leaderboard.ts` — standalone re-sync of the Redis leaderboards (idempotent).
 
+
 ---
+---
+
 
 ## Idempotency
 
@@ -134,7 +149,10 @@ friendShip.deleteMany({})
 
 Cascading deletes (User → Account / GameParticipant / Friendship / Notification) keep re-runs clean, so `npx prisma db seed` multiple times produces the same state without duplicate-key errors. Redis sorted sets are reset (`DEL leaderboard:global|ranked|casual`) before re-adding.
 
+
 ---
+---
+
 
 ## Usage
 

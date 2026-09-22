@@ -8,7 +8,10 @@
 - [Core Logic / Flow](#core-logic--flow) — Data fetching, and when it repeats
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Profile page (`/profile`) shows a user's public profile with statistics, rec
 
 When the page loads it reads the profile, game history, achievements, friends and leaderboard rank. It reads them again when the username changes or when the edit modal closes. It does **not** repeat on a timer.
 
+
 ---
+---
+
 
 ## Files
 
@@ -33,7 +39,10 @@ When the page loads it reads the profile, game history, achievements, friends an
 | `src/store.tsx` | `useApp` for authentication state, presence and API (Application Programming Interface) calls |
 | `src/theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` styles |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -96,7 +105,10 @@ When the page loads it reads the profile, game history, achievements, friends an
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -139,7 +151,10 @@ sequenceDiagram
     Profile->>Profile: Re-render with the data (no repeating timer)
 ```
 
+
 ---
+---
+
 
 ## Achievements (own profile)
 
@@ -163,7 +178,10 @@ Your own profile renders the 13 achievements defined by `ACHIEVEMENTS_DEF` in `P
 
 Hotseat games never count towards any achievement. The badge/tab counter shows `unlocked / 13`.
 
+
 ---
+---
+
 
 ## Dependencies
 

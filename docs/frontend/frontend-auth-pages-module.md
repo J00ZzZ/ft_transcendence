@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for form submission
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,7 +23,10 @@ These pages are the entry point to the app. They are:
 
 Both pages use the `RetroAuthLayout` container and share the same styling: the retro/cyber theme and the provider buttons.
 
+
 ---
+---
+
 
 ## Files
 
@@ -34,7 +40,10 @@ Both pages use the `RetroAuthLayout` container and share the same styling: the r
 | `src/components/RetroAuthLayout.tsx` | Layout wrapper — logo, tagline, centered card |
 | `src/components/OAuthButtons.tsx` | 42, GitHub, Google provider buttons |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -67,7 +76,10 @@ const [submitting, setSubmitting] = useState(false)
 | Password | Required, 12-72 chars, must contain uppercase, lowercase, number, and special character |
 | Confirm | Must match password |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -143,7 +155,10 @@ sequenceDiagram
     Login->>Login: Load home page (or the 2FA code page)
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -180,7 +195,10 @@ onClick provider button
        └── The backend handles the full OAuth redirect
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

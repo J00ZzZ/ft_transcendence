@@ -1,5 +1,10 @@
 # Frontend — Dashboard
 
+
+---
+---
+
+
 ## Status: Superseded by the Home page
 
 > **The standalone `Dashboard` page no longer exists.** Its features — player stats, leaderboard rank, friends list, achievements and recent activity — now live on the **Home page** (`/home`, `src/pages/Home.tsx`). See [frontend-home-module.md](frontend-home-module.md) for the current implementation.
@@ -32,7 +37,10 @@ flowchart LR
 4. **Notifications** — bell and toasts from `useNotifications()`, which uses an SSE (Server-Sent Events) stream.
 5. **Quick actions** — start a game (`navigate('/gamelobby')`), leaderboard and friends.
 
+
 ---
+---
+
 
 ## Files (current)
 
@@ -42,7 +50,10 @@ flowchart LR
 | `src/hooks/useNotifications.tsx` | Notification bell + toasts (SSE) |
 | `src/api.ts` | Typed `getApi`/`postApi` request helpers |
 
+
 ---
+---
+
 
 ## Dependencies
 

@@ -219,7 +219,7 @@ function nextTurn(players: GameState['players'], from: PlayerColor): PlayerColor
   // holds the turn, so the prediction must not skip past it.
   for (let i = 1; i <= players.length; i++) {
     const p = players[(idx + i) % players.length];
-    if (p?.status === 'active' || p?.status === 'disconnected') return p.color;
+    if (p.status === 'active' || p.status === 'disconnected') return p.color;
   }
   return from;
 }

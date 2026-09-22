@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { Server } from 'socket.io';
+import type { Server } from 'socket.io';
 
 // RedisBroadcaster forwards game:* Redis pub/sub messages to the matching
 // Socket.IO room, decoupling broadcast from event publishing.
@@ -19,7 +19,7 @@ export class RedisBroadcaster {
   // Listen on the game:* pattern and forward each message to the matching
   // Socket.IO room.
   start(io: Server): void {
-    this.subscriber.psubscribe('game:*', (err, count) => {
+    void this.subscriber.psubscribe('game:*', (err, count) => {
       if (err) {
         console.error('Failed to subscribe to game:* pattern:', err);
       } else {

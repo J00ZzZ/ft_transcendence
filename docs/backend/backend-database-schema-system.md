@@ -8,7 +8,10 @@
 - [Entity Relationships](#entity-relationships) — ER diagram showing model relations
 - [Indexes](#indexes) — Database indexes for query performance
 
+
 ---
+---
+
 
 ## Overview
 
@@ -18,9 +21,17 @@ The database uses PostgreSQL 16 with Prisma ORM (Prisma 7, `@prisma/adapter-pg`)
 > flags**. All per-user stats (rating, wins, streaks), avatar data, and
 > disconnect/reconnect counters live directly on **`User`**.
 
+
+---
 ---
 
+
 ## Enums
+
+
+---
+---
+
 
 ### FriendshipStatus
 
@@ -31,6 +42,11 @@ enum FriendshipStatus {
   blocked
 }
 ```
+
+
+---
+---
+
 
 ### PlayerColor
 
@@ -43,6 +59,11 @@ enum PlayerColor {
 }
 ```
 
+
+---
+---
+
+
 ### GameStatus
 
 ```prisma
@@ -51,6 +72,11 @@ enum GameStatus {
   ABANDONED
 }
 ```
+
+
+---
+---
+
 
 ### GameType
 
@@ -63,9 +89,17 @@ enum GameType {
 
 > There is no `UserStatus` enum — presence is a runtime Redis concern (see `backend-presence-module.md`), with `'online' | 'playing' | 'offline'` derived from the presence key TTL.
 
+
+---
 ---
 
+
 ## Models
+
+
+---
+---
+
 
 ### User
 
@@ -100,7 +134,10 @@ data, and disconnect/reconnect counters.
 
 **Relations:** `accounts`, `notifications`, `achievement` (1:1), `gameParticipants`, `sentFriendships`, `receivedFriendships`
 
+
 ---
+---
+
 
 ### Achievement
 
@@ -115,7 +152,10 @@ avatar data (those live on `User`).
 
 **Relations:** `user` (1:1, back-reference)
 
+
 ---
+---
+
 
 ### Account
 
@@ -130,7 +170,10 @@ OAuth provider links, one row per provider per user.
 
 **Relations:** `user` (back-reference)
 
+
 ---
+---
+
 
 ### Game
 
@@ -147,7 +190,10 @@ Historical results only — live matchmaking state is stored in Redis, not here.
 
 **Relations:** `participants` (GameParticipant[])
 
+
 ---
+---
+
 
 ### GameParticipant
 
@@ -165,7 +211,10 @@ One row per player per game.
 
 **Relations:** `game`, `user`
 
+
 ---
+---
+
 
 ### Bots
 
@@ -186,7 +235,10 @@ Modules that must tell humans from bots:
 | Achievements (`achievements.service`) | Skips bot participants, so games against bots never unlock human achievements |
 | Leaderboard (`leaderboard.service`) | Excludes bots when it rebuilds from Postgres, using `startsWith BOT_PREFIX` in the query plus `!isBotUserId()` in memory |
 
+
 ---
+---
+
 
 ### Friendship
 
@@ -200,7 +252,10 @@ Modules that must tell humans from bots:
 
 **Relations:** `user` (SentFriendships), `friend` (ReceivedFriendships)
 
+
 ---
+---
+
 
 ### Notification
 
@@ -217,7 +272,10 @@ Persisted notifications backing the SSE stream and the bell dropdown.
 
 **Relations:** `user` (back-reference)
 
+
 ---
+---
+
 
 ## Entity Relationships
 
@@ -313,7 +371,10 @@ erDiagram
     }
 ```
 
+
 ---
+---
+
 
 ## Indexes
 

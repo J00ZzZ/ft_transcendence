@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision tree for move selection
 - [Dependencies](#dependencies) — Internal dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Bot AI module provides an automated opponent for single-player (PvE) games. 
 
 Bot turns are scheduled by the `SocketServer` (not by the bot itself) so two bot turns never overlap.
 
+
 ---
+---
+
 
 ## Files
 
@@ -30,7 +36,10 @@ Bot turns are scheduled by the `SocketServer` (not by the bot itself) so two bot
 |------|------|
 | `bot.ts` | `LudoBot` class + `getOrCreateBot()` / `isBotPlayer()` helpers |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -67,7 +76,10 @@ The backend writes the id and the engine reads it, so the two copies must be
 changed together. The backend keeps the list of modules that filter bots — see
 [`../backend/backend-database-schema-system.md`](../backend/backend-database-schema-system.md) → Bots.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -141,7 +153,10 @@ flowchart LR
 
 The bot picks **option 2** (highest score, `640`) and moves G0 to step 14. In real games the same priority chain decides first — if any move could capture, it would take that move before scoring anything.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -171,7 +186,10 @@ takeTurn()
   └── Return whether the game is still active
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

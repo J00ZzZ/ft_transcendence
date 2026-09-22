@@ -11,7 +11,10 @@
 - [Dependencies](#dependencies) — Internal services this module relies on
 - [Configuration / Environment](#configuration--environment) — Redis and engine configuration
 
+
 ---
+---
+
 
 ## Overview
 
@@ -23,7 +26,10 @@ The Match module is the bridge between the REST API and the real-time ludo-engin
 
 The module uses Redis for short-lived match data (queues, active games) and lets the ludo-engine own the actual game logic over Socket.IO.
 
+
 ---
+---
+
 
 ## Files
 
@@ -37,7 +43,10 @@ The module uses Redis for short-lived match data (queues, active games) and lets
 | `match.postgame.service.ts` | `POST /api/game/end` processing (scoring, ratings, achievements) |
 | `match.module.ts` | NestJS module — registers all services, PrismaService |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -73,7 +82,10 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -93,7 +105,10 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 | `POST` | `/api/game/end` | engine key | Engine callback — process game end (scoring/achievements) |
 | `POST` | `/api/game/:id/started` | engine key | Engine callback — mark game started |
 
+
 ---
+---
+
 
 ## Seat Finalization (`isSeatFinalized`)
 
@@ -112,7 +127,10 @@ Deliberately **not** terminal:
 
 The helper is fail-open: a missing key, unreadable value, or schema drift returns `false`, which keeps the match advertised rather than locking a legitimate player out.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -183,7 +201,10 @@ sequenceDiagram
     Site-->>User: Take you into the game
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -241,7 +262,10 @@ GET /api/games/mine
       REJOIN MATCH button is offered for a seat that is gone
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -253,7 +277,10 @@ GET /api/games/mine
 | `JwtService` | Issue JWTs for Socket.IO engine handshake |
 | `secrets.ts` | `ENGINE_API_KEY` for validating engine callbacks |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 

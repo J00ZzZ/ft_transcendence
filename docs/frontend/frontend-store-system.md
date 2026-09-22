@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for authentication and game state changes
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The store is one React Context provider (`AppProvider`) that holds all global UI
 5. **Helpers** — `addBot`, `removeBot`, `addPlayer`, `removePlayer`, `startGame`, `roll`, `endTurn`, `settingOn`, `toggleSetting`.
 6. **Session keep-alive** — a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is still waiting for a response. This is the **client → server** direction only, and it shows that the browser session is still active; keeping the notification SSE stream alive runs the other way and is handled server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
+
 ---
+---
+
 
 ## Files
 
@@ -30,7 +36,10 @@ The store is one React Context provider (`AppProvider`) that holds all global UI
 |------|------|
 | `src/store.tsx` | `AppProvider`, `useApp` hook, all state and actions |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -157,7 +166,10 @@ export const SETTING_DEFAULTS: Record<string, boolean> = {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -221,7 +233,10 @@ sequenceDiagram
 
 > **Note:** `startGame` only builds the local seat state used by the offline/hotseat preview. For a real match, the lobby calls `POST /api/match/create` (or the PvP (player versus player) and PvE (player versus environment) shortcuts) and stores the returned `activeMatch`; the Game page then connects to the engine over Socket.IO.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -283,7 +298,10 @@ toggleSetting(key)
   └── Flip current value (settings or default)
 ```
 
+
 ---
+---
+
 
 ## `api.ts` — Refresh and Retry
 
@@ -296,7 +314,10 @@ toggleSetting(key)
 
 `store.tsx` also refreshes **early**, every 14 minutes: access tokens expire after 15 minutes (`JwtModule` `expiresIn: '15m'`), so refreshing one minute ahead keeps the presence heartbeat (and any other call) from arriving with an expired token. The 401 retry path above would still recover, but the browser logs the 401 first.
 
+
 ---
+---
+
 
 ## Dependencies
 

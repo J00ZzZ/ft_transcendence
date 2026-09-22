@@ -9,7 +9,10 @@ nginx, a NestJS REST API, a standalone real-time game engine (with an inline bot
 AI), PostgreSQL, Redis, and a Prisma Studio DB browser. A separate `frontend-dev`
 Vite HMR service is available for development only.
 
+
 ---
+---
+
 
 ## Topology
 
@@ -41,7 +44,10 @@ graph TB
 > through nginx like all other API routes. There is no direct browser→backend
 > path for auth.
 
+
 ---
+---
+
 
 ## Services
 
@@ -57,7 +63,10 @@ real process (`backend/app/postgres_16_db/`, `backend/app/redis/`).
 > `ludo-engine` process (`backend/app/ludo-engine/src/bot.ts`). The engine accepts
 > a `bot` role in the JWT and can auto-fill slots with bot players.
 
+
 ---
+---
+
 
 ## Containers, images & volumes
 
@@ -100,7 +109,10 @@ without a rebuild.
 `transcendence_network` (bridge) — all containers attach to it; `db`, `redis`,
 `backend`, `ludo-engine`, and `nginx` resolve each other by service name.
 
+
 ---
+---
+
 
 ## The SPA build handoff
 
@@ -138,7 +150,10 @@ The nginx config is **bind-mounted** from `nginx/conf/nginx.conf`, so config edi
 need only a container restart, not an image rebuild. The `Dockerfile` also `COPY`s it
 as a fallback so the image stays runnable standalone.
 
+
 ---
+---
+
 
 ## Request paths
 
@@ -165,7 +180,10 @@ selected per request from the `Host` header (`isTunnelRequest` in
 engine's real hostname or port. The inline bot AI connects internally inside the
 engine process.
 
+
 ---
+---
+
 
 ## Connection liveness (two-direction heartbeats)
 
@@ -219,7 +237,10 @@ of ~288/min. A new room or a rejoin banner still appears within a few seconds.
 Measured with two tabs on the lobby page: 61 Redis `SCAN`s/min = 60 poll requests (30 per user) plus
 the engine's idle sweep, i.e. 6.8 Redis ops/s and 0.003% of one CPU core, with no throttled request.
 
+
 ---
+---
+
 
 ## Data layer
 
@@ -261,7 +282,10 @@ friends, match (creator, player, query, postgame), notification, and the avatar
 metadata cache. The engine is a separate process, so its `RedisGameStore` and
 `RedisBroadcaster` read `process.env.REDIS_PASSWORD` directly instead.
 
+
 ---
+---
+
 
 ## Backend modules
 
@@ -292,7 +316,10 @@ metadata cache. The engine is a separate process, so its `RedisGameStore` and
 7. `JwtStrategy` reads the access token from `req.cookies` — `cookieParser()` in `main.ts` is required for this.
 8. When the access token expires, the SPA calls `POST /api/auth/refresh` with the `refresh_token` cookie to silently rotate the session.
 
+
 ---
+---
+
 
 ## Configuration (.env)
 
@@ -305,7 +332,10 @@ is a single lookup point over `process.env`: `secret(name)` returns `undefined` 
 `requireSecret(name)` throws at boot on a missing value. The remaining `${...}` in
 `compose.yaml` are non-secret topology values and all carry defaults.
 
+
 ---
+---
+
 
 ## Dev vs. production paths
 
@@ -320,13 +350,19 @@ events through bind mounts, and HMR silently never fires without it.
 `make dev` still brings up nginx, so the production path stays verifiable while you
 iterate against HMR.
 
+
 ---
+---
+
 
 ## Make targets
 
 See the [README](../README.md) **Commands** section for the full list of make targets.
 
+
 ---
+---
+
 
 ## Directory Layout
 

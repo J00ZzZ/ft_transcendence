@@ -12,7 +12,10 @@
 - [Data Structures](#data-structures) — Redis key patterns and value formats
 - [Dependencies](#dependencies) — External dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -23,7 +26,10 @@ The Redis Infrastructure module provides the persistence and messaging layer for
 3. **Match metadata** — a hash per match holding seats, colors, ready flags, and status (the lobby source of truth).
 4. **Pub/sub messaging** — publishes game events to Redis channels for cross-instance broadcasting.
 
+
 ---
+---
+
 
 ## Files
 
@@ -33,7 +39,10 @@ The Redis Infrastructure module provides the persistence and messaging layer for
 | `socket/event-publisher.ts` | `EventPublisher` — serialises each `GameEvent` into a pub/sub payload and calls `store.publish()` |
 | `socket/redis-broadcaster.ts` | `RedisBroadcaster` — `PSUBSCRIBE game:*`, then forwards each message to the matching Socket.IO room |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -64,7 +73,10 @@ class RedisGameStore {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -98,7 +110,10 @@ sequenceDiagram
     Store-->>Engine: done
 ```
 
+
 ---
+---
+
 
 ## What Redis Spawns Per Game Session
 
@@ -134,7 +149,10 @@ On top of the three keys, each game also has a Redis pub/sub channel
 to it; `RedisBroadcaster` picks it up and passes it to the Socket.IO room, so
 all clients stay in sync even across several engine instances.
 
+
 ---
+---
+
 
 ## How the Engine Handles Multiple Bots
 
@@ -212,7 +230,10 @@ The helper `isBotUserId()` (`common/bot.ts`) is the **one place** that answers
 "is this a bot?" — the engine, the match postgame scorer, and the achievements
 service all use it, so they never disagree.
 
+
 ---
+---
+
 
 ## Piece-Level State: Why No Board Is Ever Built
 
@@ -343,7 +364,10 @@ saves part of that and still duplicates the piece positions. The piece-node
 model already *is* the occupancy map: **16 nodes with a `step` field answer
 "where is everything?" without ever building a board.**
 
+
 ---
+---
+
 
 ## Data Structures
 
@@ -373,7 +397,10 @@ Game state is stored as JSON under the `state` field of the game hash:
 }
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -406,7 +433,10 @@ publish(gameId, message)
   └── PUBLISH game:{gameId} <message>
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -414,7 +444,10 @@ publish(gameId, message)
 |-----------|---------|
 | `ioredis` | Redis client for Node.js — supports pub/sub, pipelining, hashes, and lists |
 
+
 ---
+---
+
 
 ## What Pub/Sub Is (plain English)
 

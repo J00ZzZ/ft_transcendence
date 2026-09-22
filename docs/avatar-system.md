@@ -11,7 +11,10 @@
 - [Verification](#verification) — how to check an avatar change end to end
 - [Known limitations](#known-limitations) — accepted trade-offs and follow-ups
 
+
 ---
+---
+
 
 ## Overview
 
@@ -36,7 +39,10 @@ Three properties make that work:
   reload; a byte-identical URL can be answered from the browser's in-memory image cache with no
   request at all.
 
+
 ---
+---
+
 
 ## Files
 
@@ -71,7 +77,10 @@ Three properties make that work:
 | `frontend/src/pages/Profile.tsx` | Sets the change locally on upload/delete, so the uploader's own view needs no SSE; shows upload/reset errors and the `photoLoadError` warning in a message area with a fixed height. |
 | every `<UserAvatar>` call site | Passes `userId` (and `isBot` where the seat can be a bot). |
 
+
 ---
+---
+
 
 ## Storage & caching model
 
@@ -113,7 +122,10 @@ bytes.
 `no-cache` does not mean "do not store". It means "store, then check with the server before every
 reuse". `no-store`, which the `404` for a user with no photo uses, means "do not store this at all".
 
+
 ---
+---
+
 
 ## Avatar system revamp policies
 
@@ -129,7 +141,10 @@ reuse". `no-store`, which the `404` for a user with no photo uses, means "do not
 7. **The SSE keep-alive must stay enabled.** SSE has no replay, so a stream that gets reset loses any
    `avatar_changed` event published during the drop.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -268,7 +283,10 @@ So whenever a change is known, the URL gains `?v=<stamp>`:
 On a **fresh page load** there is nothing cached for the bare URL, so the base URL is fetched and
 revalidated normally — the stamp is only needed once a change happens inside a session.
 
+
 ---
+---
+
 
 ## Failure modes & guarantees
 
@@ -281,7 +299,10 @@ revalidated normally — the stamp is only needed once a change happens inside a
 | An image the browser cannot decode | the generated avatar | Same `onError` path as a 404 — the marker covers both. |
 | Postgres is unavailable | the upload/delete fails with an error | Redis is only written after the Postgres write succeeds, so a `has: true` record with no stored photo cannot be created. |
 
+
 ---
+---
+
 
 ## Verification
 
@@ -312,7 +333,10 @@ Then in the browser, with DevTools open:
 4. In a waiting room, watch the other player's seat update **without a reload**, and confirm the
    console has no avatar 404s.
 
+
 ---
+---
+
 
 ## Known limitations
 

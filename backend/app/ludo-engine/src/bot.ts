@@ -1,5 +1,5 @@
-import { LudoEngine } from './engine';
-import { RedisGameStore } from './redis';
+import type { LudoEngine } from './engine';
+import type { RedisGameStore } from './redis';
 import { BoardMapper } from './board-mapper';
 import { isBotUserId } from './socket/auth';
 import type { PlayerColor, GameState, LegalMove } from './types';
@@ -15,11 +15,11 @@ export function getOrCreateBot(
   store: RedisGameStore,
 ): LudoBot {
   if (!botMap.has(gameId)) botMap.set(gameId, new Map());
-  const gameBots = botMap.get(gameId)!;
+  const gameBots = botMap.get(gameId);
   if (!gameBots.has(color)) {
     gameBots.set(color, new LudoBot(gameId, color, engine, store));
   }
-  return gameBots.get(color)!;
+  return gameBots.get(color);
 }
 
 export function isBotPlayer(
@@ -122,7 +122,7 @@ export class LudoBot {
   private async takeTurnUnsafe(): Promise<boolean> {
     // Strict turn validation : mirrors socket-handlers.ts early validation for humans
     const state = await this.store.loadGameState(this.gameId);
-    if (!state || state.status !== 'active') return false;
+    if (state?.status !== 'active') return false;
     if (state.currentTurn !== this.color) return false; // Not our turn
     if (state.turnPhase !== 'WAITING_FOR_ROLL') return false; // Wrong phase
 
@@ -132,7 +132,7 @@ export class LudoBot {
     if (legalMoves.length > 0) {
       // Re-validate after roll: turn may have changed due to disconnect
       const afterRoll = await this.store.loadGameState(this.gameId);
-      if (!afterRoll || afterRoll.currentTurn !== this.color) return false;
+      if (afterRoll?.currentTurn !== this.color) return false;
 
       // Select best move using heuristics
       const bestMove = this.selectBestMove(legalMoves, afterRoll, diceValue);
@@ -144,8 +144,7 @@ export class LudoBot {
       // Re-validate once more: the game can end or the turn can move on
       // during the delay above (e.g. the other player times out).
       const beforeMove = await this.store.loadGameState(this.gameId);
-      if (!beforeMove || beforeMove.status !== 'active' || beforeMove.currentTurn !== this.color)
-        return false;
+      if (beforeMove?.status !== 'active' || beforeMove.currentTurn !== this.color) return false;
 
       // Execute move : engine emits piece_moved and game_ended events via handleEngineEvent
       const { state: finalState } = await this.engine.movePiece(this.gameId, bestMove.pieceId);

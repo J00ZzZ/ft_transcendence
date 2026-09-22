@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Friends page (`/friends`, full-screen) manages friendships. It has:
 
 > **Note:** The Friends page reads all of its data from the backend API (Application Programming Interface). It calls the endpoints below and refreshes the lists every 15 seconds.
 
+
 ---
+---
+
 
 ## Files
 
@@ -32,7 +38,10 @@ The Friends page (`/friends`, full-screen) manages friendships. It has:
 | `src/components/UserAvatar.tsx` | Player avatars |
 | `src/components/RankBadge.tsx` | Rank badges |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -68,7 +77,10 @@ type BlockedUser = {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -86,7 +98,10 @@ sequenceDiagram
     Page->>Page: Render active tab (Friends / Blocked)
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -100,7 +115,10 @@ Unblock→ POST /api/friends/unblock/{userId}
 Invite → POST /api/friends/{friendId}/invite → store activeMatch → navigate('/gamelobby/table')
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

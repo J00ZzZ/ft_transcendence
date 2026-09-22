@@ -10,7 +10,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for each operation
 - [Dependencies](#dependencies) — Internal services this module relies on
 
+
 ---
+---
+
 
 ## Overview
 
@@ -25,7 +28,10 @@ The Friends module manages the friendship lifecycle between users. It supports:
 
 Friendships have a status field: `pending`, `accepted`, or `blocked`.
 
+
 ---
+---
+
 
 ## Files
 
@@ -35,7 +41,10 @@ Friendships have a status field: `pending`, `accepted`, or `blocked`.
 | `friends.service.ts` | Business logic: Prisma queries for friendship CRUD |
 | `friends.module.ts` | NestJS module — registers controller, service, and PrismaService |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -94,7 +103,10 @@ enum FriendshipStatus {
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -115,7 +127,10 @@ enum FriendshipStatus {
 
 > **Real-time touches:** friend requests and accepted friendships fire a `NotificationService.notify()` push (bell + SSE), and friend lists show live presence status via `PresenceService.getStatuses()`. Game invites create a room and send a `game_invite` notification.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -244,7 +259,10 @@ sequenceDiagram
     Site-->>User: Show "user blocked"
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -303,7 +321,10 @@ POST /api/friends/block/{userId} (JWT required)
   └── 200 (friendship object)
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

@@ -9,7 +9,8 @@ import { ResultSubmitter } from './result-submitter';
 import { SocketHandlers } from './socket-handlers';
 import { BotTurnScheduler } from './bot-scheduler';
 import { PostGameManager } from './post-game';
-import { verifyToken, GameSocket } from './auth';
+import type { GameSocket } from './auth';
+import { verifyToken } from './auth';
 import { LobbyManager } from '../lobby';
 import { teardownRoom } from '../player-handler';
 import type { PlayerColor } from '../types';
@@ -47,8 +48,13 @@ export class SocketServer {
     const lobbyManager = new LobbyManager(this.store, this.publisher);
     this.engine.setLobbyManager(lobbyManager);
     this.broadcaster = new RedisBroadcaster();
-    this.resultSubmitter = new ResultSubmitter(this.engine, this.store, this.userIdMap, (gameId) =>
-      this.cleanupGame(gameId),
+    this.resultSubmitter = new ResultSubmitter(
+      this.engine,
+      this.store,
+      this.userIdMap,
+      (gameId) => {
+        this.cleanupGame(gameId);
+      },
     );
     this.botScheduler = new BotTurnScheduler(
       this.store,
@@ -62,14 +68,18 @@ export class SocketServer {
       this.engine,
       this.publisher,
       POST_GAME_TIMEOUT_MS,
-      (gameId) => this.cleanupGame(gameId),
+      (gameId) => {
+        this.cleanupGame(gameId);
+      },
     );
     this.handlers = new SocketHandlers(
       this.store,
       this.engine,
       this.userIdMap,
       getOrCreateBot,
-      (gameId) => this.botScheduler.schedule(gameId, BOT_THINK_MS),
+      (gameId) => {
+        this.botScheduler.schedule(gameId, BOT_THINK_MS);
+      },
       (gameId) => {
         // teardownRoom already broadcast game_expired; this clears the engine's
         // in-memory state (userIdMap, bots, locks).
@@ -82,10 +92,10 @@ export class SocketServer {
 
       if (event.type === 'game_ended') {
         this.postGame.onGameEnded(event.gameId);
-        this.resultSubmitter.submitGameResult(event.gameId);
+        void this.resultSubmitter.submitGameResult(event.gameId);
       } else if (event.type === 'game_started') {
         this.botScheduler.schedule(event.gameId, BOT_THINK_MS);
-        this.resultSubmitter.notifyGameStarted(event.gameId);
+        void this.resultSubmitter.notifyGameStarted(event.gameId);
       } else if (event.type === 'piece_moved') {
         // Wait for the move's box-by-box animation to finish on screen
         // (path.length steps) plus a short thinking pause before acting again.
@@ -153,7 +163,7 @@ export class SocketServer {
     const matchKeys = await this.store.scanMatchKeys();
     for (const key of matchKeys) {
       const match = await this.store.getMatchData(key.slice('match:'.length));
-      if (!match || match.status !== 'WAITING') continue;
+      if (match?.status !== 'WAITING') continue;
 
       // A seat is seated only while its player is present: a reserved slot
       // (player<N>_left) keeps its row so the owner can reclaim the color, but it
@@ -178,7 +188,9 @@ export class SocketServer {
         // broadcaster) and runs cleanupGame through its notify callback.
         await teardownRoom(
           this.store,
-          (event) => this.engine.emitEvent(event),
+          (event) => {
+            this.engine.emitEvent(event);
+          },
           match.id,
           this.cleanupGame,
         );
@@ -212,10 +224,16 @@ export class SocketServer {
       const token = socket.handshake.auth?.token;
       // A token is mandatory: bots are driven server-side and the SPA always
       // supplies one.
-      if (!token) return next(new Error('Authentication required'));
+      if (!token) {
+        next(new Error('Authentication required'));
+        return;
+      }
 
       const payload = verifyToken(token);
-      if (!payload) return next(new Error('Invalid token'));
+      if (!payload) {
+        next(new Error('Invalid token'));
+        return;
+      }
 
       socket.data.userId = payload.userId;
       socket.data.username = payload.username;
@@ -234,23 +252,36 @@ export class SocketServer {
 
       socket.on(
         'join_game',
-        (gameId: string, playerColor: PlayerColor, userId?: string, displayName?: string) =>
-          this.handlers.handleJoinGame(socket, gameId, playerColor, userId, displayName),
+        (gameId: string, playerColor: PlayerColor, userId?: string, displayName?: string) => {
+          this.handlers.handleJoinGame(socket, gameId, playerColor, userId, displayName);
+        },
       );
 
-      socket.on('roll_dice', () => this.handlers.handleRollDice(socket));
+      socket.on('roll_dice', () => {
+        this.handlers.handleRollDice(socket);
+      });
 
-      socket.on('move_piece', (pieceId) => this.handlers.handleMovePiece(socket, pieceId));
+      socket.on('move_piece', (pieceId) => {
+        this.handlers.handleMovePiece(socket, pieceId);
+      });
 
-      socket.on('player_ready', () => this.handlers.handlePlayerReady(socket));
+      socket.on('player_ready', () => {
+        this.handlers.handlePlayerReady(socket);
+      });
 
-      socket.on('select_color', (color: string) => this.handlers.handleSelectColor(socket, color));
+      socket.on('select_color', (color: string) => {
+        this.handlers.handleSelectColor(socket, color);
+      });
 
-      socket.on('leave_game', () => this.handlers.handleLeaveGame(socket));
+      socket.on('leave_game', () => {
+        this.handlers.handleLeaveGame(socket);
+      });
 
       socket.on('end_game', () => this.postGame.handleEndGame(socket));
 
-      socket.on('disconnect', () => this.handlers.handleDisconnect(socket));
+      socket.on('disconnect', () => {
+        this.handlers.handleDisconnect(socket);
+      });
     });
   }
 }

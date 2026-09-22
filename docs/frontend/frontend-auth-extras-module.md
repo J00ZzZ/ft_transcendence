@@ -6,7 +6,10 @@
 - [Files](#files) — Source file inventory
 - [Pages](#pages) — Individual page descriptions
 
+
 ---
+---
+
 
 ## Overview
 
@@ -18,7 +21,10 @@ These pages handle the steps that happen after the password check:
 
 All three are full-screen routes (no side rail) and are public, so no session is required.
 
+
 ---
+---
+
 
 ## Files
 
@@ -31,9 +37,17 @@ All three are full-screen routes (no side rail) and are public, so no session is
 | `src/store.tsx` | `verify2fa`, `forgotPassword`, `resetPassword` actions |
 | `src/validatePassword.ts` | Client-side password validation (same rules as the backend policy) |
 
+
+---
 ---
 
+
 ## Pages
+
+
+---
+---
+
 
 ### TwoFactor (`/2fa`)
 
@@ -45,6 +59,11 @@ Reached with `?token=<pendingToken>` after password login or OAuth when the acco
 - On failure, shows an error message.
 
 **Route params:** the `token` query parameter holds the `pendingToken` from the login response.
+
+
+---
+---
+
 
 ### Password reset flow
 
@@ -60,6 +79,11 @@ flowchart TD
     H --> I["User signs in with the new password"]
 ```
 
+
+---
+---
+
+
 ### 2FA flow
 
 ```mermaid
@@ -74,7 +98,10 @@ flowchart TD
     G -- "No" --> H["Show error, retry"]
 ```
 
+
 ---
+---
+
 
 ### ForgotPassword (`/forgot-password`)
 
@@ -85,7 +112,10 @@ Step one of password reset.
 - Always shows the same success message, so it never reveals whether an address is registered.
 - On success, shows "check your inbox" confirmation with a link back to `/login`.
 
+
 ---
+---
+
 
 ### ResetPassword (`/reset-password`)
 
@@ -100,7 +130,10 @@ Step two of password reset.
 
 **Route params:** the `token` query parameter holds the 64-character hexadecimal reset token from the email.
 
+
 ---
+---
+
 
 ## Password Policy
 
@@ -118,7 +151,10 @@ export function passwordError(password: string): string | null {
 }
 ```
 
+
 ---
+---
+
 
 ## Page Notes
 
@@ -126,7 +162,10 @@ export function passwordError(password: string): string | null {
 - **ResetPassword** is reached from the emailed link, which includes `?token=<resetToken>`. It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`.
 - **TwoFactor** is reached in two ways, both with `?token=<pendingToken>`: from `Login.tsx` after the password step succeeds, or from the backend's OAuth callback after it emails the code.
 
+
 ---
+---
+
 
 ## Dependencies
 

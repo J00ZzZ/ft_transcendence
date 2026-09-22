@@ -12,7 +12,10 @@
 - [Configuration / Environment](#configuration--environment) — Secrets and environment variables used
 - [Module Exports](#module-exports) — What AuthModule re-exports for other modules
 
+
 ---
+---
+
 
 ## Overview
 
@@ -26,7 +29,10 @@ The Auth module handles all authentication concerns for the Ludo Transcendence a
 
 The module also provides the `JwtAuthGuard` used by other modules to protect their endpoints.
 
+
 ---
+---
+
 
 ## Files
 
@@ -58,7 +64,10 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `dto/update-profile.dto.ts` | Validation schema for profile updates |
 | `dto/change-password.dto.ts` | Validation schema for `PATCH /api/auth/profile/password` |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -120,7 +129,10 @@ export const PASSWORD_MAX = 72; // bcrypt ignores bytes past 72
 export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -176,7 +188,10 @@ Edit these module-level constants to tweak auth behaviour (all defined in `backe
 | `MAX_ATTEMPTS` | `twofactor.service.ts` | 5 | 2FA / reset attempt limit |
 | `PASSWORD_MIN` / `PASSWORD_MAX` | `auth/dto/password.rules.ts` | 12 / 72 | Password length bounds (the same values are used in `frontend/src/validatePassword.ts`) |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -360,7 +375,10 @@ sequenceDiagram
     Site-->>User: Go to the login page
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -475,7 +493,10 @@ GET /api/auth/me (or any @UseGuards(JwtAuthGuard) route)
   └── Execute handler
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -495,7 +516,10 @@ GET /api/auth/me (or any @UseGuards(JwtAuthGuard) route)
 | `PrismaService` | Database access (User, Account models) |
 | `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 
@@ -528,7 +552,10 @@ All configuration is read from environment variables — the root `.env` (compos
 | `REDIS_HOST` | `redis` | SessionService, TwoFactorService |
 | `REDIS_PORT` | `6479` | SessionService, TwoFactorService |
 
+
 ---
+---
+
 
 ## Module Exports
 

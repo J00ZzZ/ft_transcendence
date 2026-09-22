@@ -10,7 +10,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal services this module relies on
 
+
 ---
+---
+
 
 ## Overview
 
@@ -26,7 +29,10 @@ The User module manages public user profiles, game history, and avatar images.
 > and freshness rules, and how a failed load is handled — is described in full in
 > [`avatar-system.md`](../avatar-system.md).
 
+
 ---
+---
+
 
 ## Files
 
@@ -36,7 +42,10 @@ The User module manages public user profiles, game history, and avatar images.
 | `user.service.ts` | Business logic: Prisma queries for user data |
 | `user.module.ts` | NestJS module — registers controller and service |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -88,7 +97,10 @@ The User module manages public user profiles, game history, and avatar images.
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -100,7 +112,10 @@ The User module manages public user profiles, game history, and avatar images.
 | `GET` | `/api/user/id/:userId/avatar` | None | Retrieve avatar image by user id |
 | `DELETE` | `/api/user/avatar` | JWT | Delete current user's avatar |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -192,7 +207,10 @@ sequenceDiagram
     Site-->>User: Show the default avatar again (no photo request)
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -258,7 +276,10 @@ DELETE /api/user/avatar (JWT)
   └── 200 { message: 'Avatar deleted' }
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

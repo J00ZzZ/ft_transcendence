@@ -10,7 +10,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for each operation
 - [Dependencies](#dependencies) — Internal services this module relies on
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,7 +23,10 @@ The Player Stats module works out aggregate statistics from a user's `GamePartic
 
 Stats include: total games, wins, losses, total captures, total pieces in goal, and average captures per game.
 
+
 ---
+---
+
 
 ## Files
 
@@ -30,7 +36,10 @@ Stats include: total games, wins, losses, total captures, total pieces in goal, 
 | `stats.service.ts` | Business logic: aggregate stats from GameParticipant records |
 | `stats.module.ts` | NestJS module — registers controller, service, and PrismaService |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -74,7 +83,10 @@ result in PvE gains `(3 + 1) * 1 = 4`.
 | `match.postgame.service.ts` | Applies the delta to `User.rating` when a real match ends (bots are skipped) |
 | `user.service.ts` | Derives the same per-game `ratingDelta` for the profile and game-history payloads, so clients can show how much a match moved the rating |
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -82,7 +94,10 @@ result in PvE gains `(3 + 1) * 1 = 4`.
 |--------|------|------|-------------|
 | `GET` | `/api/stats` | JWT | Get aggregate stats for the current authenticated user |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -110,7 +125,10 @@ sequenceDiagram
     Site-->>User: Show the numbers in the widget
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -133,7 +151,10 @@ GET /api/stats (JWT required)
   └── 200 { rating, highestRating, totalGames, wins, losses, totalCaptures, totalPiecesInGoal, avgCapturesPerGame }
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

@@ -861,13 +861,9 @@ export function Game() {
   const pausedOwnerName = (() => {
     if (!isPausedForReconnect) return null;
     const color = view.pauseTurnOwner ?? effectiveTurn;
-    return (
-      localNames[color] ||
-      pausedSeat?.displayName ||
-      pausedSeat?.username ||
-      color?.toUpperCase() ||
-      'player'
-    );
+    // First non-empty candidate wins; the colour name is the final fallback.
+    const candidates = [localNames[color], pausedSeat?.displayName, pausedSeat?.username];
+    return candidates.find((name) => name) ?? color.toUpperCase();
   })();
   const activeHumanTurn = view.players.some(
     (p) => p.color === effectiveTurn && p.status === 'active' && !p.isBot,

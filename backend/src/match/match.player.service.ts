@@ -118,8 +118,7 @@ export class MatchPlayerService {
     // A seat the engine finalized (grace expired / End Game) is terminal: no
     // fresh token may be minted for it, even from a cached tab or a crafted
     // POST. Without this the /api/games/mine filter could be bypassed.
-    const seatColor =
-      data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
+    const seatColor = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
     if (data.status === 'ACTIVE' && (await isSeatFinalized(this.redis, gameId, seatColor))) {
       throw new ForbiddenException({
         code: 'MATCH_SEAT_EXPIRED',
@@ -340,11 +339,7 @@ export class MatchPlayerService {
 
   // Notify the other human players when a match is aborted. The payload keeps
   // the `reason` field ('cancel') for wire stability with older clients.
-  private async notifyMatchAbort(
-    gameId: string,
-    data: Record<string, string>,
-    actorId: string,
-  ) {
+  private async notifyMatchAbort(gameId: string, data: Record<string, string>, actorId: string) {
     const actor = await this.prisma.db.user.findUnique({
       where: { id: actorId },
       select: { username: true },

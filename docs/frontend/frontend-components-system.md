@@ -12,7 +12,10 @@
 - [Implementation Notes](#implementation-notes) — Portals, compact mode, avatar attributes, CJK (Chinese, Japanese and Korean) text sizing
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -29,7 +32,10 @@ The shared components are reusable UI (user interface) building blocks used on s
 10. **ProfileEditModal / RulesModal** — edit-profile dialog and rules popup.
 11. **CyberModal / ResultsModal** — cyber-styled modal base and the post-game results overlay.
 
+
 ---
+---
+
 
 ## Files
 
@@ -55,7 +61,10 @@ The shared components are reusable UI (user interface) building blocks used on s
 | `src/components/ResultsModal.tsx` | Post-game results overlay — podium, rank badges, outcome title, return-to-lobby |
 | `src/avatarCache.ts` | Avatar state store, keyed by immutable user id — live `avatar_changed` overrides (`{has, style}`), a remount stamp per user, and a `broken` set so a failed photo is not retried |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -85,7 +94,10 @@ type DieProps = {
 
 No props; it renders the three provider buttons.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -157,7 +169,10 @@ sequenceDiagram
     OAuth->>Browser: onClick → window.location.href = '/api/auth/{provider}'
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -208,7 +223,10 @@ sequenceDiagram
   └── Sign out → logout() → POST /api/auth/logout → navigate('/login')
 ```
 
+
 ---
+---
+
 
 ## Rank Tiers (`utils/ranks.ts`)
 
@@ -224,7 +242,10 @@ sequenceDiagram
 
 The top tier depends on position, not on points: a player is MAMEE only while they hold a podium spot. The mamee and milo aura glows come from the `BADGE_*_AURA` constants in `styles/tw.ts`.
 
+
 ---
+---
+
 
 ## Theme-aware Tailwind Utilities (`styles/tw.ts`)
 
@@ -259,7 +280,10 @@ Per-constant notes:
 | `PAY_TAG_BASE` | win95 and terminal override the border, background and colour regardless of rank, so the order relative to the rank modifiers does not matter (the theme selector has higher specificity than the rank modifier). |
 | `BADGE_*_AURA` | RankBadge's fire/plasma glow for the mamee and milo tiers: static `::before`/`::after` layers with their own always-running animation. A previous session hit a Tailwind JIT (just-in-time) scanner bug that silently dropped rules for this very long combined class string, so the conversion was checked against the compiled CSS. The difference in the CSS — mamee's `before:` has no `pointer-events-none` and the other three do — is copied from the original, not a mistake. |
 
+
 ---
+---
+
 
 ## Implementation Notes
 
@@ -270,7 +294,10 @@ Per-constant notes:
 - **RetroNavbar compact mode.** Below Tailwind's `xl` breakpoint (1280px) the sidebar collapses to an icon-only rail. The labels are hidden from JavaScript rather than by CSS, because parts of the bar are plain inline styles. Every page that renders the bar uses the same threshold with `w-[88px] xl:w-[270px]`.
 - **RetroNavbar track layout.** The nav track uses `overflow-y: auto` only as a fallback. An earlier version also shifted the track vertically to move the active item nearer the centre, and that shift was removed: at short window heights it pushed the last item over the theme button.
 
+
 ---
+---
+
 
 ## Dependencies
 

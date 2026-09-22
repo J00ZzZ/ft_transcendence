@@ -5,7 +5,10 @@
 
 Cette Politique de Confidentialité explique comment l'application web ft-Transcendence (RetroLudo '42) (« l'App », « nous », « nous ») collecte, utilise, divulgue et protège vos données personnelles. Elle est élaborée conformément à la **Loi malaisienne sur la protection des données personnelles 2010 (« PDPA »)** et à ses principes directeurs : Général, Avis et Choix, Divulgation, Sécurité, Conservation, Intégrité des Données et Accès.
 
+
 ---
+---
+
 
 ## 1. Quelles données personnelles nous collectons
 
@@ -23,7 +26,10 @@ L'App collecte uniquement les données nécessaires pour fournir le jeu et ses f
 
 Nous ne collectons **pas** de coordonnées de carte de paiement, de données de localisation, ou de données provenant d'enfants de moins de 13 ans. L'App est un jeu et ne procède à aucun profilage automatisé au-delà de l'affichage des statistiques de jeu que vous voyez déjà.
 
+
 ---
+---
+
 
 ## 2. Avis et choix (consentement)
 
@@ -32,7 +38,10 @@ En créant un compte et en utilisant l'App, vous consentez à la collecte et à 
 - Vous pouvez retirer votre consentement en supprimant votre compte à tout moment (voir Section 7).
 - Lorsque des données facultatives sont impliquées (par ex., télécharger un avatar, lier une méthode OAuth), elles ne sont collectées que sur votre choix exprès.
 
+
 ---
+---
+
 
 ## 3. Comment nous utilisons vos données
 
@@ -47,7 +56,10 @@ Nous utilisons vos données personnelles uniquement pour :
 
 Nous ne vendons, ne louons **ni n'échangeons** vos données personnelles, et nous ne les utilisons pas pour le marketing ou la publicité.
 
+
 ---
+---
+
 
 ## 4. Divulgation
 
@@ -58,6 +70,11 @@ Vos données sont divulguées uniquement selon les besoins pour faire fonctionne
 - **Conformité légale** : nous pouvons divulguer des données si nous y sommes tenus par la loi ou par une autorité compétente.
 
 Nous ne transférons pas vos données personnelles au-delà des finalités décrites ici sans votre consentement, sauf lorsque cela est nécessaire pour fournir le service.
+
+
+---
+---
+
 
 ## 5. Sécurité
 
@@ -72,13 +89,19 @@ Nous appliquons des mesures techniques et organisationnelles raisonnables pour p
 
 Étant donné que l'App est un projet de développement/évaluation auto-hébergé, le déploiement utilise un **certificat TLS autosigné** ; la connexion reste chiffrée, mais n'est pas validée par des autorités de certification publiques. Vous ne devriez pas utiliser l'App pour stocker des données hautement sensibles.
 
+
 ---
+---
+
 
 ## 6. Conservation
 
 Nous conservons vos données personnelles uniquement pour la durée de vie de votre compte et selon les besoins pour fournir les fonctionnalités que vous utilisez. Les données éphémères (état de partie en direct, présence, notifications, jetons de sécurité temporaires) sont conservées en mémoire avec une expiration automatique. Lorsque vous supprimez votre compte, vos données personnelles sont supprimées (voir Section 7).
 
+
 ---
+---
+
 
 ## 7. Intégrité des données, accès et correction (vos droits en vertu de la PDPA)
 
@@ -96,19 +119,28 @@ En vertu de la PDPA, vous avez le droit de :
 
 Pour toute demande d'accès, de correction, ou autre, contactez l'équipe (voir Section 9).
 
+
 ---
+---
+
 
 ## 8. Intégrité des données
 
 Nous prenons des mesures raisonnables pour nous assurer que les données personnelles que nous détenons sont exactes, complètes et non trompeuses, et nous les corrigeons ou les mettons à jour lorsque vous nous en informez ou les modifiez vous-même.
 
+
 ---
+---
+
 
 ## 9. Contact
 
 Pour toute question, réclamation ou demande concernant vos données personnelles en vertu de la PDPA, veuillez contacter l'équipe via les canaux de contact du projet (tels que répertoriés dans le README du projet).
 
+
 ---
+---
+
 
 ## 10. Modifications de cette Politique
 

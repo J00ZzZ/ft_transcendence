@@ -1,5 +1,5 @@
-import { LudoEngine } from '../engine';
-import { RedisGameStore } from '../redis';
+import type { LudoEngine } from '../engine';
+import type { RedisGameStore } from '../redis';
 import type { PlayerColor } from '../types';
 import { BACKEND_URL } from './auth';
 

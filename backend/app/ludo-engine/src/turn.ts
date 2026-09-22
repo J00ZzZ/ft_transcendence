@@ -1,4 +1,4 @@
-import { GameState, MoveResult, PlayerColor } from './types';
+import type { GameState, MoveResult, PlayerColor } from './types';
 import { MoveValidator } from './move-validator';
 import { advanceTurnInState } from './player-handler';
 

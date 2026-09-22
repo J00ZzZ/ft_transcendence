@@ -8,7 +8,10 @@
 - [Core Logic / Flow](#core-logic--flow) — Where each setting is toggled
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -21,7 +24,10 @@ There is **no dedicated settings page** — account settings are distributed acr
 
 > **Note:** There is no `src/pages/Settings.tsx` and no `AccountMenu` — the former Shell/AccountMenu layout was removed; the account popover is now part of `RetroNavbar`, and the 2FA toggle moved to the Profile page's edit modal.
 
+
 ---
+---
+
 
 ## Files
 
@@ -32,7 +38,10 @@ There is **no dedicated settings page** — account settings are distributed acr
 | `src/pages/Profile.tsx` | Opens the edit modal on the Profile page |
 | `src/store.tsx` | `lang` / `setLang`, `SETTING_DEFAULTS`, `logout` |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -56,7 +65,10 @@ export const SETTING_DEFAULTS: Record<string, boolean> = {
 settings: Record<string, boolean>  // Stored values; anything missing uses SETTING_DEFAULTS
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -83,7 +95,10 @@ Game preference toggles are read with a fallback:
 (key: string) => (key in settings ? settings[key] : (SETTING_DEFAULTS[key] ?? false))
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

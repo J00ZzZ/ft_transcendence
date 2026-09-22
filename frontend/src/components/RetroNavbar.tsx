@@ -165,14 +165,19 @@ export function RetroNavbar({
     } catch (err) {
       console.error('Failed to rejoin active game:', err);
       // Show the localized error message inline (e.g. MATCH_SEAT_EXPIRED).
-      setRejoinError(
+      const message =
         typeof err === 'object' && err !== null && 'message' in err
           ? String(err.message)
-          : (err as Error).message ?? t('common.requestFailed', { status: 0 }),
-      );
+          : t('common.requestFailed', { status: 0 });
+      setRejoinError(message);
       // Only refresh the active-game poll when the seat is genuinely expired;
       // otherwise the poll itself will clear the banner within ≤10 s anyway.
-      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'MATCH_SEAT_EXPIRED') {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code?: string }).code === 'MATCH_SEAT_EXPIRED'
+      ) {
         setActiveGame(null);
       } else {
         fetchActiveGame();

@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for route rendering and redirects
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,7 +23,10 @@ The app bootstrap layer does four things:
 3. **Session bootstrap** — `AppProvider` calls `/api/auth/me` on page load to see if the user is already logged in. The probe is skipped on the guest-facing public routes (`/`, `/login`, `/signup`), where there cannot be a session to restore.
 4. **full-screen rendering** — every route renders directly via `FULL_ROUTES`; there is no shell layout wrapper.
 
+
 ---
+---
+
 
 ## Files
 
@@ -29,9 +35,17 @@ The app bootstrap layer does four things:
 | `src/App.tsx` | Root component — route maps, authentication guard, AppProvider container |
 | `src/store.tsx` | `AppProvider` context — session state, login/register/logout/2FA/password-reset actions, game state |
 
+
+---
 ---
 
+
 ## Key Types / Interfaces
+
+
+---
+---
+
 
 ### Route Categories
 
@@ -62,6 +76,11 @@ const PUBLIC_ROUTES = new Set([
   '/privacy', '/terms'
 ])
 ```
+
+
+---
+---
+
 
 ### AppProvider State
 
@@ -114,9 +133,17 @@ type AppState = {
 }
 ```
 
+
+---
 ---
 
+
 ## Core Logic / Flow
+
+
+---
+---
+
 
 ### Bootstrap and Routing
 
@@ -140,9 +167,17 @@ sequenceDiagram
     App->>App: Show login page or home page
 ```
 
+
+---
 ---
 
+
 ## Logic Paths Summary
+
+
+---
+---
+
 
 ### Initial Load Path
 ```
@@ -155,6 +190,11 @@ Browser load
             └── 429/5xx/network → retry (backoff), then setAuthReady(true)
 ```
 
+
+---
+---
+
+
 ### Route Guard Path
 ```
 useEffect([authReady, known, user, isPublic, hasNotice])
@@ -165,13 +205,19 @@ useEffect([authReady, known, user, isPublic, hasNotice])
   └── else → render route component
 ```
 
+
 ---
+---
+
 
 ### Account-action notices
 
 Account-action arrivals (`?verified=...`, `?reset=...`, `?error=...`, `?token=...`) are tied to one account action, not to the signed-in session, so a signed-in user must still see them instead of being sent to `/home`. `Screen` therefore treats any route carrying one of those query keys as exempt from the "signed-in users leave public routes" redirect — for example, verifying (or resetting) account B while account A happens to be signed in in the same browser.
 
+
 ---
+---
+
 
 ## Dependencies
 

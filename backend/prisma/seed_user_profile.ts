@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/prisma/client';
+import type { GameType, PlayerColor } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 loadEnv({ path: join(__dirname, '..', '..', '.env') });
@@ -218,18 +219,22 @@ async function main() {
           startedAt: new Date(now - m.ago),
           endedAt: new Date(now - m.ago + 18 * MINUTE),
           status: 'COMPLETED',
-          gameType: m.type as any,
+          gameType: m.type as GameType,
           participants: {
-            create: m.parts
-              .filter((p) => p.uid)
-              .map((p) => ({
-                id: randomUUID(),
-                user_id: p.uid!,
-                color: p.c as any,
-                rank: p.r,
-                piecesCaptured: p.cap,
-                piecesInGoal: p.goal,
-              })),
+            create: m.parts.flatMap((p) =>
+              p.uid
+                ? [
+                    {
+                      id: randomUUID(),
+                      user_id: p.uid,
+                      color: p.c as PlayerColor,
+                      rank: p.r,
+                      piecesCaptured: p.cap,
+                      piecesInGoal: p.goal,
+                    },
+                  ]
+                : [],
+            ),
           },
         },
       });
@@ -394,18 +399,22 @@ async function main() {
           startedAt: new Date(now - m.ago),
           endedAt: new Date(now - m.ago + 16 * MINUTE),
           status: 'COMPLETED',
-          gameType: m.type as any,
+          gameType: m.type as GameType,
           participants: {
-            create: m.parts
-              .filter((p) => p.uid)
-              .map((p) => ({
-                id: randomUUID(),
-                user_id: p.uid!,
-                color: p.c as any,
-                rank: p.r,
-                piecesCaptured: p.cap,
-                piecesInGoal: p.goal,
-              })),
+            create: m.parts.flatMap((p) =>
+              p.uid
+                ? [
+                    {
+                      id: randomUUID(),
+                      user_id: p.uid,
+                      color: p.c as PlayerColor,
+                      rank: p.r,
+                      piecesCaptured: p.cap,
+                      piecesInGoal: p.goal,
+                    },
+                  ]
+                : [],
+            ),
           },
         },
       });

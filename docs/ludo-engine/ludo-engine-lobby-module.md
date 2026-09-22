@@ -9,14 +9,20 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for each operation
 - [Dependencies](#dependencies) — Internal dependencies
 
+
 ---
+---
+
 
 ## Overview
 
 The Lobby module handles the pre-game setup: players join and leave, pick
 colors, mark ready, and trigger the start.
 
+
 ---
+---
+
 
 ## Files
 
@@ -24,7 +30,10 @@ colors, mark ready, and trigger the start.
 |------|------|
 | `lobby.ts` | `LobbyManager` — color selection (with swap); readiness is part of the engine GameState |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -35,7 +44,10 @@ The **match metadata hash** (`match:{gameId}`) tracks seats — `player1_id`,
 roster and ready flags live in the engine GameState (`state.players` +
 `state.readyPlayers`), which `emitLobbyUpdate` broadcasts to clients.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -86,7 +98,10 @@ The `player<N>_left` flag is what keeps the seated count correct, so a reserved
 seat cannot hold a room open. See also
 [`ludo-engine-core-system.md`](ludo-engine-core-system.md) → Seat statuses.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -111,7 +126,10 @@ player_ready
   │   └── No → keep waiting (lobby_update)
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

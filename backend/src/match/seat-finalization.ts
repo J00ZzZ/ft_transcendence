@@ -16,7 +16,10 @@ export async function isSeatFinalized(
   try {
     const state = JSON.parse(raw) as { players?: Array<{ color?: string; status?: string }> };
     const seat = state.players?.find((p) => p.color === color);
-    return seat?.status !== undefined && (TERMINAL_SEAT_STATUSES as readonly string[]).includes(seat.status);
+    return (
+      seat?.status !== undefined &&
+      (TERMINAL_SEAT_STATUSES as readonly string[]).includes(seat.status)
+    );
   } catch {
     return false;
   }

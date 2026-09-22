@@ -10,6 +10,11 @@ Verified directly against the current repo (`nginx/conf/nginx.conf`,
 see [Known issue](#known-issue) at the bottom for one place where a comment
 in the code no longer matches what actually runs.
 
+
+---
+---
+
+
 ## The one idea that makes this simple
 
 nginx is the **only** server that any client communicates with. Browsers — local or
@@ -38,6 +43,11 @@ host-side debugging (`psql`, Prisma Studio, `npm run dev`'s Vite proxy).
 Nothing but nginx is ever reachable from another device — that's what makes
 [tunnel mode](./tunnel.md) need zero extra routing config of its own.
 
+
+---
+---
+
+
 ## TLS
 
 `nginx/Dockerfile` generates a self-signed cert at build time (`openssl req
@@ -49,6 +59,11 @@ restricts it to `TLSv1.2`/`TLSv1.3` and sets the standard hardening headers
 (`X-Frame-Options`, `HSTS`, a `Content-Security-Policy`, etc.) directly in
 the `server {}` block.
 
+
+---
+---
+
+
 ## Serving the SPA
 
 The frontend is a separate container (`frontend` service) that runs
@@ -58,6 +73,11 @@ a shared named volume, `spa_dist`. nginx mounts that volume read-only at
 Node/Vite process involved at runtime. `location /` uses
 `try_files $uri $uri/ /index.html` so client-side routes (React Router)
 resolve correctly on a hard refresh instead of 404ing.
+
+
+---
+---
+
 
 ## Routing table (active config, in `nginx.conf`)
 
@@ -83,6 +103,11 @@ resolve `backend`/`ludo-engine` once and cache the IP for the life of the
 nginx worker — restarting either service in dev would leave nginx stuck
 retrying an unreachable IP address until nginx itself restarted.
 
+
+---
+---
+
+
 ## Vite dev proxy (`frontend-dev`)
 
 Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.config.ts` repeats the two proxy `location` blocks from `nginx.conf`:
@@ -94,7 +119,10 @@ Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.c
 
 `VITE_IN_CONTAINER=true` (set by `Dockerfile.dev`) selects the in-container service names; otherwise the host's published ports are used. Repeating `nginx.conf` here is intentional: nginx, this dev server, and (for the engine) direct Docker DNS all behave identically, so no absolute backend URL ever leaks into the SPA and the browser never needs to know the engine's real address.
 
+
 ---
+---
+
 
 ## Known issue
 

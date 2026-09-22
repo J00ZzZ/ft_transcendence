@@ -11,7 +11,10 @@
 - [Event Reference](#event-reference) — Complete event payload reference
 - [Configuration](#configuration) — Socket.IO server settings
 
+
 ---
+---
+
 
 ## Overview
 
@@ -19,13 +22,21 @@ The ludo-engine exposes a Socket.IO server on port 3001. All game communication 
 
 The server is started by `index.ts` which calls `SocketServer.start(3001)`. The `SocketServer` class in `socket/server.ts` registers all event handlers and manages the `engine` (game state machine) and `redisGameStore` (persistence).
 
+
 ---
+---
+
 
 ## Quick Reference
 
 Every socket event at a glance — direction, what triggers it, and its
 input/output. Each event is documented in full below; see
 [Event Reference](#event-reference) for the complete payload schemas.
+
+
+---
+---
+
 
 ### Client → Server
 
@@ -40,6 +51,11 @@ input/output. Each event is documented in full below; see
 
 | `end_game` | Host presses "End Game" | `()` | PvE/hotseat: abort the whole game. PvP: prune this player, abort the room if fewer than 2 humans remain | `game_expired` or `player_aborted` |
 | `disconnect` | Socket drops (automatic) | — | Start the reconnect grace period, but only for a live, unfinished **active** seat — an exited/finished seat has no pieces left and must not be revivable. In **PvP**, dropping during your own turn also pauses the game (`paused` + `pauseTurnOwner`); dropping during someone else's turn lets play continue until the turn reaches the departed seat, which then simply waits | `player_disconnected`, then `player_reconnected` or `player_exited` |
+
+
+---
+---
+
 
 ### Server → Client
 
@@ -62,7 +78,10 @@ input/output. Each event is documented in full below; see
 | `state_update` | A live exit moved the turn (and cleared the departed seat's pieces), or a PvP disconnect set/cleared the reconnect pause | full `GameState` (includes `paused` / `pauseTurnOwner`) | Room-wide. The SPA's reducer merges it field by field; it is also the fallback for any other pub/sub frame |
 | `error` | Invalid action / failed authentication | `string` | Sent to the offending socket |
 
+
 ---
+---
+
 
 ## Files
 
@@ -79,9 +98,17 @@ input/output. Each event is documented in full below; see
 | `socket/redis-broadcaster.ts` | Room-based state broadcasts via Redis |
 | `socket/result-submitter.ts` | POST /api/game/end callback to backend |
 
+
+---
 ---
 
+
 ## Connection
+
+
+---
+---
+
 
 ### Handshake
 
@@ -108,9 +135,19 @@ The JWT payload (issued by `MatchService`) contains:
 }
 ```
 
+
+---
+---
+
+
 ### JWT Validation
 
 The `socket/auth.ts` middleware reads the token from `socket.handshake.auth.token` and verifies it with a minimal HMAC-SHA256 check (no external JWT library). It maps `playerId`/`sub`/`userId` to `socket.data.userId`, and attaches `role`, `gameId`, `username`, and `displayName` to `socket.data`. Invalid or missing tokens are rejected with an `error` event.
+
+
+---
+---
+
 
 ### Connection flow
 
@@ -130,6 +167,11 @@ sequenceDiagram
     Engine-->>Player: game_ended (if someone won)
 ```
 
+
+---
+---
+
+
 ### Rooms
 
 - Each game has a Socket.IO room named after its raw `gameId` (no prefix) — `socket.join(gameId)` / `io.to(gameId).emit(...)`.
@@ -137,9 +179,17 @@ sequenceDiagram
 - Players join the room via `join_game`.
 - Server broadcasts to a room using `io.to(room).emit(...)`.
 
+
+---
 ---
 
+
 ## Client → Server Events
+
+
+---
+---
+
 
 ### `join_game`
 
@@ -160,7 +210,10 @@ socket.emit('join_game', gameId, playerColor, userId?, displayName?);
 
 **Errors:** `error` event with message.
 
+
 ---
+---
+
 
 ### `end_game`
 
@@ -172,7 +225,10 @@ socket.emit('end_game');
 
 **Response:** `game_ended` / `player_aborted` broadcast.
 
+
 ---
+---
+
 
 ### `roll_dice`
 
@@ -186,7 +242,10 @@ socket.emit('roll_dice');
 
 **Errors:** `error` if not your turn, wrong phase, or player exited.
 
+
 ---
+---
+
 
 ### `move_piece`
 
@@ -204,7 +263,10 @@ socket.emit('move_piece', pieceId);
 
 **Errors:** `error` if piece not in current legal moves.
 
+
 ---
+---
+
 
 ### `player_ready`
 
@@ -216,7 +278,10 @@ socket.emit('player_ready');
 
 **Response:** None
 
+
 ---
+---
+
 
 ### `select_color`
 
@@ -232,7 +297,10 @@ socket.emit('select_color', color);
 
 **Response:** None
 
+
 ---
+---
+
 
 ### `leave_game`
 
@@ -249,9 +317,10 @@ socket.emit('leave_game');
 
 Exits are applied by one function, `finalizeDeparture` in `backend/app/ludo-engine/src/player-handler.ts`, which also tears the room down when the departure drops it below quorum.
 
----
 
 ---
+---
+
 
 ### `disconnect`
 
@@ -279,7 +348,10 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 
 **Room teardown is emitted from one place.** `teardownRoom` emits `game_expired`, marks the match `ABORTED`, deletes the engine game state, and runs the cleanup callback. Callers do not emit `game_expired` themselves, so a client never receives it twice.
 
+
 ---
+---
+
 
 ## Server → Client Events
 
@@ -302,9 +374,17 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 | `state_update` | full `GameState` | A live exit moved the turn — the other events don't carry it |
 | `error` | `string` | On invalid action |
 
+
+---
 ---
 
+
 ## Event Reference
+
+
+---
+---
+
 
 ### GameState
 
@@ -333,6 +413,11 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 }
 ```
 
+
+---
+---
+
+
 ### PlayerMeta
 
 ```typescript
@@ -357,6 +442,11 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 }
 ```
 
+
+---
+---
+
+
 ### Piece
 
 ```typescript
@@ -368,6 +458,11 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
   isInBase?: boolean;   // true when step <= 0
 }
 ```
+
+
+---
+---
+
 
 ### MoveResult
 
@@ -387,7 +482,10 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 }
 ```
 
+
 ---
+---
+
 
 ## Configuration
 
@@ -399,6 +497,11 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 | `REDIS_PASSWORD` | (from secrets) | Redis authentication |
 | `BACKEND_URL` | `http://backend:3000` | Engine callback URL |
 | `ENGINE_API_KEY` | (from secrets) | Validates engine→backend callbacks |
+
+
+---
+---
+
 
 ### Tunable constants
 

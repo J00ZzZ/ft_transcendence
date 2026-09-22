@@ -10,7 +10,10 @@
 - [Dependencies](#dependencies) — Internal services this module relies on
 - [Configuration](#configuration) — Environment variables
 
+
 ---
+---
+
 
 ## Overview
 
@@ -24,7 +27,10 @@ The engine core is the game's referee: it runs inside the `ludo-engine` service 
 6. **Saves state** — writes to Redis via `RedisGameStore` so a restart doesn't lose the game.
 7. **Serializes operations** — a per-game lock ensures roll/move never run on top of each other.
 
+
 ---
+---
+
 
 ## Files
 
@@ -41,7 +47,10 @@ The engine core is the game's referee: it runs inside the `ludo-engine` service 
 | `lobby.ts` | Lobby management — color selection with seat swap (ready gate is in player-handler.ts) |
 | `index.ts` | Entry point — starts Socket.IO server on port 3001 |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -216,7 +225,10 @@ export type GameEvent =
   | { type: 'lobby_update'; gameId; players };                                                  // Lobby seats changed
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -262,7 +274,10 @@ sequenceDiagram
     end
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -323,7 +338,10 @@ move_piece(pieceId)
   └── saveGameState; emit piece_moved (+ game_ended if finished)
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -347,7 +365,10 @@ Module-level constants in the engine's support files — edit at the top of each
 > `player-handler.ts` adds a hardcoded `+1000` ms buffer to the PvP grace
 > period so the prune timer fires just after the reconnect deadline.
 
+
 ---
+---
+
 
 ## Configuration
 

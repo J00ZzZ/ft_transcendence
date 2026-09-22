@@ -42,7 +42,7 @@ export class RedisGameStore {
   async getAvatarMeta(userId: string): Promise<{ has: boolean; style?: string } | null> {
     if (!userId) return null;
     const data = await this.client.hgetall(`avatar:${userId}`);
-    if (!data || data.has === undefined) return null;
+    if (data?.has === undefined) return null;
     return { has: data.has === '1', style: data.style || undefined };
   }
 

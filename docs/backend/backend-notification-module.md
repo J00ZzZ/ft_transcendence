@@ -12,7 +12,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -29,7 +32,10 @@ Notification types: `friend_request`, `friend_accepted`, `friend_removed`, `frie
 
 > The module is imported by `FriendsModule`, `MatchModule`, `AchievementsModule`, `PresenceModule`, `AuthModule`, and `UserModule`, which inject `NotificationService` and call `notify()` / `notifyTransient()`. It exports `NotificationService` so any module can send a notification.
 
+
 ---
+---
+
 
 ## SSE & Redis Pub/Sub transport
 
@@ -52,7 +58,10 @@ unsubscribes, the service's `finalize(() => subject.complete())` completes the
 Subject, and `removeClient()` drops it from the maps and unsubscribes from the
 per-user Redis channel when the last tab for that user closes.
 
+
 ---
+---
+
 
 ## Failure contract
 
@@ -81,7 +90,10 @@ therefore guarantees:
   Subject from the in-memory maps and unsubscribes from Redis when the last tab
   for a user closes. No dead Subjects accumulate.
 
+
 ---
+---
+
 
 ## Files
 
@@ -91,7 +103,10 @@ therefore guarantees:
 | `notification.service.ts` | Redis pub/sub bridging, per-user SSE Subjects, persistence, `notify()` helper |
 | `notification.module.ts` | NestJS module — registers controller/service, exports `NotificationService` |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -126,7 +141,10 @@ export interface NotificationPayload {
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -137,7 +155,10 @@ export interface NotificationPayload {
 | `PATCH` | `/api/notifications/:id/read` | JWT | Mark one notification read |
 | `POST` | `/api/notifications/read-all` | JWT | Mark all notifications read |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -161,7 +182,10 @@ sequenceDiagram
 
 When a client opens `/api/notifications/stream`, the service creates an rxjs `Subject`, adds it to a per-user array (supporting multiple tabs), and — on first tab for a user — subscribes to `notify:<userId>` on Redis. Closing the last tab unsubscribes.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -186,7 +210,10 @@ POST /api/notifications/read-all (JWT)
   └── notification.updateMany({ userId, read: false }, { read: true })
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -199,7 +226,10 @@ POST /api/notifications/read-all (JWT)
 | `secrets.ts` | Redis password (`REDIS_PASSWORD`) |
 | `JwtAuthGuard` | Protects all notification endpoints |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 

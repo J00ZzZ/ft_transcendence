@@ -1,6 +1,9 @@
 # RetroLudo '42 — Full Ruleset
 
+
 ---
+---
+
 
 ## 1. The Track Length in One Number: 57
 
@@ -32,23 +35,39 @@ flowchart LR
 | 52–56 | Colored home column | Only you |
 | 57 | Home triangle | Only you (finished) |
 
+
 ---
+---
+
 
 ## 2. Objective
 
 Be the first player to get **all four** of your pieces from the Starting Area
 to the Home Triangle.
 
+
+---
+---
+
+
 ## 3. Setup
 
 Each player picks one of the four colors (**Red, Green, Yellow, Blue**) and
 puts their four pieces in their matching Starting Area.
 
+
+---
+---
+
+
 ## 4. Turn Order
 
 Players take turns **clockwise**. On your turn you roll the die once.
 
+
 ---
+---
+
 
 ## 5. Rolling and Entering the Board
 
@@ -82,7 +101,10 @@ flowchart TD
     E --> A
 ```
 
+
 ---
+---
+
 
 ## 6. Movement and Capturing
 
@@ -114,7 +136,10 @@ flowchart TD
     F --> H
 ```
 
+
 ---
+---
+
 
 ## 7. 🚧 Blocking (Blockades)
 
@@ -191,7 +216,10 @@ Blockade blocks a landing:
   pieces are stuck together instead of covering more ground — and a blockade
   at your own home-column entry can slow down *your* other pieces behind it.
 
+
 ---
+---
+
 
 ## 8. ⭐ Star Spaces (Safe Zones)
 
@@ -224,7 +252,10 @@ Safe space — sharing is allowed:
    Result: no capture. Red and Green now SHARE the star space.
 ```
 
+
 ---
+---
+
 
 ## 9. 🎨 Colored Columns (Home Stretch)
 
@@ -246,7 +277,10 @@ Home stretch — only the owner can enter:
    GREEN can never land on steps 52–56. Red pieces here are untouchable.
 ```
 
+
 ---
+---
+
 
 ## 10. 🏠 Home Triangle (The End)
 
@@ -270,7 +304,10 @@ Exact roll needed:
    Roll a 3, 4, 5, or 6 → too far, piece stays put, turn passes.
 ```
 
+
 ---
+---
+
 
 ## 11. Bonus Rolls at a Glance
 
@@ -282,7 +319,10 @@ Exact roll needed:
 | Normal move (no 6, no capture) | ❌ No — turn ends |
 | No piece can move | Turn passes on its own (a 6 still gives another roll) |
 
+
 ---
+---
+
 
 ## 12. Quick Reference
 

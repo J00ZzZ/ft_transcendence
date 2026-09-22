@@ -10,7 +10,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -21,7 +24,10 @@ The Achievements module tracks 13 achievement badges earned from match performan
 
 Hotseat games never reach the backend, so they are not counted. Bots (`user_id` starting `bot-`) are never evaluated.
 
+
 ---
+---
+
 
 ## Files
 
@@ -32,7 +38,10 @@ Hotseat games never reach the backend, so they are not counted. Bots (`user_id` 
 | `achievements.registry.ts` | Single source of truth: 13 rules with keys, types, and thresholds |
 | `achievements.module.ts` | NestJS module — registers controller, service, PrismaService |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -88,7 +97,10 @@ To add or tweak an achievement, edit `ACHIEVEMENT_KEYS` / `ACHIEVEMENT_RULES` in
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -97,7 +109,10 @@ To add or tweak an achievement, edit `ACHIEVEMENT_KEYS` / `ACHIEVEMENT_RULES` in
 | `GET` | `/api/achievements` | JWT | Report for all 13 achievements: `{ unlocked, progress, target }` per key |
 | `POST` | `/api/achievements/check` | JWT | Force re-evaluate (silent backfill), return newly-unlocked keys |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -126,7 +141,10 @@ sequenceDiagram
 
 `POST /api/achievements/check` runs a retroactive loop over the user's completed games (so historical games can unlock per-game achievements), with `announce=false` (silent).
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -148,7 +166,10 @@ POST /api/achievements/check (JWT)
   └── 200 { unlocked: ["achFirstBlood", ...] }
 ```
 
+
 ---
+---
+
 
 ## Notes / Common Issues
 
@@ -161,6 +182,11 @@ POST /api/achievements/check (JWT)
 - **`achSpeedDemon` needs both `startedAt` and `endedAt`** on the game; if either is missing, progress is 0 (no unlock) — it does not error.
 - **`POST /achievements/check`** runs the same rules with `announce: false` — a silent backfill pass useful after schema/seed changes. Because no single game is passed in, it replays the user's full `COMPLETED` game history so per-game rules can unlock from historical games, not just the latest one.
 - **Frontend badge counter** (`achievementsBadge` / `achievementsTab`) is `unlocked / 13`.
+
+
+---
+---
+
 
 ## Dependencies
 

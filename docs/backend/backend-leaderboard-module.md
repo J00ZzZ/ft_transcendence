@@ -12,7 +12,10 @@
 - [Dependencies](#dependencies) — Other services this module relies on
 - [Configuration / Environment](#configuration--environment) — Environment variables used
 
+
 ---
+---
+
 
 ## Overview
 
@@ -24,7 +27,10 @@ The Leaderboard module shows a **ranked list of players**, sorted by rating
    (`leaderboard:{mode}`), so it is always sorted by rating and fast to read.
 3. **Your own rank** — the request can also return the logged-in user's position via `myRank`.
 
+
 ---
+---
+
 
 ## Data Flow & Population
 
@@ -237,7 +243,10 @@ sequenceDiagram
 > `casual` sets are created by the seed and the fill-on-demand, but only
 > `global` is updated after every game.
 
+
 ---
+---
+
 
 ## Files
 
@@ -248,7 +257,10 @@ sequenceDiagram
 | `leaderboard-redis.service.ts` | Redis layer: ZADD / ZREVRANGE / ZREVRANK / ZCARD (PostgreSQL backfill orchestrated by LeaderboardService) |
 | `leaderboard.module.ts` | NestJS module — registers controller, services, and PrismaService |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -296,7 +308,10 @@ interface LeaderboardResponse {
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -304,7 +319,10 @@ interface LeaderboardResponse {
 |--------|------|------|-------------|
 | `GET` | `/api/leaderboard?mode=global&page=1&limit=20` | JWT (required) | Get the leaderboard; includes `myRank` for the logged-in user |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -340,7 +358,10 @@ sequenceDiagram
     Site-->>User: Show the leaderboard table
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -379,7 +400,10 @@ FILL ON DEMAND (first read after Redis is empty)
   └── Reads all users from PostgreSQL and ZADDs them into leaderboard:{mode}
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -389,7 +413,10 @@ FILL ON DEMAND (first read after Redis is empty)
 | `LeaderboardRedisService` | Redis layer: sorted-set reads/writes (PostgreSQL backfill is in LeaderboardService) |
 | `ioredis` | Redis client |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 

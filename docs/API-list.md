@@ -2,7 +2,10 @@
 
 Complete reference of all HTTP and WebSocket APIs in the project. Updated 14 Sep 2026
 
+
 ---
+---
+
 
 ## **Legend**
 
@@ -14,7 +17,10 @@ Complete reference of all HTTP and WebSocket APIs in the project. Updated 14 Sep
 
 > **Auth note:** All 🔒 endpoints authenticate via the `token` httpOnly cookie. No `Authorization: Bearer` header is used.
 
+
 ---
+---
+
 
 ## **Error responses**
 
@@ -111,7 +117,10 @@ An error response has one of two shapes:
 
 > Not every backend error has a code yet. When an error has no `code`, the frontend shows its English `message` instead.
 
+
 ---
+---
+
 
 ## **Table of Contents**
 
@@ -222,7 +231,10 @@ An error response has one of two shapes:
 21. **[Server → Client Events](#21-server--client-events-on)** — What the client receives: state updates, dice/move results, game end
 22. **[End-to-End Flow](#22-end-to-end-flow)** — A complete walkthrough from login to a finished game
 
+
 ---
+---
+
 
 ## HTTP APIs — Backend (NestJS)
 
@@ -236,7 +248,17 @@ Auth is handled via **httpOnly cookies**:
 
 No manual `Authorization` header is needed for cookie-authenticated requests.
 
+
+---
+---
+
+
 ### 1. Auth — Account & Sessions
+
+
+---
+---
+
 
 #### `POST /api/auth/register`
 
@@ -267,7 +289,10 @@ Create a new user account. Sends a verification email; no session is set until t
 
 **Errors:** 409 `AUTH_USERNAME_TAKEN` / `AUTH_EMAIL_TAKEN` if the username or email exists; 400 with a `VALIDATION_*` code if the body fails validation. See [Error responses](#error-responses).
 
+
 ---
+---
+
 
 #### `GET /api/auth/verify-email`
 
@@ -279,7 +304,10 @@ Redeem an emailed verification link. Redirects to the SPA with a query param on 
 **Query:** `token` — the 64-char hex token from the email link  
 **Response:** 302 redirect to `{FRONTEND_URL}/login?verified=1` or `?error=invalid-verification-link`
 
+
 ---
+---
+
 
 #### `POST /api/auth/login`
 
@@ -320,7 +348,10 @@ Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with
 
 **Errors:** 401 if invalid credentials, 403 if email not verified.
 
+
 ---
+---
+
 
 #### `POST /api/auth/2fa/verify`
 
@@ -350,7 +381,10 @@ Redeem a 2FA code emailed during login. Sets session cookies on success.
 
 **Errors:** 401 `AUTH_CODE_INVALID` if the code is invalid/expired or there were too many attempts; 400 `VALIDATION_CODE_FORMAT` if the code is not 6 digits.
 
+
 ---
+---
+
 
 #### `POST /api/auth/refresh`
 
@@ -371,7 +405,10 @@ Silent re-authentication. Trade a valid refresh token for a fresh access token +
 
 **Errors:** 401 if refresh token is missing, expired, or revoked.
 
+
 ---
+---
+
 
 #### `POST /api/auth/logout`
 
@@ -390,7 +427,10 @@ Revoke the refresh token and clear both cookies.
 
 ```
 
+
 ---
+---
+
 
 #### `GET /api/auth/me`
 
@@ -417,11 +457,17 @@ Return the current user from the access token cookie.
 
 ```
 
----
 
 ---
+---
+
 
 ### 2. Auth — Profile & Password
+
+
+---
+---
+
 
 #### `POST /api/auth/forgot-password`
 
@@ -448,7 +494,10 @@ Email a password-reset link. Response is identical whether or not the email is r
 
 ```
 
+
 ---
+---
+
 
 #### `POST /api/auth/reset-password`
 
@@ -478,7 +527,10 @@ Redeem a reset token and set a new password.
 
 **Errors:** 401 if token is invalid or expired.
 
+
 ---
+---
+
 
 #### `GET /api/auth/profile`
 
@@ -503,7 +555,10 @@ Return the full profile for the logged-in user (used by the Edit-Profile card).
 
 ```
 
+
 ---
+---
+
 
 #### `PATCH /api/auth/profile`
 
@@ -525,7 +580,10 @@ Update the logged-in user's profile (display name / username, email, etc.).
 
 **Response:** the updated profile / success message. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` or `VALIDATION_DISPLAY_NAME_CHARS`.
 
+
 ---
+---
+
 
 #### `PATCH /api/auth/profile/password`
 
@@ -554,9 +612,10 @@ Change the password while logged in (requires the current password).
 
 ```
 
----
 
 ---
+---
+
 
 #### `DELETE /api/auth/profile`
 
@@ -586,11 +645,17 @@ change-password flow).
 
 **Errors:** 400 if `confirm` is not `true`; 403 if the account has no password set; 401 if the password is wrong.
 
----
 
 ---
+---
+
 
 ### 3. Auth — 2FA
+
+
+---
+---
+
 
 #### `GET /api/auth/2fa`
 
@@ -608,7 +673,10 @@ Get the current user's 2FA preference.
 
 ```
 
+
 ---
+---
+
 
 #### `PATCH /api/auth/2fa`
 
@@ -635,11 +703,17 @@ Toggle the user's 2FA preference.
 
 ```
 
----
 
 ---
+---
+
 
 ### 4. Auth — OAuth (Google / GitHub / 42)
+
+
+---
+---
+
 
 #### `GET /api/auth/google`
 
@@ -650,7 +724,10 @@ Redirect to Google OAuth consent screen.
 **Headers:** None  
 **Response:** 302 redirect.
 
+
 ---
+---
+
 
 #### `GET /api/auth/google/callback`
 
@@ -661,7 +738,10 @@ Google OAuth callback. Do not call directly.
 **Headers:** None  
 **Response:** 302 redirect to `FRONTEND_URL`.
 
+
 ---
+---
+
 
 #### `GET /api/auth/github`
 
@@ -672,7 +752,10 @@ Redirect to GitHub OAuth consent screen.
 **Headers:** None  
 **Response:** 302 redirect.
 
+
 ---
+---
+
 
 #### `GET /api/auth/github/callback`
 
@@ -683,7 +766,10 @@ GitHub OAuth callback. Do not call directly.
 **Headers:** None  
 **Response:** 302 redirect to `FRONTEND_URL`.
 
+
 ---
+---
+
 
 #### `GET /api/auth/42`
 
@@ -694,7 +780,10 @@ Redirect to 42 (intra) OAuth consent screen.
 **Headers:** None  
 **Response:** 302 redirect.
 
+
 ---
+---
+
 
 #### `GET /api/auth/42/callback`
 
@@ -705,11 +794,17 @@ Redirect to 42 (intra) OAuth consent screen.
 **Headers:** None  
 **Response:** 302 redirect to `FRONTEND_URL`.
 
----
 
 ---
+---
+
 
 ### 5. User
+
+
+---
+---
+
 
 #### `GET /api/user/:username`
 
@@ -744,7 +839,10 @@ Get a user's public profile.
 
 **Errors:** 404 if user not found.
 
+
 ---
+---
+
 
 #### `GET /api/user/:username/games`
 
@@ -801,7 +899,10 @@ Get a user's game history.
 
 **Errors:** 404 if user not found.
 
+
 ---
+---
+
 
 #### `POST /api/user/avatar`
 
@@ -823,7 +924,10 @@ Upload an avatar image (max 2 MB, PNG/JPEG/GIF/WebP).
 
 **Errors:** 400 `AVATAR_FILE_REQUIRED` (no file) or `AVATAR_INVALID_TYPE` (not a PNG/JPEG/GIF/WebP); 400 if the file exceeds 2 MB.
 
+
 ---
+---
+
 
 #### `GET /api/user/id/:userId/avatar`
 
@@ -840,7 +944,10 @@ Retrieve a user's custom avatar image, keyed by the **immutable user id** — a 
 > Full pipeline — storage layers, the shared Redis record, caching and freshness rules, seat
 > rendering: [`avatar-system.md`](avatar-system.md).
 
+
 ---
+---
+
 
 #### `DELETE /api/user/avatar`
 
@@ -858,9 +965,10 @@ Delete the current user's custom avatar.
 
 ```
 
----
 
 ---
+---
+
 
 ### 6. Match — Matchmaking
 
@@ -882,7 +990,10 @@ const socket = io(window.location.origin, { // same-origin → nginx → ludo-en
 
 ```
 
+
 ---
+---
+
 
 #### `POST /api/match/pvp/invite`
 
@@ -912,7 +1023,10 @@ Create a PvP invite game with a shareable code.
 - Share `inviteCode` via chat/friend list.
 - Recipient joins via `POST /api/match/join/:code`.
 
+
 ---
+---
+
 
 #### `POST /api/match/join/:code`
 
@@ -940,7 +1054,10 @@ Join a PvP game by invite code.
 
 **Errors:** 404 `MATCH_INVITE_INVALID` if the code is not found/expired; 403 `MATCH_ALREADY_STARTED` if the game started; 400 `MATCH_OWN_INVITE` if joining your own invite.
 
+
 ---
+---
+
 
 #### `POST /api/match/pve`
 
@@ -977,7 +1094,10 @@ Start a PvE (vs bot) game.
 - Bots fill remaining slots automatically.
 - `playerCount` must be 2 or 4.
 
+
 ---
+---
+
 
 #### `POST /api/match/create`
 
@@ -1019,11 +1139,17 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
 - `playerCount` accepts 2-4; `botCount` must be 0 to `playerCount-1`. Bots are only allowed in PvE games.
 - `botColors` / `seatColors` (optional string arrays) can override the default slot colors. Seat `color` is otherwise assigned by the server.
 
----
 
 ---
+---
+
 
 ### 7. Game Actions — Room
+
+
+---
+---
+
 
 #### `POST /api/game/:id/ready`
 
@@ -1044,11 +1170,10 @@ Signal that the current player is ready.
 
 ```
 
----
-
-
 
 ---
+---
+
 
 #### `POST /api/game/:id/exit`
 
@@ -1069,7 +1194,10 @@ Acknowledge leaving the game (after game has ended).
 
 ```
 
+
 ---
+---
+
 
 #### `POST /api/game/:id/abort`
 
@@ -1092,7 +1220,10 @@ Cancel an unstarted game (while still in WAITING state).
 
 **Errors:** 404 if game not found, 403 if user is not a player.
 
+
 ---
+---
+
 
 #### `POST /api/game/:id/invite`
 
@@ -1109,11 +1240,17 @@ Invite a friend into a WAITING PvP room.
 
 ```
 
----
 
 ---
+---
+
 
 ### 8. Game Actions — Browse
+
+
+---
+---
+
 
 #### `GET /api/games/rooms`
 
@@ -1124,7 +1261,10 @@ List open (WAITING PvP) rooms that can be joined.
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** Array of joinable room summaries.
 
+
 ---
+---
+
 
 #### `GET /api/games/mine`
 
@@ -1138,7 +1278,10 @@ MATCH button they can no longer use.
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** Array of the user's room summaries.
 
+
 ---
+---
+
 
 #### `POST /api/game/:id/rejoin`
 
@@ -1163,7 +1306,17 @@ Rejoin a room the user is seated in (after a refresh).
 `MATCH_SEAT_EXPIRED` when the seat has been finalized (the engine parked every piece at `step = -1`),
 so no fresh token is minted for a seat that can never move again.
 
+
+---
+---
+
+
 ### 9. Game End (engine callback)
+
+
+---
+---
+
 
 #### `POST /api/game/end`
 
@@ -1208,7 +1361,10 @@ Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authen
 - Evaluates achievements for all participants (fires unlock notifications)
 - Updates Redis `leaderboard:global` sorted set
 
+
 ---
+---
+
 
 #### `POST /api/game/:id/started`
 
@@ -1228,11 +1384,17 @@ Called by ludo-engine once the ready-check passes and the game transitions to AC
 
 - Deletes `match:{gameId}` from Redis
 
----
 
 ---
+---
+
 
 ### 10. Leaderboard
+
+
+---
+---
+
 
 #### `GET /api/leaderboard`
 
@@ -1281,11 +1443,17 @@ Get paginated leaderboard rankings.
 
 ```
 
----
 
 ---
+---
+
 
 ### 11. Achievements
+
+
+---
+---
+
 
 #### `GET /api/achievements`
 
@@ -1334,7 +1502,10 @@ Get the current user's achievement report (unlocked state + progress + target pe
 | `achSpeedDemon` | per-game | Win in under 30 minutes |
 | `achUnstoppable` | per-game | Capture ≥ 3 pieces in one game |
 
+
 ---
+---
+
 
 #### `POST /api/achievements/check`
 
@@ -1355,11 +1526,17 @@ Force re-evaluate achievements for the current user.
 
 The `unlocked` array contains the **keys** of any achievements newly unlocked by this evaluation (e.g. `achFirstBlood`). This backfill runs silently (`announce=false` — no notification burst fires).
 
----
 
 ---
+---
+
 
 ### 12. Stats
+
+
+---
+---
+
 
 #### `GET /api/stats`
 
@@ -1384,13 +1561,19 @@ Get player statistics for the current user.
 
 ```
 
----
 
 ---
+---
+
 
 ### 13. Friends — Requests
 
 All friend endpoints require JWT auth via cookie.
+
+
+---
+---
+
 
 #### `POST /api/friends/request/:userId`
 
@@ -1405,7 +1588,10 @@ Send a friend request.
 
 **Errors:** 400 `FRIEND_ALREADY` / `FRIEND_REQUEST_PENDING` / `FRIEND_BLOCKED`; 403 `NOT_FRIENDS_WITH_USER`; 404 `USER_NOT_FOUND`.
 
+
 ---
+---
+
 
 #### `POST /api/friends/accept/:requestId`
 
@@ -1420,7 +1606,10 @@ Accept a friend request.
 
 **Errors:** 404 if request not found, 403 if not addressed to current user.
 
+
 ---
+---
+
 
 #### `POST /api/friends/decline/:requestId`
 
@@ -1435,7 +1624,10 @@ Decline a friend request.
 
 **Errors:** 404 if request not found.
 
+
 ---
+---
+
 
 #### `GET /api/friends/requests`
 
@@ -1470,11 +1662,17 @@ Get pending friend requests (both sent and received).
 
 ```
 
----
 
 ---
+---
+
 
 ### 14. Friends — Manage
+
+
+---
+---
+
 
 #### `DELETE /api/friends/remove/:friendId`
 
@@ -1487,7 +1685,10 @@ Remove a friend.
 **Body:** None  
 **Response:** `{ "message": "Friend removed" }`
 
+
 ---
+---
+
 
 #### `GET /api/friends`
 
@@ -1511,7 +1712,10 @@ Get the current user's friends list.
 
 ```
 
+
 ---
+---
+
 
 #### `POST /api/friends/block/:userId`
 
@@ -1524,7 +1728,10 @@ Block a user.
 **Body:** None  
 **Response:** Returns the blocked friendship object with user and friend details.
 
+
 ---
+---
+
 
 #### `GET /api/friends/blocked`
 
@@ -1549,7 +1756,10 @@ List users the current user has blocked.
 
 ```
 
+
 ---
+---
+
 
 #### `POST /api/friends/unblock/:userId`
 
@@ -1567,11 +1777,17 @@ Unblock a user.
 
 ```
 
----
 
 ---
+---
+
 
 ### 15. Friends — Game Invites
+
+
+---
+---
+
 
 #### `POST /api/friends/:friendId/invite`
 
@@ -1596,7 +1812,10 @@ Invite a friend to a PvP game. Creates a match room and seats the friend; pushes
 
 ```
 
+
 ---
+---
+
 
 #### `GET /api/friends/invites/pending`
 
@@ -1607,7 +1826,10 @@ Get the current user's pending game invite (if any).
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** `null` or a pending-invite object.
 
+
 ---
+---
+
 
 #### `POST /api/friends/invites/dismiss`
 
@@ -1624,11 +1846,17 @@ Dismiss the current user's pending game invite.
 
 ```
 
----
 
 ---
+---
+
 
 ### 16. Presence
+
+
+---
+---
+
 
 #### `POST /api/presence/heartbeat`
 
@@ -1655,7 +1883,10 @@ Send a presence heartbeat. Called every ~20s while the app is open.
 
 ```
 
+
 ---
+---
+
 
 #### `DELETE /api/presence/heartbeat`
 
@@ -1674,7 +1905,10 @@ Clear presence (e.g. on logout).
 
 ```
 
+
 ---
+---
+
 
 #### `GET /api/presence/online-count`
 
@@ -1692,11 +1926,17 @@ Get the site-wide count of currently online users (for the homepage badge bar).
 
 ```
 
----
 
 ---
+---
+
 
 ### 17. Notifications
+
+
+---
+---
+
 
 #### `GET /api/notifications/stream`
 
@@ -1722,7 +1962,10 @@ Types: `friend_request` | `friend_accepted` | `friend_removed` | `friend_decline
 
 **Keep-alive (server → client):** the server writes a `ping` frame into the stream every 20 s (`SSE_HEARTBEAT_MS`). Between notifications this response sends no bytes for minutes, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the frame exists to satisfy the tunnel's socket requirements and stop the stream being treated as dead. It is unrelated to the **client → server** presence heartbeat ([`POST /api/presence/heartbeat`](#post-apipresenceheartbeat)), which is a separate request that writes nothing into this stream. See [architecture.md](architecture.md) → Connection liveness (two-direction heartbeats).
 
+
 ---
+---
+
 
 #### `GET /api/notifications`
 
@@ -1733,7 +1976,10 @@ List unread notifications (populates the bell dropdown on page load).
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** Array of `NotificationPayload` (unread only, newest first, max 50).
 
+
 ---
+---
+
 
 #### `PATCH /api/notifications/:id/read`
 
@@ -1746,7 +1992,10 @@ Mark a single notification as read.
 **Body:** None  
 **Response:** Empty / `204`.
 
+
 ---
+---
+
 
 #### `POST /api/notifications/read-all`
 
@@ -1758,11 +2007,17 @@ Mark all notifications as read.
 **Body:** None  
 **Response:** Empty / `204`.
 
----
 
 ---
+---
+
 
 ### 18. Health
+
+
+---
+---
+
 
 #### `GET /health`
 
@@ -1791,9 +2046,17 @@ On DB error:
 
 ```
 
+
+---
 ---
 
+
 ## WebSocket APIs — Ludo Engine
+
+
+---
+---
+
 
 ### 19. Connection
 
@@ -1824,9 +2087,17 @@ JWT payload structure:
 
 **Health endpoint on the engine:** `GET http://localhost:3001/health` returns `{ "status": "ok", "uptime": 12345.67 }`.
 
+
+---
 ---
 
+
 ### 20. Client → Server Events (emit)
+
+
+---
+---
+
 
 #### `join_game`
 
@@ -1850,7 +2121,10 @@ socket.emit('join_game', gameId, playerColor, userId?, displayName?);
 
 **Errors:** `error` event with message.
 
+
 ---
+---
+
 
 #### `roll_dice`
 
@@ -1867,7 +2141,10 @@ socket.emit('roll_dice');
 
 **Errors:** `error` if not your turn, wrong phase, or player exited.
 
+
 ---
+---
+
 
 #### `move_piece`
 
@@ -1888,7 +2165,10 @@ socket.emit('move_piece', pieceId);
 
 **Errors:** `error` if piece not in current legal moves.
 
+
 ---
+---
+
 
 #### `player_ready`
 
@@ -1903,7 +2183,10 @@ socket.emit('player_ready');
 
 **Response:** `lobby_update` broadcast (updated ready flags).
 
+
 ---
+---
+
 
 #### `select_color`
 
@@ -1922,7 +2205,10 @@ socket.emit('select_color', color);
 
 **Response:** `lobby_update` or `color_selected` broadcast.
 
+
 ---
+---
+
 
 #### `leave_game`
 
@@ -1937,7 +2223,10 @@ socket.emit('leave_game');
 
 **Response:** `lobby_update` broadcast to the remaining players.
 
+
 ---
+---
+
 
 #### `end_game`
 
@@ -1952,11 +2241,10 @@ socket.emit('end_game');
 
 **Response:** `game_ended` / `player_aborted` broadcast.
 
----
-
-
 
 ---
+---
+
 
 #### `disconnect`
 
@@ -1971,7 +2259,10 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 
 **Response:** `player_exited` event (broadcast to room).
 
+
 ---
+---
+
 
 ### 21. Server → Client Events (on)
 
@@ -1994,7 +2285,10 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 | `state_update` | full `GameState` | After a live exit moved the turn (also the SPA's catch-all for any other pub/sub frame) |
 | `error` | `string` | On invalid action |
 
+
 ---
+---
+
 
 ### 22. End-to-End Flow
 
@@ -2029,7 +2323,10 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 
 ```
 
+
 ---
+---
+
 
 ## Notes
 
