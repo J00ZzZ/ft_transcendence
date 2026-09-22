@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RetroAuthLayout, NeonCheck } from '../components/RetroAuthLayout';
+import { LegalModal } from '../components/LegalModal';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { passwordError } from '../validatePassword';
@@ -30,6 +31,8 @@ export function Signup() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -43,6 +46,10 @@ export function Signup() {
     }
     if (password !== confirm) {
       setError(t('auth.passwordMismatch'));
+      return;
+    }
+    if (!agreed) {
+      setError(t('auth.agreeRequired'));
       return;
     }
     setSubmitting(true);
@@ -151,8 +158,31 @@ export function Signup() {
             lineHeight: 1.4,
           }}
         >
-          <NeonCheck offsetTop />
-          {t('auth.agreeTerms')}
+          <input
+            type="checkbox"
+            className="peer sr-only"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            aria-required="true"
+          />
+          <NeonCheck
+            offsetTop
+            checked={agreed}
+            className="peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#00f0ff]"
+          />
+          {t('auth.agreePrefix')}
+          <button
+            type="button"
+            className={RETRO_AUTH_LINK}
+            style={{ padding: 0, border: 'none', background: 'none' }}
+            onClick={(e) => {
+              // The label wraps this button, so stop the click toggling the box.
+              e.stopPropagation();
+              setLegalOpen(true);
+            }}
+          >
+            {t('auth.agreeLegal')}
+          </button>
         </label>
         <button type="submit" disabled={submitting} className={RETRO_AUTH_BTN}>
           {submitting ? t('auth.creatingBtn') : t('auth.createAccountBtn')}
@@ -202,6 +232,13 @@ export function Signup() {
           </a>
         </div>
       </form>
+      <LegalModal
+        isOpen={legalOpen}
+        initialDoc="terms"
+        onClose={() => {
+          setLegalOpen(false);
+        }}
+      />
     </RetroAuthLayout>
   );
 }

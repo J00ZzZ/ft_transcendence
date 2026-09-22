@@ -55,6 +55,7 @@ An error response has one of two shapes:
 | `AUTH_PROVIDER_LINKED` | 409 | Provider linked to another user |
 | `AUTH_PROVIDER_NOT_LINKED` | 404 | Provider not linked to this account |
 | `AUTH_KEEP_ONE_SIGNIN` | 403 | Must keep at least one sign-in method |
+| `AUTH_EMAIL_NOT_VERIFIED` | 200 | Notice: verify the address before signing in |
 | `AUTH_PASSWORD_UPDATED` | 200 | Notice: password changed, other devices signed out |
 
 *Validation (400)*
@@ -264,7 +265,7 @@ No manual `Authorization` header is needed for cookie-authenticated requests.
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Create a new user account and send a verification email. This call sets no session.
+Create a new user account and send a verification email. This call sets no session, and the account cannot sign in until the emailed link is redeemed. The signup form requires its terms tick before it calls this endpoint; the body below does not carry it.
 
 **Headers:** None  
 **Body:**
@@ -313,7 +314,7 @@ Redeem an emailed verification link. Redirects to the SPA with a query param on 
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with 2FA disabled, sets the session cookies. The password is the only factor checked, so an account whose address is not yet verified can still sign in.
+Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with 2FA disabled, sets the session cookies. An address that is not yet verified cannot sign in: the reply is a 200 notice with the code `AUTH_EMAIL_NOT_VERIFIED`.
 
 **Headers:** None  
 **Body:**
@@ -346,7 +347,17 @@ Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with
 
 ```
 
-**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. Sign-in does not check whether the address has been verified, so an unverified account can sign in with its password.
+**Response (address not verified):** HTTP 200, and no session cookies are set.
+
+```json
+{
+  "code": "AUTH_EMAIL_NOT_VERIFIED",
+  "message": "Verify your email address before signing in"
+}
+
+```
+
+**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. An unverified address is not an error: it returns the 200 notice above, so the browser logs no failed request.
 
 
 ---
@@ -503,7 +514,7 @@ Email a password-reset link. Response is identical whether or not the email is r
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Redeem a reset token and set a new password.
+Redeem a reset token and set a new password. Redeeming the emailed link also marks the address as verified, so an account that had not verified yet can sign in afterwards.
 
 **Headers:** None  
 **Body:**

@@ -199,10 +199,14 @@ sequenceDiagram
     Store->>Store: Loading finished
 
     Note over App,API: Logging in
-    App->>Store: login(username, password)
+    App->>Store: login(identifier, password)
     Store->>API: POST /api/auth/login
-    API-->>Store: user info
-    Store->>Store: Save the user
+    alt Address not verified
+        API-->>Store: 200 notice, no session
+    else Otherwise
+        API-->>Store: user info, or a pending token when 2FA is on
+        Store->>Store: Save the user when a session was issued
+    end
 
     Note over App,API: Logging out
     App->>Store: logout()
@@ -250,15 +254,17 @@ Mount
        └── 429/5xx/network → retry up to 3× (exponential backoff, honours Retry-After),
             then leave `user` unchanged and setAuthReady(true)
 
-login(username, password)
+login(identifier, password)
   └── POST /api/auth/login
-       ├── 200 → setUser(user), return null
-       └── error → return error message
+       ├── 200 + code=AUTH_EMAIL_NOT_VERIFIED → return { error } (the translated notice)
+       ├── 200 + twoFactorRequired=false → setUser(user), return {}
+       ├── 200 + twoFactorRequired=true → return { pendingToken }
+       └── non-2xx → return { error }
 
-register(username, password, email?)
+register(username, password, email)
   └── POST /api/auth/register
-       ├── 200 → setUser(user), return null
-       └── error → return error message
+       ├── 200 → return null (no session; the account activates via the emailed link)
+       └── error → return the message
 
 logout()
   └── POST /api/auth/logout → setUser(null)

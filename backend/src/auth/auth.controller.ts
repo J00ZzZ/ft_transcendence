@@ -81,17 +81,24 @@ export class AuthController {
   }
 
   // Factor one. 2FA off → session cookies; 2FA on → { pendingToken }, no
-  // session. Brute-force surface, so tightly throttled.
+  // session; an unverified address → a notice, also with no session. Brute-force
+  // surface, so tightly throttled.
   @Throttle({ default: { limit: 5, ttl: MINUTE_MS } })
   @Post('login')
   @HttpCode(200)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
+    // 200 with a code, so the browser logs no error for this normal state.
+    if ('emailNotVerified' in result) {
+      return {
+        code: 'AUTH_EMAIL_NOT_VERIFIED',
+        message: 'Verify your email address before signing in',
+      };
+    }
     if (result.twoFactorRequired) {
       return { twoFactorRequired: true, pendingToken: result.pendingToken };
     }
-    // LoginResult is discriminated on twoFactorRequired, so the early return
-    // above narrows this to the session variant.
+    // The union narrows to the session variant here, the only one left.
     this.setSessionCookies(res, result.accessToken, result.refreshToken);
     return { twoFactorRequired: false, user: result.user };
   }

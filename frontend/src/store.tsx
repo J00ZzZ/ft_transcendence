@@ -120,7 +120,8 @@ type AppState = {
   user: AuthUser | null;
   setUser: (u: AuthUser | null) => void;
   authReady: boolean;
-  /** Factor one. `identifier` is a username or email. Success = { pendingToken } (code emailed); failure = { error }. */
+  /** Factor one. `identifier` is a username or email. Session = {}, emailed
+   *  code = { pendingToken }; otherwise { error }. */
   login: (
     identifier: string,
     password: string,
@@ -264,6 +265,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!res.ok)
         return { error: apiError(await res.json().catch(() => null), i18n.t('auth.loginFailed')) };
       const data = await res.json();
+      // A notice carries a code but no session: the address is not verified
+      // yet. Sent as 200, so the browser logs no error for it.
+      if (data.code === 'AUTH_EMAIL_NOT_VERIFIED') {
+        return { error: apiError(data, i18n.t('auth.loginFailed')) };
+      }
       // 2FA off: the backend already set the session cookies, so there's no
       // code step — record the user and let the caller route straight home.
       if (!data.twoFactorRequired) {

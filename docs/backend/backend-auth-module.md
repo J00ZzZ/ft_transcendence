@@ -21,7 +21,7 @@
 
 The Auth module handles all authentication concerns for the Ludo Transcendence application. It supports the following flows:
 
-1. **Password-based auth with email verification** — users register with a username/email/password and are sent a verification link, which records the address as verified. Sign-in accepts the password whether or not the address has been verified. Login requires either no 2FA or an emailed code.
+1. **Password-based auth with email verification** — users register with a username/email/password and are sent a verification link, which records the address as verified. Sign-in is refused until that link is redeemed: the reply is a 200 notice (`AUTH_EMAIL_NOT_VERIFIED`), not an error. Login then requires either no 2FA or an emailed code.
 2. **Two-factor authentication (2FA)** — email-code-based 2FA. When enabled, login requires a password (factor one) plus a 6-digit emailed code (factor two).
 3. **Refresh-token sessions** — a short-lived access token (15 min) plus a long-lived, revocable refresh token (7 days) stored in an httpOnly cookie, with silent rotation via a `/refresh` endpoint.
 4. **Password reset** — forgot-password emails a one-time link; reset-password redeems it with a new password.
@@ -141,7 +141,7 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 |--------|------|------|-------------|
 | `POST` | `/api/auth/register` | None | Create account, send verification email (no session set) |
 | `GET` | `/api/auth/verify-email` | None | Redeem emailed verification link, redirect to SPA |
-| `POST` | `/api/auth/login` | None | Authenticate — returns `{ twoFactorRequired }` or sets session |
+| `POST` | `/api/auth/login` | None | Authenticate — returns `{ twoFactorRequired }`, the not-verified notice, or sets session |
 | `POST` | `/api/auth/2fa/verify` | None | Redeem 2FA code + pendingToken for session |
 | `POST` | `/api/auth/refresh` | None (refresh cookie) | Rotate refresh token, issue fresh access token |
 | `POST` | `/api/auth/forgot-password` | None | Email reset link (generic response — no enumeration) |
@@ -235,6 +235,9 @@ sequenceDiagram
     alt Wrong password / unknown user
         Server-->>Site: Error message
         Site-->>User: Show the error
+    else Correct, address not verified
+        Server-->>Site: Notice (AUTH_EMAIL_NOT_VERIFIED)
+        Site-->>User: Ask them to open the verification link
     else Correct, 2FA off
         Server->>Server: Create a login session (stored in a browser cookie)
         Server-->>Site: Logged in
@@ -409,6 +412,7 @@ POST /api/auth/login
   ├── Validate LoginDto
   ├── Find user by username OR email → 401 if not found
   ├── bcrypt.compare(password, hash) → 401 if mismatch
+  ├── If the address is not verified → 200 { code: 'AUTH_EMAIL_NOT_VERIFIED' }, no cookies
   ├── If 2FA enabled:
   │   ├── TwoFactorService.startChallenge(userId)  // returns { pendingToken, code }
   │   ├── MailService.send2faCode(email, code)     // every call emails a fresh code
@@ -460,7 +464,7 @@ POST /api/auth/reset-password
   ├── TwoFactorService.consumeResetToken(token)
   │   ├── Invalid/expired → 401
   │   └── Valid → bcrypt.hash(newPassword)
-  ├── Prisma user.update({ password_hash, emailVerified: now })
+  ├── Prisma user.update({ password_hash, emailVerified: now })  // the link proves inbox control
   ├── SessionService.revokeAll(userId)
   └── Return { message: 'Password updated...' }
 ```

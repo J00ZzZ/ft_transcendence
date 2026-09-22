@@ -66,27 +66,39 @@ export function RetroAuthLayout({ tag, children }: { tag?: string; children: Rea
   );
 }
 
-/** Neon cyan checkbox used by auth forms */
-export function NeonCheck({ offsetTop }: { offsetTop?: boolean }) {
+// Decorative neon checkbox glyph. Signup pairs it with a hidden real input, so
+// it takes `checked` plus any focus classes the caller needs.
+export function NeonCheck({
+  offsetTop,
+  checked,
+  className,
+}: {
+  offsetTop?: boolean;
+  checked?: boolean;
+  className?: string;
+}) {
   return (
     <span
+      className={className}
       style={{
         width: 16,
         height: 16,
         marginTop: offsetTop ? 1 : undefined,
         flex: 'none',
         borderRadius: 4,
-        background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.5), rgba(255, 0, 127, 0.4))',
+        background: checked
+          ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.5), rgba(255, 0, 127, 0.4))'
+          : 'transparent',
         border: '1px solid rgba(0, 240, 255, 0.6)',
         display: 'inline-grid',
         placeItems: 'center',
         color: '#ffffff',
         fontSize: 10,
         fontWeight: 900,
-        boxShadow: '0 0 8px rgba(0, 240, 255, 0.4)',
+        boxShadow: checked ? '0 0 8px rgba(0, 240, 255, 0.4)' : 'none',
       }}
     >
-      ✓
+      {checked ? '✓' : ''}
     </span>
   );
 }

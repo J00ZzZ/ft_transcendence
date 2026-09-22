@@ -43,7 +43,7 @@ The shared components are reusable UI (user interface) building blocks used on s
 |------|------|
 | `src/components/RetroNavbar.tsx` | Top navigation bar — logo, nav links, language selector, user menu, sign out (used by every page) |
 | `src/components/railButton.ts` | Shared rail-button styles — `railButtonStyle(active)` and `railHoverHandlers(active, edge)`, used by the navbar rail buttons |
-| `src/components/RetroAuthLayout.tsx` | Retro-styled authentication page container (`tag` + `children`, plus the `NeonCheck` glyph) |
+| `src/components/RetroAuthLayout.tsx` | Retro-styled authentication page container (`tag` + `children`), and `NeonCheck` — the terms tick glyph |
 | `src/components/Board.tsx` | Ludo board — tracks, bases, pieces, legal-move highlights |
 | `src/components/Die.tsx` | Dice component — face rendering with roll animation |
 | `src/components/UserAvatar.tsx` | Avatar image — keyed by the immutable `userId`; requests the photo only when the seat is not a bot and a photo is known to exist (payload flag or a live `avatar_changed` override), otherwise renders the DiceBear default. A failed load marks that id broken for the session so it is not retried; an optional `onPhotoError` callback runs when that happens, so a parent component can show a message (the Profile page uses it to show a warning in the user's language) |
@@ -56,7 +56,7 @@ The shared components are reusable UI (user interface) building blocks used on s
 | `src/components/ProfileEditModal.tsx` | Edit-profile dialog |
 | `src/components/DeleteAccountModal.tsx` | Delete-account dialog (sets a password first for OAuth-only accounts) |
 | `src/components/RulesModal.tsx` | "How to Play" rules popup |
-| `src/components/LegalModal.tsx` | Privacy Policy / Terms of Service popup |
+| `src/components/LegalModal.tsx` | Privacy Policy / Terms of Service popup, opened from Home's footer and from the Signup terms link |
 | `src/components/MarkdownViewer.tsx` | Renders the markdown legal documents |
 | `src/components/CyberModal.tsx` | Cyber-styled modal base (`CyberButton`, `CyberModal`) used for confirmations and dialogs |
 | `src/components/ResultsModal.tsx` | Post-game results overlay — podium, rank badges, outcome title, return-to-lobby |
@@ -75,6 +75,16 @@ The shared components are reusable UI (user interface) building blocks used on s
 type RetroAuthLayoutProps = {
   tag?: string;          // Optional tagline displayed above the form
   children: ReactNode;   // Form content
+}
+```
+
+### NeonCheck Props
+
+```typescript
+type NeonCheckProps = {
+  offsetTop?: boolean;   // Nudges the box down 1px to line up with the first text line
+  checked?: boolean;     // Draws the tick and the glow; an empty box when false
+  className?: string;    // Extra classes, such as the focus ring Signup passes in
 }
 ```
 

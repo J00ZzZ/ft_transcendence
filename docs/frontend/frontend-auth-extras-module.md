@@ -162,7 +162,7 @@ export function passwordError(pw: string): string | null {
 ## Page Notes
 
 - **ForgotPassword** collects an email and asks the backend to send a reset link. The confirmation screen always appears: the backend never reveals whether the address is registered, and neither does the page.
-- **ResetPassword** is reached from the emailed link, which includes `?token=<resetToken>`. It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`.
+- **ResetPassword** is reached from the emailed link, which includes `?token=<resetToken>`. It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`. Redeeming the link also marks the address as verified, so an account that had not verified yet can sign in afterwards.
 - **TwoFactor** is reached in two ways, both with `?token=<pendingToken>`: from `Login.tsx` after the password step succeeds, or from the backend's OAuth callback after it emails the code.
 
 

@@ -19,7 +19,7 @@
 These pages are the entry point to the app. They are:
 
 1. **Login** — identifier (username or email), password, OAuth (Open Authorization) buttons, and two-factor authentication (2FA) support. It also shows one-shot notices carried in the query string (`verified`, `reset`, `error`) that arrive from email links and OAuth callbacks.
-2. **Signup** — username, email and password fields, plus a confirm-password field that must match. On success the form is replaced by a "check your inbox" confirmation screen.
+2. **Signup** — username, email and password fields, a confirm-password field that must match, and a terms tick that must be checked before the form submits. Its link opens the legal popup. On success the form is replaced by a "check your inbox" confirmation screen.
 
 Both pages use the `RetroAuthLayout` container and share the same styling: the retro/cyber theme and the provider buttons.
 
@@ -65,6 +65,8 @@ const [password, setPassword] = useState('')
 const [confirm, setConfirm] = useState('')
 const [error, setError] = useState<string | null>(null)
 const [submitting, setSubmitting] = useState(false)
+const [agreed, setAgreed] = useState(false)
+const [legalOpen, setLegalOpen] = useState(false)
 ```
 
 ### Validation Rules
@@ -75,6 +77,7 @@ const [submitting, setSubmitting] = useState(false)
 | Email | Required, valid email format (used for verification and 2FA) |
 | Password | Required, 12-72 chars, must contain uppercase, lowercase, number, and special character |
 | Confirm | Must match password |
+| Agree | Must be ticked before the form submits; its link opens the legal popup |
 
 
 ---
@@ -103,6 +106,9 @@ sequenceDiagram
     else 2FA on
         API-->>Store: "need a code" (pendingToken)
         Login->>Login: Go to the "enter code" page
+    else Address not verified
+        API-->>Store: notice (address not verified)
+        Login->>Login: Show the message and stay on the page
     else Wrong details
         API-->>Store: error
         Login->>Login: Show the error message
@@ -119,9 +125,9 @@ sequenceDiagram
     participant Store as App state
     participant API as Backend
 
-    User->>Signup: Type username, email, password + confirm
-    Signup->>Signup: Check the password rule and that the two passwords match
-    alt Rule broken or passwords don't match
+    User->>Signup: Type username, email, password + confirm, tick the terms box
+    Signup->>Signup: Check the password rule, the two passwords and the terms box
+    alt Rule broken, passwords don't match, or the box is unticked
         Signup->>Signup: Show the message
     else They are accepted
         Signup->>Store: Call register()
@@ -171,6 +177,7 @@ onSubmit(e)
   │   ├── POST /api/auth/login
   │   │   ├── 200 + twoFactorRequired=false → setUser(user), navigate('/home')
   │   │   ├── 200 + twoFactorRequired=true → navigate('/2fa?token=' + pendingToken)
+  │   │   ├── 200 + code=AUTH_EMAIL_NOT_VERIFIED → setError(the translated notice)
   │   │   └── error → setError(message)
   └── setSubmitting(false)
 ```
@@ -182,6 +189,7 @@ onSubmit(e)
   ├── If submitting → return
   ├── If passwordError(password) → setError(the password rule message)
   ├── If password !== confirm → setError('Passwords do not match')
+  ├── If !agreed → setError(the terms message); return
   ├── register(username, password, email)
   │   ├── POST /api/auth/register
   │   │   ├── 200 → setSent(true) (the form is replaced by the "check your inbox" screen; no session is created)
@@ -208,5 +216,6 @@ onClick provider button
 | `store.tsx` | `useApp()` for login/register actions, returns `{ error, pendingToken }` |
 | `router.tsx` | `navigate` for post-auth redirect |
 | `theme.ts` | `btnGold`, `goldText`, `input`, `label` styles |
-| `RetroAuthLayout.tsx` | Retro-styled centered card container (`tag` + `children`, plus the `NeonCheck` glyph) |
+| `RetroAuthLayout.tsx` | Retro-styled centered card container (`tag` + `children`), and `NeonCheck` — the glyph that shows the terms tick |
+| `LegalModal.tsx` | The legal popup the terms link opens: Terms of Service and Privacy Policy, with tabs and language buttons |
 | `OAuthButtons.tsx` | Provider button row |
