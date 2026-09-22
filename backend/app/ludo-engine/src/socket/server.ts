@@ -71,11 +71,8 @@ export class SocketServer {
       getOrCreateBot,
       (gameId) => this.botScheduler.schedule(gameId, BOT_THINK_MS),
       (gameId) => {
-        // A grace timeout dropped the room below the minimum human count
-        // (or a single-instance disconnect window fully expired). The
-        // game_expired broadcast already went out through teardownRoom's
-        // engine event -> publisher -> broadcaster path; this callback only
-        // clears the engine's in-memory state (userIdMap, bots, locks).
+        // teardownRoom already broadcast game_expired; this clears the engine's
+        // in-memory state (userIdMap, bots, locks).
         this.cleanupGame(gameId);
       },
     );
@@ -131,10 +128,9 @@ export class SocketServer {
       console.log(`Ludo engine listening on port ${port}`);
     });
 
-    // Periodic checks: expired lobbies, plus grace windows whose in-process
-    // timer was lost. The grace sweep also runs once now, so windows that
-    // expired while this process was down are settled as soon as it comes back
-    // up instead of holding those seats' turns forever.
+    // Periodic checks: expired lobbies, plus grace windows lost to a restart.
+    // The grace sweep also runs once now, so windows that expired while this
+    // process was down are settled immediately on startup.
     setInterval(() => this.checkExpiredLobbies(), 60 * 1000);
     setInterval(() => this.checkExpiredGraceWindows(), 60 * 1000);
     void this.checkExpiredGraceWindows();
@@ -189,12 +185,9 @@ export class SocketServer {
       }
     }
   }
-  // Sweep for grace windows that have already expired. The disconnect handler's
-  // in-process timer normally prunes them; this covers the case where that timer
-  // was lost (an engine restart, or a crash between disconnect and expiry),
-  // which would otherwise leave the seat 'disconnected' and the turn held on it
-  // forever. expireDisconnectedPlayer re-checks the window, so racing the timer
-  // is safe.
+  // Sweep for grace windows that have already expired, covering windows whose
+  // in-process timer was lost (an engine restart or a crash). Safe to race the
+  // timer because expireDisconnectedPlayer re-checks the deadline.
   private async checkExpiredGraceWindows(): Promise<void> {
     const now = Date.now();
     const gameKeys = await this.store.scanGameKeys();

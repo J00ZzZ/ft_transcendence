@@ -1,7 +1,5 @@
-// Mirror of the ludo-engine TypeScript types; the engine defines them, this copy matches.
 // Mirror of the ludo-engine TypeScript types; the engine defines them, this copy
-// matches. The engine's 'resigned' PlayerStatus was removed with the unused
-// concede path; terminal seats are 'exited' only.
+// matches. Terminal seats are 'exited' only.
 
 export type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
 export type PlayerStatus = 'active' | 'exited' | 'inactive' | 'disconnected';

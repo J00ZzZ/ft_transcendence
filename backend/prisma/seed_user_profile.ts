@@ -13,10 +13,9 @@ const HOUR = 3600_000;
 const MINUTE = 60_000;
 const now = Date.now();
 
-// Demo-data script for two specific accounts (harleyhxng, harleynghxedu):
-// sets their stats/achievements, replays their match history, and wires
-// their friendships. Run manually with ts-node; ignores accounts that
-// don't exist.
+// Demo data for two accounts (harleyhxng, harleynghxedu): their stats,
+// achievements, match history, and friendships. Run manually with ts-node;
+// accounts that do not exist are skipped.
 async function main() {
   console.log('🚀 Injecting distinct pilot profiles for harleyhxng & harleynghxedu...');
 

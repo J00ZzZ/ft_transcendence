@@ -99,9 +99,7 @@ export function Home() {
   const [legalModalDoc, setLegalModalDoc] = useState<LegalDocType | null>(null);
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
-  // ------------------------------------------------------------------------
-  // 2. LIVE PLAYER CAREER STATS API
-  // ------------------------------------------------------------------------
+  // **2. LIVE PLAYER CAREER STATS API**
   type PlayerStats = {
     rating?: number;
     highestRating?: number;
@@ -148,9 +146,7 @@ export function Home() {
       });
   }, []);
 
-  // ------------------------------------------------------------------------
-  // 3. THEME & CRT CONTROLS
-  // ------------------------------------------------------------------------
+  // **3. THEME & CRT CONTROLS**
   const [crtEnabled, setCrtEnabled] = useState(true);
 
   useEffect(() => {
@@ -167,9 +163,7 @@ export function Home() {
     retroAudio.playUiBeep(440, 0.05);
   };
 
-  // ------------------------------------------------------------------------
-  // 4. CYBER COMM // FRIEND LIST & AUDIO
-  // ------------------------------------------------------------------------
+  // **4. CYBER COMM // FRIEND LIST & AUDIO**
   const [friends, setFriends] = useState<Friend[] | null>(null);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [isFriendsLoading, setIsFriendsLoading] = useState(false);
@@ -270,9 +264,7 @@ export function Home() {
     };
   }, []);
 
-  // ------------------------------------------------------------------------
-  // 5. HUB ARCADE CABINET: 3D ATTRACT MODE & PRESS START
-  // ------------------------------------------------------------------------
+  // **5. HUB ARCADE CABINET: 3D ATTRACT MODE & PRESS START**
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isWarpingToLobby, setIsWarpingToLobby] = useState(false);
 

@@ -311,10 +311,8 @@ export class MatchPlayerService {
     return { message: 'Exited game', gameId };
   }
 
-  // Cancel (abort) a match, setting its status to ABORTED.
-  // The 'resign' alias and its REST route were removed: the concede path was
-  // unreachable from the UI, and removing it forecloses a scored concede —
-  // quitting via End Game is free and unscored, by design.)
+  // Cancel (abort) a match, setting its status to ABORTED. Quitting stays
+  // unscored: End Game records no result.
   async cancelGame(gameId: string, userId: string) {
     const data = await this.redis.hgetall(`match:${gameId}`);
     if (!data.id)

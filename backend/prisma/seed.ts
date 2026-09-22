@@ -60,9 +60,8 @@ const MINUTE = 60_000;
 const now = Date.now();
 
 // Database seed script: wipes and repopulates Users, Achievements,
-// Friendships and a sample Game with 28 demo players across rating tiers,
-// plus Redis leaderboard entries. Run via `prisma db seed` (see
-// prisma.config.ts).
+// Friendships, a sample Game, and Redis leaderboard entries with 28 demo
+// players across rating tiers. Run via `prisma db seed`.
 async function main() {
   console.log('🌱 Seeding Ludo database with expanded 28-player Cyber Roster...');
 

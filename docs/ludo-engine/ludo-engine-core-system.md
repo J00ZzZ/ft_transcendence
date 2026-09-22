@@ -122,6 +122,28 @@ already done at game start.
 A player who leaves a **live game** is parked as `exited` with `isFinished` set, because the
 post-game result logic prunes on that status.
 
+A grace window is only opened for a seat that can actually come back. A seat is no longer resumable
+once it is `exited` or the match is finished, because every one of its pieces is parked at
+`step = -1`. Parking such a seat in `disconnectedPlayers` would let a later `join_game` take the
+reconnect branch and flip it back to `active` with all four pieces still at `-1`; `MoveValidator`
+skips `step < 0`, so that seat could never produce a legal move and its turn would auto-pass forever.
+
+The reset on turn advance is deliberate. The turn-scoped snapshot (`turnPhase`, `pendingLegalMoves`,
+`pendingDiceValue`, `pendingIsFirstRoll`) belongs to the player who just finished. Leaving it behind
+stranded the next player whenever a seat was pruned mid-`WAITING_FOR_MOVE`: the new player could
+neither roll (`Invalid turn phase`) nor move a piece, freezing the game. `rollDice` also resets these
+on its own paths, but doing it in `advanceTurnInState` makes the invariant hold for every caller.
+
+**Quorum.** `hasQuorum(state)` is the single predicate that decides whether a room can continue: it
+requires at least two seats that are both `active` and not bots. Bots never count, so a PvE room is
+not kept alive by its bot seats. When a departure drops the room below that count, `teardownRoom`
+runs: it emits `game_expired`, marks the match `ABORTED`, deletes the engine game state, and calls
+the in-memory cleanup callback (which clears `userIdMap`, bots, and per-game locks).
+
+**Source files.** `firstActiveColor`, `advanceTurnInState`, `handlePlayerDisconnect`,
+`handlePlayerReconnect`, `expireDisconnectedPlayer`, `finalizeDeparture`, `teardownRoom`, and
+`hasQuorum` all live in `backend/app/ludo-engine/src/player-handler.ts`.
+
 ### GameState
 
 ```typescript
@@ -320,7 +342,7 @@ Module-level constants in the engine's support files — edit at the top of each
 | Constant | File | Default | What it controls |
 |----------|------|---------|------------------|
 | `DISCONNECT_GRACE_MS` | `player-handler.ts` | 45 s | PvP reconnect window before a disconnected player is pruned |
-| `SINGLE_SOCKET_DISCONNECT_GRACE_MS` | `player-handler.ts` | 1 h | Bot-mode reconnect window before the game auto-aborts |
+| `SINGLE_SOCKET_DISCONNECT_GRACE_MS` | `player-handler.ts` | 1 h | Single-instance (PvE/hotseat) reconnect window before the game auto-aborts |
 
 > `player-handler.ts` adds a hardcoded `+1000` ms buffer to the PvP grace
 > period so the prune timer fires just after the reconnect deadline.

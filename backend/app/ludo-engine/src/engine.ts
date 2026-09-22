@@ -103,10 +103,8 @@ export class LudoEngine {
         throw new Error('Current player has exited');
       }
 
-      // Paused for a disconnect grace window: no rolls until the paused seat
-      // reconnects (reconnect clears the pause) or is pruned (prune advances
-      // the turn). Without this gate a crafted client could act while the
-      // game is frozen for everyone else.
+      // Frozen for a disconnect grace window: no rolls until the paused seat
+      // reconnects or is pruned.
       if (state.paused) {
         throw new Error('Game is paused — waiting for player to reconnect');
       }
@@ -306,10 +304,8 @@ export class LudoEngine {
     await this.emitLobbyUpdate(gameId);
   }
 
-  // Replay a grace window's expiry under the game lock. The disconnect handler
-  // arms an in-process timer for this, which a restart loses — the server's
-  // periodic sweep calls this instead so an expired window can never leave a
-  // seat parked as 'disconnected' with the turn held on it.
+  // Replay a grace window expiry under the game lock, so the server sweep can
+  // settle windows lost to a restart.
   async expireDisconnectedPlayer(
     gameId: string,
     color: PlayerColor,

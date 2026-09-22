@@ -73,9 +73,7 @@ export function LudoLobby() {
   const { t } = useTranslation();
   const { user, setActiveMatch } = useApp();
 
-  // ------------------------------------------------------------------------
-  // CRT CONTROLS
-  // ------------------------------------------------------------------------
+  // **CRT CONTROLS**
   const [crtEnabled, setCrtEnabled] = useState(true);
 
   useEffect(() => {
@@ -323,9 +321,7 @@ export function LudoLobby() {
                   gap: 20,
                 }}
               >
-                {/* ════════════════════════════════════════════════════════════════════════════
-                  LEVEL 1: HOST NEW TABLE TICKET
-                 ════════════════════════════════════════════════════════════════════════════ */}
+                {/* **LEVEL 1: HOST NEW TABLE TICKET** */}
                 <div
                   className={`${RETRO_TICKET_PASS} ${TICKET_PINK} ${hostBusy ? 'disabled' : ''}`}
                   onClick={
@@ -418,9 +414,7 @@ export function LudoLobby() {
                   </div>
                 </div>
 
-                {/* ════════════════════════════════════════════════════════════════════════════
-                  LEVEL 2: HOTSEAT MODE TICKET
-                 ════════════════════════════════════════════════════════════════════════════ */}
+                {/* **LEVEL 2: HOTSEAT MODE TICKET** */}
                 <div
                   className={`${RETRO_TICKET_PASS} ${TICKET_YELLOW}`}
                   onClick={() => {
@@ -509,9 +503,7 @@ export function LudoLobby() {
                   </div>
                 </div>
 
-                {/* ════════════════════════════════════════════════════════════════════════════
-                  LEVEL 3: BOT MODE TICKET
-                 ════════════════════════════════════════════════════════════════════════════ */}
+                {/* **LEVEL 3: BOT MODE TICKET** */}
                 <div
                   className={`${RETRO_TICKET_PASS} ${TICKET_GREEN}`}
                   onClick={() => {
@@ -600,9 +592,7 @@ export function LudoLobby() {
                   </div>
                 </div>
 
-                {/* ════════════════════════════════════════════════════════════════════════════
-                  LEVEL 4 (LAST): ACCESS VIA ROOM CODE TICKET
-                 ════════════════════════════════════════════════════════════════════════════ */}
+                {/* **LEVEL 4 (LAST): ACCESS VIA ROOM CODE TICKET** */}
                 <div
                   className={`${RETRO_TICKET_PASS} ${TICKET_CYAN}`}
                   onClick={() => {
@@ -770,9 +760,7 @@ export function LudoLobby() {
                 </div>
               )}
 
-              {/* ════════════════════════════════════════════════════════════════════════════
-                BELOW THEM: OPEN QUANTUM ROOMS
-               ════════════════════════════════════════════════════════════════════════════ */}
+              {/* **BELOW THEM: OPEN QUANTUM ROOMS** */}
               <section className={RETRO_WINDOW} id="roomsWindow">
                 <div
                   className={WINDOW_HEADER}

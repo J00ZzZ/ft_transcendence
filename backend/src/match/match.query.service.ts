@@ -100,10 +100,8 @@ export class MatchQueryService {
         if (!seatIds.includes(userId)) continue;
         if (data.status !== 'WAITING' && data.status !== 'ACTIVE') continue;
 
-        // A seat the engine finalized (grace expired / End Game) is terminal:
-        // stop advertising this match to a player who can no longer rejoin.
-        // Checked only for ACTIVE matches — a WAITING room has no live game
-        // state, so the extra read would always come back empty.
+        // A seat the engine finalized cannot be rejoined: stop advertising this
+        // match to that player. ACTIVE only; a WAITING room has no game state.
         if (data.status === 'ACTIVE') {
           const color = data[`player${seatIds.indexOf(userId) + 1}_color`];
           if (color && (await isSeatFinalized(this.redis, data.id, color))) continue;

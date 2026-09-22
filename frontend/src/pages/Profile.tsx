@@ -166,9 +166,7 @@ export function Profile() {
   const username = query.get('u') ?? user?.username;
   const isOwnProfile = user?.username === username;
 
-  // ------------------------------------------------------------------------
-  // CRT CONTROLS
-  // ------------------------------------------------------------------------
+  // **CRT CONTROLS**
   const [crtEnabled, setCrtEnabled] = useState(true);
 
   useEffect(() => {
@@ -505,9 +503,7 @@ export function Profile() {
                     minHeight: 0,
                   }}
                 >
-                  {/* ═══════════════════════════════════════════════════════════════
-                    1. STEAM PROFILE HERO HEADER (Avatar + Identity + ELO Citadel)
-                   ═══════════════════════════════════════════════════════════════ */}
+                  {/* **1. STEAM PROFILE HERO HEADER (Avatar + Identity + ELO Citadel)** */}
                   <div
                     style={{
                       background:
@@ -756,10 +752,9 @@ export function Profile() {
                                   {t('profileExtra.editProfileBtn')}
                                 </button>
                               </div>
-                              {/* Stable reserved message area: upload errors show
-                                  red, photo-load fallback shows amber. minHeight
-                                  keeps the box height stable so long translated
-                                  strings never shift the surrounding layout. */}
+                              {/* Message area: upload errors red, photo fallback
+                                  amber. minHeight keeps the box steady for
+                                  longer translated strings. */}
                               <div
                                 style={{
                                   minHeight: 34,
@@ -900,9 +895,7 @@ export function Profile() {
                     </div>
                   </div>
 
-                  {/* ═══════════════════════════════════════════════════════════════
-                    2. HORIZONTAL CAREER STATS SHOWCASE STRIP (4 Columns)
-                   ═══════════════════════════════════════════════════════════════ */}
+                  {/* **2. HORIZONTAL CAREER STATS SHOWCASE STRIP (4 Columns)** */}
                   <div
                     style={{
                       display: 'grid',
@@ -1101,9 +1094,7 @@ export function Profile() {
                     </div>
                   </div>
 
-                  {/* ═══════════════════════════════════════════════════════════════
-                    3. STEAM 2-COLUMN SHOWCASE (Main Left Tabs + Sidebar Right)
-                   ═══════════════════════════════════════════════════════════════ */}
+                  {/* **3. STEAM 2-COLUMN SHOWCASE (Main Left Tabs + Sidebar Right)** */}
                   <div
                     style={{
                       display: 'grid',
@@ -1113,9 +1104,7 @@ export function Profile() {
                       minHeight: 0,
                     }}
                   >
-                    {/* ───────────────────────────────────────────────────────────
-                      LEFT MAIN SHOWCASE (Tabbed Match History / Achievements)
-                     ─────────────────────────────────────────────────────────── */}
+                    {/* **LEFT MAIN SHOWCASE (Tabbed Match History / Achievements)** */}
                     <div
                       style={{
                         background: 'rgba(14, 5, 36, 0.92)',
@@ -1540,9 +1529,7 @@ export function Profile() {
                       </div>
                     </div>
 
-                    {/* ───────────────────────────────────────────────────────────
-                      RIGHT STEAM SIDEBAR (Allied Operatives + Apex Citadel)
-                     ─────────────────────────────────────────────────────────── */}
+                    {/* **RIGHT STEAM SIDEBAR (Allied Operatives + Apex Citadel)** */}
                     <div
                       style={{
                         display: 'flex',

@@ -95,6 +95,25 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 
 ---
 
+## Seat Finalization (`isSeatFinalized`)
+
+**Source:** `backend/src/match/seat-finalization.ts`
+
+This helper answers one question: can this seat still be rejoined? It is used in two places — `GET /api/games/mine` (stop advertising a match to a departed player) and `POST /api/game/:id/rejoin` (refuse to mint a token for a seat that is gone).
+
+The engine owns the authoritative live game state (`game:{gameId}` hash, field `state`, one JSON blob). A seat whose `PlayerMeta.status` is `exited` (pruned on grace expiry, or removed by End Game) is terminal: the player can never resume that seat, so the backend must stop treating the match as rejoinable for them. `exited` is the only terminal status.
+
+Deliberately **not** terminal:
+
+| Status | Why it can still rejoin |
+|--------|-------------------------|
+| `disconnected` | The grace window is running; the player can still come back |
+| `inactive` | A waiting-room leave, or a seat that has not joined a live game yet |
+
+The helper is fail-open: a missing key, unreadable value, or schema drift returns `false`, which keeps the match advertised rather than locking a legitimate player out.
+
+---
+
 ## Core Logic / Flow
 
 ### 1. Create a PvP Match
@@ -209,6 +228,17 @@ POST /api/game/:id/exit
 
 POST /api/game/:id/abort
   └── Cancel WAITING game, notify engine → return { message, gameId }
+
+POST /api/game/:id/rejoin
+  ├── Verify the caller holds a seat → else 403 MATCH_NOT_PLAYER
+  ├── ACTIVE room whose seat is finalized → 403 MATCH_SEAT_EXPIRED
+  └── Clear the reservation flag and mint a fresh engine JWT
+
+GET /api/games/mine
+  ├── Scan match:* hashes where the caller is seated
+  ├── Skip rooms that are not WAITING or ACTIVE
+  └── ACTIVE room whose seat is finalized (isSeatFinalized) → skip, so no
+      REJOIN MATCH button is offered for a seat that is gone
 ```
 
 ---

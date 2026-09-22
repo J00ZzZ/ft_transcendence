@@ -9,7 +9,7 @@ import type { PlayerColor } from '../game/types';
 import { retroAudio } from '../utils/audio';
 import { RETRO_BTN } from '../styles/tw';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// **Helpers**
 
 // Notification.payload is typed as an object, but the backend historically sent
 // a JSON string for some rows. Keep the defensive parse for old/streamed rows.
@@ -185,7 +185,7 @@ function getToastInfo(
   }
 }
 
-// ─── Single Toast ────────────────────────────────────────────────────────────
+// **Single Toast**
 
 function Toast({
   notification,
@@ -588,7 +588,7 @@ function Toast({
   );
 }
 
-// ─── Toast Container ─────────────────────────────────────────────────────────
+// **Toast Container**
 
 export function NotificationToasts({
   toasts,

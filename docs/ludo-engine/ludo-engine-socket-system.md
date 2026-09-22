@@ -236,13 +236,18 @@ socket.emit('select_color', color);
 
 ### `leave_game`
 
-Leave the current game (acknowledges leaving after game has ended).
+Leave the current game.
 
 ```js
 socket.emit('leave_game');
 ```
 
-**Response:** None
+**Response:** `player_exited` (plus `state_update` in a live game). The effect depends on the room state:
+
+- **Waiting room** — the seat is parked `inactive` and its Redis row is reserved, so a rejoin returns the same colour.
+- **Live game** — the seat is parked `exited`, every piece is moved to `step = -1`, and the turn advances if it was theirs.
+
+Exits are applied by one function, `finalizeDeparture` in `backend/app/ludo-engine/src/player-handler.ts`, which also tears the room down when the departure drops it below quorum.
 
 ---
 
@@ -267,6 +272,12 @@ Expiry is not tied to the in-process timer: the window itself lives in Redis (`d
 Advancing a turn always resets the turn-scoped snapshot (`turnPhase` → `WAITING_FOR_ROLL`, and `pendingLegalMoves` / `pendingDiceValue` / `pendingIsFirstRoll` cleared) plus the new player's `consecutiveSixes` / `hasRolled` / `bonusRoll`, so whoever inherits the turn can roll immediately. Without that, a prune landing mid-`WAITING_FOR_MOVE` kept the *departed* player's pending moves: the next player could neither roll (`Invalid turn phase`) nor move, freezing the game.
 
 Because `player_exited` carries only `{ color }`, a live exit also republishes the full state as `state_update` — otherwise every client keeps rendering the departed player's turn (and their pieces) until some unrelated event happens to carry `currentTurn`.
+
+**Pause and wait.** A PvP drop pauses the game only when the dropped player holds the turn: `handlePlayerDisconnect` sets `state.paused` and `state.pauseTurnOwner`, and `rollDice`, `movePiece`, and bot turns are all rejected while the flag is set. Dropping during another player's turn pauses nothing — play continues until the turn reaches the departed seat, which then waits there because no other seat owns the turn. PvE and hotseat never pause: they are single-instance games, so their only states are running and aborted, and the long window's expiry tears the room down.
+
+The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which also resumes the same turn with its pending dice and moves), when the seat is pruned (`finalizeDeparture`, which then advances the turn), and by a defensive owner-only check in `join-manager` on `join_game`. Another player's reconnect must not clear a pause that belongs to a seat still inside its grace window.
+
+**Room teardown is emitted from one place.** `teardownRoom` emits `game_expired`, marks the match `ABORTED`, deletes the engine game state, and runs the cleanup callback. Callers do not emit `game_expired` themselves, so a client never receives it twice.
 
 ---
 

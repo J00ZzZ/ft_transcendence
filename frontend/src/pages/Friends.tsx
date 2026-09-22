@@ -71,9 +71,7 @@ export function Friends() {
   const { t } = useTranslation();
   const { setActiveMatch } = useApp();
 
-  // ------------------------------------------------------------------------
-  // CRT CONTROLS
-  // ------------------------------------------------------------------------
+  // **CRT CONTROLS**
   const [crtEnabled, setCrtEnabled] = useState(true);
 
   useEffect(() => {
@@ -90,9 +88,7 @@ export function Friends() {
     retroAudio.playUiBeep(440, 0.05);
   };
 
-  // ------------------------------------------------------------------------
-  // STATE MANAGEMENT
-  // ------------------------------------------------------------------------
+  // **STATE MANAGEMENT**
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [blocked, setBlocked] = useState<BlockedUser[]>([]);
@@ -459,9 +455,7 @@ export function Friends() {
                   minHeight: 0,
                 }}
               >
-                {/* ════════════════════════════════════════════════════════════════
-                  LEFT COLUMN: Allied Operatives / Restricted Pilots List
-                 ════════════════════════════════════════════════════════════════ */}
+                {/* **LEFT COLUMN: Allied Operatives / Restricted Pilots List** */}
                 <div
                   style={{
                     display: 'flex',
@@ -588,7 +582,7 @@ export function Friends() {
                         {t('friends.scanningFrequencies')}
                       </div>
                     ) : activeTab === 'friends' ? (
-                      /* ─── TAB 1: ALLIED FRIENDS STREAM ─── */
+                      /* **TAB 1: ALLIED FRIENDS STREAM** */
                       filteredFriends.length === 0 ? (
                         <div
                           style={{
@@ -833,7 +827,7 @@ export function Friends() {
                           );
                         })
                       )
-                    ) : /* ─── TAB 2: BLOCKED LIST ─── */
+                    ) : /* **TAB 2: BLOCKED LIST** */
                     blocked.length === 0 ? (
                       <div
                         style={{
@@ -923,9 +917,7 @@ export function Friends() {
                   </div>
                 </div>
 
-                {/* ════════════════════════════════════════════════════════════════
-                  RIGHT COLUMN: Transmit Module + Dedicated Bottom-Right Incoming Panel
-                 ════════════════════════════════════════════════════════════════ */}
+                {/* **RIGHT COLUMN: Transmit Module + Dedicated Bottom-Right Incoming Panel** */}
                 <div
                   style={{
                     display: 'flex',

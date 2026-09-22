@@ -1,6 +1,4 @@
-/* ==========================================================================
-   RETRO WAVE ARCADE - WEB AUDIO CHIPTUNE SYNTHESIZER
-   ========================================================================== */
+/* **RETRO WAVE ARCADE - WEB AUDIO CHIPTUNE SYNTHESIZER** */
 
 export class RetroAudioEngine {
   ctx: AudioContext | null = null;

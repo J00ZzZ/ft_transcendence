@@ -12,15 +12,9 @@ export function firstActiveColor(state: GameState): PlayerColor | undefined {
 	return COLORS.find((c) => state.players.find((p) => p.color === c)?.status === 'active');
 }
 
-// Advance turn to the next seated (active) player.
-// Mutates state in-place.
-// Scans state.players[] directly (players-as-truth). A disconnected seat whose
-// grace window is still open HOLDS the turn (nobody else can act — turn
-// ownership gates roll/move/bot actions — until it reconnects or is pruned);
-// pruned/left seats are skipped. The explicit `paused` flag is separate and set
-// only by handlePlayerDisconnect (a PvP player dropping during their own turn);
-// this function clears it once its owner reconnects or is pruned, then advances.
-// Idempotent: safe to call while paused.
+// Move to the next seat that can play, scanning state.players[] in order.
+// Exited seats are skipped; a disconnected seat with an open grace window holds
+// the turn. Clears the paused flag once its owner reconnects or is pruned.
 export function advanceTurnInState(state: GameState): void {
 	// If paused, check if the pause owner has reconnected or been pruned
 	if (state.paused) {
@@ -48,11 +42,6 @@ export function advanceTurnInState(state: GameState): void {
 		return;
 	}
 
-	// Scan forward for the next player who can take the turn.
-	// Exited seats are skipped. Disconnected seats with running grace hold the
-	// turn (the game waits there — turn ownership gates roll/move/bot actions —
-	// until that seat reconnects or its grace expires and it is pruned).
-	// Disconnected seats with expired grace are treated as exited.
 	let loopCount = 0;
 	let nextIdx = (currentIdx + 1) % state.players.length;
 	while (loopCount < state.players.length) {
@@ -64,13 +53,10 @@ export function advanceTurnInState(state: GameState): void {
 		if (p.status === 'disconnected') {
 			const disc = state.disconnectedPlayers.find((d) => d.color === p.color);
 			if (disc && Date.now() < disc.reconnectDeadline) {
-				// Grace still running — the turn waits on this seat. No pause flag
-				// is needed: nobody else can act (it is not their turn), a
-				// reconnect revives the seat in place, and grace expiry prunes it.
+				// The turn waits on this seat; a reconnect resumes it in place.
 				state.currentTurn = p.color;
 				break;
 			}
-			// Grace expired — treat as exited, keep scanning
 		}
 		// 'exited' or 'inactive' or expired disconnected — skip
 		nextIdx = (nextIdx + 1) % state.players.length;
@@ -84,15 +70,8 @@ export function advanceTurnInState(state: GameState): void {
 	}
 
 	state.firstRollOfTurn = true;
-	// A turn advance always begins a NEW player's turn, so the turn-scoped
-	// snapshot left behind by the previous player must not survive: turnPhase and
-	// the pending roll/move belong to them. Leaving them behind stranded the next
-	// player whenever a seat left mid-WAITING_FOR_MOVE (a prune advanced
-	// currentTurn but kept the departed player's pendingLegalMoves, so the new
-	// player could neither roll — 'Invalid turn phase' — nor move a piece). The
-	// resign path was removed with the unused concede route, so this no longer
-	// applies to resign. rollDice's own callers already reset these; doing it here
-	// makes the invariant hold for every caller.
+	// Clear the previous player's turn snapshot: the pending roll and moves
+	// belong to them, and keeping them blocks the next player from acting.
 	state.turnPhase = 'WAITING_FOR_ROLL';
 	state.pendingLegalMoves = [];
 	state.pendingDiceValue = undefined;
@@ -124,19 +103,14 @@ export async function handlePlayerDisconnect(
 	const existing = state.disconnectedPlayers.find((d) => d.color === color);
 	if (existing) return; // Already in grace period
 
-	// Only a seat that can actually come back gets a window. A seat is no longer
-	// resumable once it is exited (left, or pruned by an expired window) or the
-	// match is finished : every one of its pieces is parked at step -1. Parking
-	// such a seat in disconnectedPlayers is what let a later join_game take the
-	// reconnect branch and flip it back to 'active' with all four pieces still at
-	// -1 : MoveValidator skips step < 0, so that seat could never produce a legal
-	// move and its turn auto-passed forever (a "zombie" seat).
+	// Only a resumable seat gets a window. An exited or finished seat has all
+	// pieces parked at step -1, so reviving it would create a seat that can
+	// never make a legal move.
 	const player = state.players.find((p) => p.color === color);
 	if (!player || player.status !== 'active' || player.isFinished) return;
 
-	// Determine mode up-front: bot-mode games PAUSE on disconnect (and use a
-	// long reconnect window), PvP games HOLD the disconnected player's turn for
-	// the short window then prune on expiry.
+	// Single-instance games (PvE, hotseat) use the long reconnect window; PvP
+	// uses the short one.
 	const matchData = await store.getMatchData(gameId);
 	const isSingleSocketMode = matchData?.gameType === 'PVE' || matchData?.gameType === 'HOTSEAT';
 	const graceMs = isSingleSocketMode ? SINGLE_SOCKET_DISCONNECT_GRACE_MS : DISCONNECT_GRACE_MS + 1000;
@@ -153,12 +127,8 @@ export async function handlePlayerDisconnect(
 	player.status = 'disconnected';
 	player.isConnected = false;
 
-	// HOLD the turn: pause only in PvP when it's the disconnected player's own
-	// turn (PvE/hotseat have no freeze concept — the game runs or is aborted).
-	// If they disconnect during another player's turn, the game continues for
-	// others; when the turn arrives at the disconnected player, it simply waits
-	// there (turn ownership gates everyone). Pending dice/moves are preserved so
-	// a reconnect resumes the exact state. Pruning happens on grace expiry only.
+	// Pause only when the dropped player holds the turn: the game waits there
+	// for a reconnect or a prune. PvE and hotseat never pause.
 	if (
 		!isSingleSocketMode &&
 		state.currentTurn === color &&
@@ -181,24 +151,15 @@ export async function handlePlayerDisconnect(
 		emit({ type: 'state_update', gameId, state });
 	}
 
-	// Grace timeout = reconnect window, NOT a forfeit. On expiry: bot-mode
-	// auto-aborts the whole instance; PvP prunes just this player and aborts
-	// the room if fewer than 2 humans remain.
-	//
-	// The timer is only a convenience: expireDisconnectedPlayer re-reads the
-	// window from Redis, so the server's periodic sweep can replay the same call.
-	// A restart between disconnect and expiry would otherwise lose this timer and
-	// leave the seat 'disconnected' with the turn held on it forever.
+	// Expiry is a reconnect deadline, not a forfeit. The window lives in Redis,
+	// so the server sweep can replay this call after a restart.
 	setTimeout(() => {
 		void expireDisconnectedPlayer(store, emit, gameId, color, notifyAbort);
 	}, graceMs);
 }
 
-// Expire a grace window FOR REAL, with the window Redis holds as the source of
-// truth: prune the seat, or abort the room when too few humans remain. Safe to
-// call from anywhere and more than once : it no-ops unless the entry still
-// exists and its deadline has actually passed, so the in-process timer and the
-// server's sweep can both call it.
+// Expire a grace window: prune the seat, or abort the room when too few humans
+// remain. Safe to call repeatedly; it no-ops unless the deadline has passed.
 export async function expireDisconnectedPlayer(
 	store: RedisGameStore,
 	emit: (event: GameEvent) => void,
@@ -216,22 +177,17 @@ export async function expireDisconnectedPlayer(
 	const matchData = await store.getMatchData(gameId);
 	const isSingleSocketMode = matchData?.gameType === 'PVE' || matchData?.gameType === 'HOTSEAT';
 
-	// Delegate to the unified exit chokepoint. For single-instance modes the room
-	// is torn down wholesale after the seat is finalized; for PvP the quorum check
-	// inside finalizeDeparture handles teardown if needed. Pass notifyAbort so it's
-	// called when teardownRoom is invoked from finalizeDeparture (PvP quorum loss).
+	// Single-instance modes tear the whole room down; PvP relies on the quorum
+	// check inside finalizeDeparture.
 	await finalizeDeparture(store, emit, gameId, color, 'timeout', notifyAbort);
 	if (isSingleSocketMode) {
 		await teardownRoom(store, emit, gameId, notifyAbort);
 	}
 }
 
-// Handle a player reconnecting within the grace period. Returns true only when
-// the seat was actually restored : false means the window outlived its seat (it
-// was pruned, left, or the match finished while the window was open), so the
-// caller must reject the join instead of seating a player who cannot move.
-// `displayName` is the name the client reports now : a player may have renamed
-// while they were away, so a reconnect also refreshes the shown name.
+// Reconnect inside the grace window. Returns false when the window outlived
+// the seat, so the caller must reject the join. A reported displayName
+// refreshes the shown name.
 export async function handlePlayerReconnect(
 	store: RedisGameStore,
 	gameId: string,
@@ -255,10 +211,8 @@ export async function handlePlayerReconnect(
 	// again and resurrect this seat.
 	state.disconnectedPlayers.splice(discIndex, 1);
 
-	// Restore the seat only if a disconnect truly parked it. A seat pruned or
-	// finished while the window was open has no pieces left to resume with, so
-	// reviving it would strand a seat that can never move (see
-	// handlePlayerDisconnect). Removal stays final.
+	// Restore only a seat a disconnect actually parked; a pruned or finished
+	// seat has no pieces left to resume with, so removal stays final.
 	const player = state.players.find((p) => p.color === color);
 	const revived = !!player && player.status === 'disconnected' && !player.isFinished;
 	if (player && revived) {
@@ -316,17 +270,16 @@ export async function handlePlayerReady(
 	}
 }
 
-// ── Unified exit-path helpers (Step 3) ──────────────────────────────────────
+// Unified exit-path helper functions
 
 export type DepartureReason =
-	| 'timeout'        // grace window expired (E2/E8)
-	| 'leave'          // socket leave_game / tab-close prune in a live game (E3/E5)
-	| 'end_game'       // End Game button, freeSeat semantics (E6)
-	| 'waiting_leave'; // left a WAITING room: reversible, reserves the seat (E3 waiting branch)
+	| 'timeout'        // grace window expired
+	| 'leave'          // left a live game (socket leave_game or a tab-close prune)
+	| 'end_game'       // End Game button: frees the seat
+	| 'waiting_leave'; // left a waiting room: reversible, keeps the seat
 
-// The ONE place a seat leaves a game. Shared skeleton + a per-reason body.
-// Replaces the scattered exit bodies across handlePlayerExit, expireDisconnectedPlayer,
-// and handleEndGame.
+// The one place a seat leaves a game. The reason selects the per-case body:
+// a waiting-room leave is reversible, the other reasons mark the seat exited.
 export async function finalizeDeparture(
 	store: RedisGameStore,
 	emit: (event: GameEvent) => void,
@@ -390,10 +343,8 @@ export async function finalizeDeparture(
 
 	await store.saveGameState(gameId, state);
 	emit({ type: 'player_exited', gameId, color });
-	// A live-game exit changes state no other event carries: the turn may have
-	// moved off the departed seat and every one of their pieces is now off the
-	// board. Without this frame each client keeps rendering the departed player's
-	// turn (and their pieces) until some unrelated event happens to sync them.
+	// The turn may have moved and the departed seat's pieces are gone; clients
+	// need this frame to stop rendering the old turn.
 	if (state.status === 'active') {
 		emit({ type: 'state_update', gameId, state });
 	}
@@ -404,8 +355,8 @@ export async function finalizeDeparture(
 	}
 }
 
-// The ONE place a room is torn down: abort + delete + emit game_expired + clear
-// in-memory (userIdMap, bots). Replaces the 6 duplicated copies.
+// The one place a room is torn down: emit game_expired, abort the match, delete
+// the game state, and run the in-memory cleanup callback.
 export async function teardownRoom(
 	store: RedisGameStore,
 	emit: (event: GameEvent) => void,
@@ -418,8 +369,7 @@ export async function teardownRoom(
 	notify?.(gameId);
 }
 
-// The ONE quorum predicate, currently duplicated at player-handler.ts:173-181
-// and post-game.ts:56-68.
+// A room can continue only with at least two active human seats.
 export function hasQuorum(state: GameState): boolean {
 	return state.players.filter((p) => p.status === 'active' && !p.isBot).length >= 2;
 }

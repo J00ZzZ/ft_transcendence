@@ -90,11 +90,9 @@ export class JoinManager {
           // progress : only a player reconnecting to their own seat may re-enter.
           // Hotseat is exempt — only 1 socket used in this game mode.
           if (state.status !== 'waiting' && !isReconnectingPlayer && !isHotseat) {
-            // A seat left as exited belongs to a player who was removed
-            // from this live match (they left, or their reconnect window expired
-            // and the prune is final). Tell its owner the seat is gone so the
-            // client can leave, instead of the generic rejection that only
-            // reaches the console and strands them on a board they cannot use.
+            // A seat left as exited belongs to a player removed from this live
+            // match. Tell its owner the seat is gone so the client leaves instead
+            // of being stranded on a board it cannot use.
             const seat = state.players.find((p) => p.color === effectiveColor);
             if (seat?.status === 'exited') {
               socket.leave(effectiveGameId);
@@ -113,11 +111,8 @@ export class JoinManager {
             );
             state = await this.store.loadGameState(effectiveGameId);
             if (!revived) {
-              // The grace window outlived the seat: it was pruned (or left, or
-              // the match finished) while the window was open, so every piece is
-              // parked at step -1 and there is nothing to resume. Removal is
-              // final — leave the room and tell the client its seat is gone,
-              // rather than seating a player who can never make a legal move.
+              // The grace window outlived the seat: nothing is left to resume,
+              // so leave the room and tell the client its seat is gone.
               socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
@@ -188,11 +183,9 @@ export class JoinManager {
           state = await this.store.loadGameState(effectiveGameId);
         }
 
-        // Resume re-arm: unfreeze a paused PvP game only when the seat it is
-        // frozen on is the one (re)joining. PvE/hotseat never pause, and any
-        // OTHER player's reconnect must not clear a pause that belongs to a
-        // seat still inside its grace window (the owner's own revive in
-        // handlePlayerReconnect already cleared it, so this is defensive).
+        // Unfreeze a paused game only when the seat it is frozen on rejoins.
+        // Another player's reconnect must not clear a pause that belongs to a
+        // seat still inside its grace window.
         if (
           state?.status === 'active' &&
           state.paused &&

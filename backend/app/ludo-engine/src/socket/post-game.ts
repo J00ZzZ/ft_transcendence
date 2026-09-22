@@ -42,18 +42,14 @@ export class PostGameManager {
 		const isSingleSocketMode = match?.gameType === 'PVE' || match?.gameType === 'HOTSEAT';
 
 		if (isSingleSocketMode) {
-			// Single-instance mode: tear down the whole room. teardownRoom emits
-			// game_expired through the engine event -> publisher -> broadcaster
-			// path and runs cleanup via its notify callback, so no direct socket
-			// emit is needed (that would double-deliver the event).
+			// Single-instance mode: tear down the whole room. teardownRoom
+			// broadcasts game_expired and runs the cleanup callback.
 			await teardownRoom(this.store, this.engine.emitEvent.bind(this.engine), gameId, this.cleanup);
 			return;
 		}
 
-		// PvP: prune only this player. `end_game` frees the seat outright. When
-		// the prune drops the room below quorum, finalizeDeparture tears it down
-		// itself (broadcasting game_expired and running the cleanup callback),
-		// so there is no second quorum check to keep in sync here.
+		// PvP: prune only this player and free the seat. finalizeDeparture tears
+		// the room down if the prune leaves it below quorum.
 		await finalizeDeparture(
 			this.store,
 			this.engine.emitEvent.bind(this.engine),
