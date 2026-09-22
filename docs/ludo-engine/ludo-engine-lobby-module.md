@@ -87,15 +87,15 @@ left.
 
 | Event | Redis `match:{gameId}` | Engine GameState | Client roster |
 |-------|------------------------|------------------|---------------|
-| Player leaves without aborting | `reserveMatchSeat()` sets `player<N>_left`; the id and colour stay | seat parked as `inactive` | seat hidden |
-| Player presses End Game / abort | `clearMatchSeat()` deletes `player<N>_id`, `player<N>_color`, `player<N>_left` | seat removed | seat free for another player |
+| Player leaves a waiting room | `reserveMatchSeat()` sets `player<N>_left`; the id and colour stay | seat parked as `inactive` | seat hidden |
+| Player leaves a live game via End Game | `clearMatchSeat()` deletes `player<N>_id`, `player<N>_color`, `player<N>_left` | seat parked as `exited` | seat shows as gone |
+| Backend abort (`POST /api/game/:id/abort`) | the match is marked `ABORTED`; individual seats are not cleared | — | room drops out of the listings |
 | Player rejoins | the backend's `joinMatch` userId lookup finds the reserved slot and returns the same colour | seat back to `active` | seat returns |
 | Idle-abort timer fires | the room is gone | — | room closed |
 
-Both methods skip the host's seat (`player1_color`), so the room stays
-rejoinable, and both write `idleSince` to restart the room's idle-abort timer.
-The `player<N>_left` flag is what keeps the seated count correct, so a reserved
-seat cannot hold a room open. See also
+Both seat methods skip the host's seat (`player1_color`), and both write `idleSince` to
+restart the room's idle-abort timer. The `player<N>_left` flag is what keeps the
+seated count correct, so a reserved seat cannot hold a room open. See also
 [`ludo-engine-core-system.md`](ludo-engine-core-system.md) → Seat statuses.
 
 

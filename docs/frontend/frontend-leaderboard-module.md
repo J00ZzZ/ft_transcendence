@@ -51,6 +51,7 @@ The Leaderboard page (`/leaderboard`, full-screen) shows players in rank order. 
 ```typescript
 type LeaderboardEntry = {
   rank: number  // Position in the ranking
+  id: string  // Immutable user id, the key avatars are looked up by
   username: string  // Player's username
   displayName?: string  // Name shown in the game
   rating: number  // Player's rating (score)
@@ -109,7 +110,6 @@ sequenceDiagram
 
 | Dependency | Purpose |
 |-----------|---------|
-| `api.ts` | Typed request helpers |
 | `store.tsx` | `useApp` for current user |
 | `utils/ranks.ts` | Rank tier badges |
 | `i18n.ts` | `useTranslation` (`leaderboard.*` keys) |

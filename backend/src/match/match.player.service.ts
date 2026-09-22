@@ -6,6 +6,7 @@ import { secret } from '../secrets';
 import Redis from 'ioredis';
 import { isBotUserId } from '../common/bot';
 import { isSeatFinalized } from './seat-finalization';
+import { ENGINE_WS_URL } from './match.creator.service';
 
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 
@@ -92,7 +93,7 @@ export class MatchPlayerService {
     return {
       gameId,
       token,
-      engineUrl: 'ws://localhost:3001',
+      engineUrl: ENGINE_WS_URL,
       color: assignedColor,
       inviteCode: data.inviteCode || undefined,
       mode: (data as { gameType?: string }).gameType?.toLowerCase() ?? 'pvp',
@@ -149,7 +150,7 @@ export class MatchPlayerService {
     return {
       gameId,
       token,
-      engineUrl: 'ws://localhost:3001',
+      engineUrl: ENGINE_WS_URL,
       color,
       inviteCode: data.inviteCode || undefined,
       mode: (data as { gameType?: string }).gameType?.toLowerCase() ?? 'pvp',

@@ -134,8 +134,8 @@ sequenceDiagram
 >
 > 1. `seed.ts` connects straight to Redis with `ioredis`, using the same
 >    `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` values the backend uses
->    (from the root `.env` — no secret files are used).
-> 2. It clears the old sorted sets first: `DEL leaderboard:global`,
+>    (from the root `.env`).
+> 2. It clears the existing sorted sets first: `DEL leaderboard:global`,
 >    `leaderboard:ranked`, `leaderboard:casual`.
 > 3. It reads every user + rating from PostgreSQL (`allPilots`, sorted by rating
 >    descending) and writes each one into all three sets with
@@ -381,7 +381,7 @@ GET /api/leaderboard?mode=global&page=1&limit=20
   │   ├── Fetch user details from PostgreSQL, work out gamesPlayed/winRate/ranks
   │   ├── myRank = ZREVRANK(userId) + 1 (if userId given)
   │   └── Return { entries, source: 'redis', myRank? }
-  └── If Redis fails (catch): rethrow — no snapshot fallback anymore
+  └── If Redis fails (catch): rethrow
 ```
 
 ### Population Paths (summary)

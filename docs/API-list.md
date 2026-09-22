@@ -11,7 +11,7 @@ Complete reference of all HTTP and WebSocket APIs in the project. Updated 14 Sep
 
 | Icon | Meaning |
 |---|---|
-| 🔒 | Requires JWT in `token` cookie (set by login/register) |
+| 🔒 | Requires JWT in `token` cookie (set by login or 2FA verify, refreshed by `/api/auth/refresh`) |
 | 🌐 | WebSocket event (Socket.IO) |
 | 🤖 | Called by ludo-engine (backend-to-backend) |
 
@@ -243,7 +243,7 @@ Base URL: `http://localhost:3000` (or `http://backend:3000` from Docker)
 All endpoints return JSON. The backend runs on port 3000.
 
 Auth is handled via **httpOnly cookies**:
-- `token` — short-lived access token (15 min), set by login/register/refresh
+- `token` — short-lived access token (15 min), set by login, 2FA verify, OAuth completion, or refresh
 - `refresh_token` — long-lived refresh token (7 days), path-scoped to `/api/auth`
 
 No manual `Authorization` header is needed for cookie-authenticated requests.
@@ -264,7 +264,7 @@ No manual `Authorization` header is needed for cookie-authenticated requests.
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Create a new user account. Sends a verification email; no session is set until the email is verified.
+Create a new user account and send a verification email. This call sets no session.
 
 **Headers:** None  
 **Body:**
@@ -282,7 +282,7 @@ Create a new user account. Sends a verification email; no session is set until t
 
 ```json
 {
-  "message": "Account created — check your email to verify your address."
+  "message": "Account created : check your email to verify your address."
 }
 
 ```
@@ -302,7 +302,7 @@ Redeem an emailed verification link. Redirects to the SPA with a query param on 
 
 **Headers:** None  
 **Query:** `token` — the 64-char hex token from the email link  
-**Response:** 302 redirect to `{FRONTEND_URL}/login?verified=1` or `?error=invalid-verification-link`
+**Response:** 302 redirect to `<request-origin>/login?verified=1` or `<request-origin>/login?error=invalid-verification-link`. The origin is taken from the request that arrived, so a tunnel visitor is sent back to the tunnel host.
 
 
 ---
@@ -313,7 +313,7 @@ Redeem an emailed verification link. Redirects to the SPA with a query param on 
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with 2FA disabled, sets the session cookies.
+Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with 2FA disabled, sets the session cookies. The password is the only factor checked, so an account whose address is not yet verified can still sign in.
 
 **Headers:** None  
 **Body:**
@@ -331,7 +331,7 @@ Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with
 ```json
 {
   "twoFactorRequired": false,
-  "user": { "id": "uuid", "username": "string" }
+  "user": { "id": "uuid", "username": "string", "displayName": "string" }
 }
 
 ```
@@ -346,7 +346,7 @@ Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with
 
 ```
 
-**Errors:** 401 if invalid credentials, 403 if email not verified.
+**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. Sign-in does not check whether the address has been verified, so an unverified account can sign in with its password.
 
 
 ---
@@ -374,7 +374,7 @@ Redeem a 2FA code emailed during login. Sets session cookies on success.
 
 ```json
 {
-  "user": { "id": "uuid", "username": "string" }
+  "user": { "id": "uuid", "username": "string", "displayName": "string" }
 }
 
 ```
@@ -398,7 +398,7 @@ Silent re-authentication. Trade a valid refresh token for a fresh access token +
 
 ```json
 {
-  "user": { "id": "uuid", "username": "string" }
+  "user": { "id": "uuid", "username": "string", "displayName": "string" }
 }
 
 ```
@@ -520,7 +520,7 @@ Redeem a reset token and set a new password.
 
 ```json
 {
-  "message": "Password updated — you can log in with it now."
+  "message": "Password updated : you can log in with it now."
 }
 
 ```
@@ -549,6 +549,8 @@ Return the full profile for the logged-in user (used by the Edit-Profile card).
     "displayName": "Display Name",
     "email": "user@example.com",
     "hasPassword": true,
+    "avatarStyle": "bottts",
+    "hasAvatarPhoto": false,
     "providers": ["google", "github", "42"]
   }
 }
@@ -607,7 +609,7 @@ Change the password while logged in (requires the current password).
 ```json
 {
   "code": "AUTH_PASSWORD_UPDATED",
-  "message": "Password updated — other devices were signed out."
+  "message": "Password updated : other devices were signed out."
 }
 
 ```
@@ -917,7 +919,8 @@ Upload an avatar image (max 2 MB, PNG/JPEG/GIF/WebP).
 
 ```json
 {
-  "message": "Avatar uploaded"
+  "message": "Avatar uploaded",
+  "contentType": "image/png"
 }
 
 ```
@@ -972,12 +975,15 @@ Delete the current user's custom avatar.
 
 ### 6. Match — Matchmaking
 
-All match endpoints return `{ gameId, token, engineUrl }` (plus `inviteCode` for invite games).
+Match responses share a handoff shape: `{ gameId, token, engineUrl, color, mode, playerCount }`, plus `inviteCode` for invite games.
 
 - `gameId`: UUID of the new/pending match
 - `token`: JWT to use when connecting to ludo-engine via Socket.IO
-- `engineUrl`: Same-origin WebSocket URL (derived from `FRONTEND_URL`, e.g. `ws://localhost:8443`) — the browser connects to its own origin and nginx/Vite forwards `/socket.io/` to the engine
-- `inviteCode`: 6-char shareable code (invite games only)
+- `engineUrl`: the Socket.IO endpoint name, derived from `FRONTEND_URL` (`ENGINE_WS_URL`, prefix `http` → `ws`, so `wss://localhost:8443` with the example `.env`). The SPA does not use it to connect, it connects to its own origin.
+- `color`: the seat colour the caller was given
+- `mode`: `pvp`, `pve`, or `hotseat`
+- `playerCount`: `2`, `3`, or `4`
+- `inviteCode`: 6-char shareable code (invite games only, and only when the room has one)
 
 To connect to the engine:
 
@@ -1011,7 +1017,7 @@ Create a PvP invite game with a shareable code.
   "gameId": "uuid",
   "inviteCode": "ABCD12",
   "token": "jwt-string",
-  "engineUrl": "ws://localhost:8443",
+  "engineUrl": "wss://localhost:8443",
   "color": "blue",
   "mode": "pvp",
   "playerCount": 4
@@ -1044,15 +1050,16 @@ Join a PvP game by invite code.
 {
   "gameId": "uuid",
   "token": "jwt-string",
-  "engineUrl": "ws://localhost:8443",
+  "engineUrl": "wss://localhost:8443",
   "color": "red",
+  "inviteCode": "ABCD12",
   "mode": "pvp",
   "playerCount": 4
 }
 
 ```
 
-**Errors:** 404 `MATCH_INVITE_INVALID` if the code is not found/expired; 403 `MATCH_ALREADY_STARTED` if the game started; 400 `MATCH_OWN_INVITE` if joining your own invite.
+**Errors:** 404 `MATCH_INVITE_INVALID` when no WAITING room carries that code (not found, expired, or already started); 403 `MATCH_ROOM_FULL` if the last seat was taken between the lookup and the assignment; 400 `MATCH_OWN_INVITE` when you are the host.
 
 
 ---
@@ -1081,7 +1088,7 @@ Start a PvE (vs bot) game.
 {
   "gameId": "uuid",
   "token": "jwt-string",
-  "engineUrl": "ws://localhost:8443",
+  "engineUrl": "wss://localhost:8443",
   "color": "blue",
   "mode": "pve",
   "playerCount": 2
@@ -1125,7 +1132,7 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
 {
   "gameId": "uuid",
   "token": "jwt-string",
-  "engineUrl": "ws://localhost:8443",
+  "engineUrl": "wss://localhost:8443",
   "color": "blue",
   "mode": "pvp",
   "playerCount": 2,
@@ -1165,8 +1172,14 @@ Signal that the current player is ready.
 ```json
 {
   "message": "Player ready",
-  "gameId": "uuid"
+  "gameId": "uuid",
+  "readyCount": 1,
+  "totalPlayers": 2,
+  "allReady": false
 }
+```
+
+**Errors:** 404 `MATCH_GAME_NOT_FOUND` if the room is gone; 403 `MATCH_NOT_PLAYER` if the caller holds no seat.
 
 ```
 
@@ -1191,6 +1204,9 @@ Acknowledge leaving the game (after game has ended).
   "message": "Exited game",
   "gameId": "uuid"
 }
+```
+
+**Errors:** 404 `MATCH_GAME_NOT_FOUND` if the room is gone; 403 `MATCH_NOT_PLAYER` if the caller holds no seat.
 
 ```
 
@@ -1239,6 +1255,20 @@ Invite a friend into a WAITING PvP room.
 { "friendId": "user-id" }
 
 ```
+
+**Response:**
+
+```json
+{
+  "message": "Invite sent",
+  "gameId": "uuid"
+}
+```
+
+**Errors:** 404 `MATCH_GAME_NOT_FOUND` if the room is gone; 403 `MATCH_PVP_ONLY_INVITE` for a non-PvP
+room; 403 `MATCH_ALREADY_STARTED` once the room has left WAITING; 403 `MATCH_NOT_PLAYER` if the caller
+holds no seat; 403 `NOT_FRIENDS_WITH_USER` when the target is not a friend; 403 `MATCH_ROOM_FULL` if
+no seat is left for the friend.
 
 
 ---
@@ -1298,9 +1328,16 @@ Rejoin a room the user is seated in (after a refresh).
 {
   "gameId": "uuid",
   "token": "jwt-string",
-  "engineUrl": "ws://localhost:8443"
+  "engineUrl": "wss://localhost:8443",
+  "color": "red",
+  "inviteCode": "ABCD12",
+  "mode": "pvp",
+  "playerCount": 4
 }
 ```
+
+`color` is the seat's colour, and `mode` / `playerCount` describe the room. `inviteCode` is present
+only when the room has one.
 
 **Errors:** 404 if game not found, 403 `MATCH_NOT_PLAYER` if the caller holds no seat, and 403
 `MATCH_SEAT_EXPIRED` when the seat has been finalized (the engine parked every piece at `step = -1`),
@@ -1332,7 +1369,7 @@ Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authen
   "gameId": "uuid",
   "participants": [
     {
-      "userId": "string (or 'ludo-bot')",
+      "userId": "string (or 'bot-<color>' for bot seats)",
       "color": "'RED'|'GREEN'|'YELLOW'|'BLUE'",
       "rank": 1,
       "piecesCaptured": 3,
@@ -1357,9 +1394,11 @@ Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authen
 
 **Side effects:**
 - Writes `game` + `game_participant` rows to Postgres
-- Updates the player's `User` row: `rating`, `winStreak`, `bestWinStreak`, `wins`, `losses`, `botWins`, `humanWins`, etc. (scoring via `ratingDeltaFor()`)
+- Updates each non-bot participant's `User` row: `rating` (clamped at 0), `highestRating`, `wins`, `losses`, `humanWins`, `botWins`, `winStreak`, `bestWinStreak`, `pveGameStreak` (scoring via `ratingDeltaFor()`)
 - Evaluates achievements for all participants (fires unlock notifications)
-- Updates Redis `leaderboard:global` sorted set
+- Sends a `match_finished` notification to every human participant
+- Updates the Redis `leaderboard:global` sorted set
+- Deletes `match:{gameId}` from Redis
 
 
 ---
@@ -1378,11 +1417,14 @@ Called by ludo-engine once the ready-check passes and the game transitions to AC
 **Response:**
 
 ```json
-{ "ok": true }
-
+{
+  "message": "Game marked active",
+  "gameId": "uuid"
+}
 ```
 
-- Deletes `match:{gameId}` from Redis
+The room's Redis status is set to `ACTIVE`, and `startedAt` is stamped once (the first call wins).
+If the room is no longer in Redis the call answers `{ "message": "Game not found", "gameId": "uuid" }`.
 
 
 ---
@@ -1417,6 +1459,7 @@ Get paginated leaderboard rankings.
   "entries": [
     {
       "rank": 1,
+      "id": "uuid",
       "username": "string",
       "displayName": "string",
       "rating": 1500,
@@ -1805,7 +1848,7 @@ Invite a friend to a PvP game. Creates a match room and seats the friend; pushes
   "message": "Invite sent",
   "gameId": "game-id",
   "token": "<jwt>",
-  "engineUrl": "ws://localhost:8443",
+  "engineUrl": "wss://localhost:8443",
   "color": "red",
   "inviteCode": "ABCD12"
 }
@@ -1842,7 +1885,7 @@ Dismiss the current user's pending game invite.
 **Response:**
 
 ```json
-{ "ok": true }
+{ "message": "Dismissed" }
 
 ```
 
@@ -2077,13 +2120,17 @@ JWT payload structure:
 ```json
 {
   "gameId": "uuid",
-  "sub": "user-id",
-  "userId": "user-id",
+  "playerId": "user-id",
+  "username": "string",
+  "displayName": "string",
   "role": "player1" | "player",
-  "color": "red"
+  "color": "red",
+  "mode": "pvp" | "pve" | "hotseat"
 }
 
 ```
+
+`mode` is signed only on tokens minted by the creation endpoints (`/api/match/create`, `/api/match/pvp/invite`, `/api/match/pve`); the join-by-code and rejoin tokens omit it, and the engine treats a missing `mode` as a PvP seat. The engine reads the account id from `playerId` (it also accepts `sub` or `userId` if present). `username` is omitted for bot seats.
 
 **Health endpoint on the engine:** `GET http://localhost:3001/health` returns `{ "status": "ok", "uptime": 12345.67 }`.
 
@@ -2330,8 +2377,8 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 
 ## Notes
 
-- **Auth:** All auth endpoints use httpOnly cookies. Set automatically by login/register/refresh, cleared by logout. No `Authorization: Bearer` header is used.
+- **Auth:** All auth endpoints use httpOnly cookies. Set by login, 2FA verify, OAuth completion, and refresh; cleared by logout. No `Authorization: Bearer` header is used.
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
-- **Bot tokens:** `playerId` is `'ludo-bot'`, `role` is `'player'` / `'player1'`.
+- **Bot seats:** the account id is `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
 - **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
 - **Rate limiting:** Auth endpoints (`register`, `login`) have throttler guard enabled.

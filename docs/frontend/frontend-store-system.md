@@ -325,6 +325,6 @@ toggleSetting(key)
 |-----------|---------|
 | `theme.ts` | `BOT_POOL` for bot seat names |
 | `i18n.ts` | `i18n.changeLanguage` and `i18n.t` for default player names |
-| `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` for the 14-minute token refresh that runs before the token expires, and `translateErrorCode`, which turns an error code into text in the user's language |
+| `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` (called on the store's 14-minute timer, before the access token expires), and `translateErrorCode`, which turns an error code into text in the user's language |
 | `game/types.ts` | `PlayerColor` for `ActiveMatch` |
 | API (Application Programming Interface) | `/api/auth/me`, `/api/auth/login`, `/api/auth/register`, `/api/auth/logout`, `/api/auth/2fa/verify`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/2fa`, `/api/presence/heartbeat` |

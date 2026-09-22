@@ -45,7 +45,7 @@ Notifications move over two linked transports:
   recipient's per-user channel (`notify:<userId>`); `broadcast()` publishes to
   the global channel (`notify:all`). Redis decouples the emitter from the SSE
   layer — any backend service can publish without knowing who is connected.
-- **SSE** is the last mile to the browser. Each open tab holds one
+- **SSE** is the final hop to the browser. Each open tab holds one
   `GET /api/notifications/stream` connection, backed by an rxjs `Subject` in
   the service's in-memory `clients` map (one user, multiple tabs ⇒ multiple
   Subjects) plus `broadcastClients` (every Subject, for `notify:all`).

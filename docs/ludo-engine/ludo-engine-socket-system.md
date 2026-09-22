@@ -48,7 +48,6 @@ input/output. Each event is documented in full below; see
 | `player_ready` | Seated player in the waiting lobby | `()` | Mark ready; when every active player is ready the game starts | `game_started` |
 | `select_color` | Seated player during color selection | `(color: 'red'/'green'/'yellow'/'blue')` | Move the player to the requested seat color; clears Ready on both colors involved | `color_selected` + `lobby_update` |
 | `leave_game` | Player leaving a room (e.g. after a match) | `()` | Waiting room: seat parked `inactive` and reserved. Live game: seat parked `exited`, pieces cleared, turn advances | `player_exited` (+ `state_update` live) |
-
 | `end_game` | Host presses "End Game" | `()` | PvE/hotseat: abort the whole game. PvP: prune this player, abort the room if fewer than 2 humans remain | `game_expired` or `player_aborted` |
 | `disconnect` | Socket drops (automatic) | — | Start the reconnect grace period, but only for a live, unfinished **active** seat — an exited/finished seat has no pieces left and must not be revivable. In **PvP**, dropping during your own turn also pauses the game (`paused` + `pauseTurnOwner`); dropping during someone else's turn lets play continue until the turn reaches the departed seat, which then simply waits | `player_disconnected`, then `player_reconnected` or `player_exited` |
 
@@ -94,8 +93,8 @@ input/output. Each event is documented in full below; see
 | `socket/join-manager.ts` | `JoinManager` — seat resolution, game creation, reconnect vs fresh join, PvE/hotseat auto-start |
 | `socket/bot-scheduler.ts` | One timer per game that drives bot turns |
 | `socket/post-game.ts` | End-of-game flow — post-game timeout and room teardown |
-| `socket/event-publisher.ts` | Redis pub/sub → Socket.IO bridge for multi-instance scaling |
-| `socket/redis-broadcaster.ts` | Room-based state broadcasts via Redis |
+| `socket/event-publisher.ts` | `EventPublisher` — publishes each engine event to the Redis `game:{gameId}` channel |
+| `socket/redis-broadcaster.ts` | `RedisBroadcaster` — forwards Redis `game:*` messages into the matching Socket.IO room |
 | `socket/result-submitter.ts` | POST /api/game/end callback to backend |
 
 
@@ -131,9 +130,12 @@ The JWT payload (issued by `MatchService`) contains:
   "username": "username",
   "displayName": "Display Name",
   "role": "player1" | "player",
+  "color": "red" | "green" | "yellow" | "blue",
   "mode": "pvp" | "pve" | "hotseat"
 }
 ```
+
+`playerId` is the account id, which the engine reads as `userId`. `color` always identifies the seat and becomes the socket's seat colour. `mode` is present only on tokens minted when the match is created; tokens from `joinMatch` and `rejoin` omit it, and the engine derives the mode from the match record instead.
 
 
 ---
@@ -142,7 +144,9 @@ The JWT payload (issued by `MatchService`) contains:
 
 ### JWT Validation
 
-The `socket/auth.ts` middleware reads the token from `socket.handshake.auth.token` and verifies it with a minimal HMAC-SHA256 check (no external JWT library). It maps `playerId`/`sub`/`userId` to `socket.data.userId`, and attaches `role`, `gameId`, `username`, and `displayName` to `socket.data`. Invalid or missing tokens are rejected with an `error` event.
+The handshake middleware in `socket/server.ts` reads the token from `socket.handshake.auth.token` and passes it to `verifyToken` in `socket/auth.ts`. That function validates the token itself: it accepts only `HS256`, recomputes the HMAC-SHA256 signature and compares it in constant time, and rejects an expired token (`exp`). No external JWT library is used.
+
+`verifyToken` reads the account id from `playerId`, `sub`, or `userId`, and also returns `gameId`, `username`, `displayName`, `role` (default `player`), `color`, and `mode`. The middleware stores these on `socket.data`, where `color` becomes `tokenColor` — the seat colour issued by the backend. `handleJoinGame` prefers `tokenColor` over the colour the client sends, so a client cannot claim another seat. A missing token or a failed check rejects the connection.
 
 
 ---
@@ -203,7 +207,7 @@ socket.emit('join_game', gameId, playerColor, userId?, displayName?);
 |---|---|---|
 | `gameId` | string | Match UUID |
 | `playerColor` | `'red'` \| `'green'` \| `'yellow'` \| `'blue'` | Your chosen color |
-| `userId` | string | (optional) Override for bots |
+| `userId` | string | (optional) Account id of the joining user; omitted for hotseat's local seats |
 | `displayName` | string | (optional) Display name for the seat |
 
 **Response:** `game_joined` event with full `GameState`
@@ -223,7 +227,7 @@ End the game prematurely (host/admin action).
 socket.emit('end_game');
 ```
 
-**Response:** `game_ended` / `player_aborted` broadcast.
+**Response:** In PvP, `player_aborted` is broadcast, and `game_expired` follows if the room falls below quorum. In PvE and hotseat the whole room is torn down with `game_expired`. No result is posted.
 
 
 ---
@@ -240,7 +244,7 @@ socket.emit('roll_dice');
 
 **Response:** `dice_rolled` event (broadcast to all in room)
 
-**Errors:** `error` if not your turn, wrong phase, or player exited.
+**Errors:** `error` if the game is paused, it is not your turn, the phase is wrong, or the current player has exited.
 
 
 ---
@@ -276,7 +280,7 @@ Signal that the current player is ready to start the game.
 socket.emit('player_ready');
 ```
 
-**Response:** None
+**Response:** `game_started` once every active seat is ready, and `lobby_update` on each ready toggle.
 
 
 ---
@@ -295,7 +299,7 @@ socket.emit('select_color', color);
 |---|---|---|
 | `color` | string | e.g. `"red"` |
 
-**Response:** None
+**Response:** `color_selected` plus `lobby_update`.
 
 
 ---
@@ -334,7 +338,7 @@ Automatically handled by Socket.IO on connection drop.
 
 The window is only opened for a **live** seat (`status === 'active'` and not finished). Expiry is final: `finalizeDeparture(..., 'timeout')` parks every one of that colour's pieces at `step = -1` and marks the seat `exited`, and `handlePlayerDisconnect` refuses to open a new window for a seat in that state. A later `join_game` for such a seat is therefore rejected instead of being treated as a reconnect — otherwise the seat would come back `active` with all four pieces at `-1`, which `MoveValidator` skips, leaving a player who can never produce a legal move and whose turn auto-passes forever. The rejected client gets `seat_expired` (that socket only).
 
-A rename rides along with a reconnect: the `join_game` payload's `displayName` is persisted and republished on `player_reconnected`, because the rest of the room only sees that event — a live game never re-broadcasts the whole lobby roster.
+A rename is carried through the reconnect: the `join_game` payload's `displayName` is persisted and republished on `player_reconnected`, because the rest of the room only sees that event — a live game never re-broadcasts the whole lobby roster.
 
 Expiry is not tied to the in-process timer: the window itself lives in Redis (`disconnectedPlayers[].reconnectDeadline`), so `expireDisconnectedPlayer` is also replayed by a 1-minute server sweep and once at startup. A restart between disconnect and expiry therefore still kicks the seat out, instead of leaving it `disconnected` with the turn held on it forever.
 
@@ -363,7 +367,7 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 | `game_started` | `{ gameId }` | Game transitions from waiting → active |
 | `game_ended` | `{ winner, resultDetail }` | Game finished |
 | `game_timeout` | none | Post-game lobby expired (60s) — finished room torn down |
-| `game_expired` | none | Idle lobby expired (5 min, < 2 seated) |
+| `game_expired` | `{ gameId }` | Room torn down: idle lobby (5 min, < 2 seated), single-instance disconnect window expired, or quorum lost after an exit |
 | `player_exited` | `{ color }` | Permanent exit — left the room or the disconnect grace window expired |
 | `player_aborted` | `{ color, username }` | A player aborted the game |
 | `player_disconnected` | `{ color }` | A player's connection dropped |
@@ -371,7 +375,7 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 | `seat_expired` | `{ gameId, color }` | Your `join_game` was refused: that seat was already removed (left, or its grace window expired) — this socket only |
 | `lobby_update` | `{ players: [{ userId, username, avatarStyle, color, ready }] }` | Lobby seats changed |
 | `color_selected` | `{ gameId, userId, color }` | A player picked a color |
-| `state_update` | full `GameState` | A live exit moved the turn — the other events don't carry it |
+| `state_update` | full `GameState` | A live exit moved the turn, or a PvP disconnect set or cleared the reconnect pause |
 | `error` | `string` | On invalid action |
 
 
@@ -404,12 +408,13 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
   disconnectedPlayers: DisconnectState[];  // Players temporarily disconnected (grace period)
   status: 'waiting' | 'active' | 'finished';  // Game lifecycle state
   winner?: PlayerColor;                // Winner color once the game is finished
-  resultDetail?: string;               // Human-readable finish reason (all pieces home / forfeit)
+  resultDetail?: string;               // Finish reason, e.g. 'four_pieces'
   resultSubmitted?: boolean;           // Prevents duplicate backend submissions
   botBusy?: boolean;                   // Prevents overlapping bot turns
   readyPlayers: PlayerColor[];         // Players who have clicked "ready"
   paused?: boolean;                    // Whether the game is currently paused
   pauseTurnOwner?: PlayerColor;        // Whose turn it was when the game paused
+  pausedReason?: string;               // Why the game paused, e.g. 'disconnect_grace'
 }
 ```
 
@@ -424,8 +429,11 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 {
   color: PlayerColor;                  // Seat color
   status: 'active' | 'exited' | 'inactive' | 'disconnected';  // Player lifecycle state
-  username: string;                    // Seat/display name
-  displayName?: string;                // Optional display name
+  username: string;                    // Immutable account name (bots: `bot-<color>`)
+  displayName?: string;                // Name shown in the UI
+  userId?: string;                     // Account id used to key the avatar; absent for bots and hotseat seats
+  hasAvatarPhoto: boolean;             // Whether the account has an uploaded photo
+  avatarStyle?: string;                // DiceBear style used when there is no photo
   isBot: boolean;                      // Whether this seat is a bot
   isConnected: boolean;                // Whether the player's socket is currently connected
   piecesInGoal: number;                // Pieces finished (0-4)
@@ -478,7 +486,7 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
   captured: boolean;           // Whether this move captured an opponent piece
   capturedPieceIds?: PieceId[];  // Opponent pieces sent home from the landing square (a stacked block sends all of them back)
   enteredHome: boolean;        // Whether the piece entered the home lane
-  bonusRoll: boolean;          // Player rolled a 6 → rolls again
+  bonusRoll: boolean;          // The same player rolls again (a 6 or a capture)
 }
 ```
 

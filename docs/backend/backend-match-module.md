@@ -21,7 +21,7 @@
 The Match module is the bridge between the REST API and the real-time ludo-engine. It handles:
 
 1. **Matchmaking** — creates or joins PvP, PvE, or invite games.
-2. **Game lifecycle** — transitions games from `waiting` → `active` → `completed`.
+2. **Game lifecycle** — moves the engine's game state through `waiting` → `active` → `finished`, and the match record through `WAITING` → `ACTIVE` → `ABORTED` or `ENDED`.
 3. **Room browsing** — `GET /api/games/rooms` lists joinable PvP rooms, and `GET /api/games/mine` lists the rooms you are seated in.
 
 The module uses Redis for short-lived match data (queues, active games) and lets the ludo-engine own the actual game logic over Socket.IO.
@@ -73,8 +73,10 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 ```typescript
 {
   gameId: string;            // UUID of the match
-  token: string;             // JWT for Socket.IO handshake
-  engineUrl: string;         // "ws://localhost:8443" (derived from FRONTEND_URL)
+  token: string;             // JWT for the Socket.IO handshake
+  engineUrl: string;         // Socket.IO endpoint name. Derived from `FRONTEND_URL`
+                             // (`ENGINE_WS_URL`, prefix `http` → `ws`). The SPA does not use it
+                             // to connect — it connects to its own origin.
   color: string;             // Assigned seat color (server-chosen)
   mode: 'pvp' | 'pve' | 'hotseat';  // Game mode (persisted for refresh/rejoin)
   playerCount: number;       // How many players/seats
@@ -144,7 +146,7 @@ sequenceDiagram
 
     User->>Site: Configure PvP and press Start
     Site->>Server: POST /api/match/create { mode: "pvp" }
-    Server->>Server: Create a WAITING game + a one-time login token
+    Server->>Server: Create a WAITING match and sign an engine JWT (24h expiry)
     Server-->>Site: { gameId, token, engineUrl }
     Site-->>User: Take you into the game room
     Note over Site,Server: Opponents join later via invite code (/pvp/invite) or an open room
@@ -211,31 +213,33 @@ sequenceDiagram
 ### Create PvP Path
 ```
 POST /api/match/create   (mode: "pvp")
-  ├── Create a new WAITING game
-  ├── issueEngineToken(gameId, userId, role, color)
+  ├── Validate the mode and the seat counts
+  ├── Write the match hash (status WAITING) with a 24h TTL
+  ├── Sign the engine JWT for the host seat (`jwt.sign`, 24h expiry)
   └── Return { gameId, token, engineUrl }
 ```
 
 ### Invite Path
 ```
 POST /api/match/pvp/invite
-  ├── Generate inviteCode
-  ├── Redis: SET match:{gameId} + invite:{code}, EX 24h
-  ├── issueEngineToken(...)
+  ├── Generate a 6-character inviteCode
+  ├── Write the match hash (status WAITING) with a 24h TTL
+  ├── Sign the engine JWT for the host seat
   └── Return { gameId, inviteCode, token, engineUrl }
 
 POST /api/match/join/:code
-  ├── Redis: GET invite:{code}
-  │   ├── null → 404
-  │   └── found → add player, DEL invite:{code}, return { gameId, token, engineUrl }
+  ├── SCAN match:* for a room whose inviteCode matches and whose status is WAITING
+  │   ├── no match → 404 MATCH_INVITE_INVALID
+  │   ├── the caller is the host → 400 MATCH_OWN_INVITE
+  │   └── found → seat the player, then return { gameId, token, engineUrl }
 ```
 
 ### PvE Path
 ```
 POST /api/match/pve
-  ├── Create game with player + bots
-  ├── Redis: SET match:{gameId}, status = ACTIVE
-  ├── issueEngineToken(...)
+  ├── Create the match with the host and the chosen bots
+  ├── Write the match hash with status ACTIVE
+  ├── Sign the engine JWT for the host seat
   └── Return { gameId, token, engineUrl }
 ```
 
@@ -290,7 +294,7 @@ GET /api/games/mine
 | `REDIS_PORT` | `6479` | Redis port |
 | `REDIS_PASSWORD` | (from secrets) | Redis authentication |
 | `ENGINE_API_KEY` | (from secrets) | Validates `POST /api/game/end` and `/api/game/:id/started` from engine |
-| `FRONTEND_URL` | `https://localhost:8443` | Derives `ENGINE_WS_URL` (same origin, `ws://`) returned to clients |
+| `FRONTEND_URL` | `https://localhost:8443` (from `.env`) | Derives `ENGINE_WS_URL` by replacing `http` with `ws`; required, so the app throws at startup if it is unset |
 
 ### Tunable constants
 

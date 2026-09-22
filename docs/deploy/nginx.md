@@ -6,9 +6,8 @@ knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
 [`tunnel.md`](./tunnel.md).
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
-`nginx/conf/app.inc`, `compose.yaml`) rather than copied from older docs —
-see [Known issue](#known-issue) at the bottom for one place where a comment
-in the code no longer matches what actually runs.
+`nginx/conf/app.inc`, `compose.yaml`). See [Known issue](#known-issue) at the
+bottom for one place where a comment in the code does not match what runs.
 
 
 ---
@@ -129,11 +128,9 @@ Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.c
 **`nginx/conf/app.inc` is unused configuration.** It is copied into the nginx image
 and bind-mounted by `compose.yaml`, and `nginx.conf`'s own comment claims
 *"See conf/app.inc for the actual routing (shared so the local and
-ngrok-tunnelled paths ... can't drift)"* — but `nginx.conf` never actually
-`include`s it anywhere. The real, active routing is the inline `server {}`
-block described above. `app.inc` appears to be a file left over from an earlier
-refactor (it's missing the rate-limiting locations that `nginx.conf` has,
-for instance) that was never wired up, or was replaced and never deleted.
+ngrok-tunnelled paths ... can't drift)"* — but `nginx.conf` never `include`s it
+anywhere. The real, active routing is the inline `server {}` block described
+above, which also carries the rate-limiting locations that `app.inc` lacks.
 
 Not fixed here — this is reported rather than changed, because editing the
-configuration was outside the scope of the documentation update.
+configuration is outside the scope of the documentation update.

@@ -22,7 +22,7 @@ There is **no dedicated settings page** — account settings are distributed acr
 3. **Sign out** — in the `RetroNavbar` account popover; calls `POST /api/auth/logout`, then navigates to `/login`.
 4. **Game preference toggles** (sound, music, auto-roll, fast animations, move hints, friend invites, weekly recap) live in `store.tsx` as `SETTING_DEFAULTS`; no dedicated settings page exposes them yet.
 
-> **Note:** There is no `src/pages/Settings.tsx` and no `AccountMenu` — the former Shell/AccountMenu layout was removed; the account popover is now part of `RetroNavbar`, and the 2FA toggle moved to the Profile page's edit modal.
+Settings live in two places: the account popover in `RetroNavbar` (language, sign out) and the Profile page's edit modal (the 2FA toggle).
 
 
 ---

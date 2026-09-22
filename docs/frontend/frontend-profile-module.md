@@ -54,6 +54,7 @@ When the page loads it reads the profile, game history, achievements, friends an
   username: string;  // Player's username
   displayName?: string;  // Name shown in the game
   avatarStyle: string | null;  // Avatar style name
+  hasAvatarPhoto: boolean;  // Whether a custom photo is uploaded
   rating: number;  // Player's rating (score)
   highestRating: number;  // Best rating ever reached
   wins: number;  // Games won
@@ -72,15 +73,18 @@ When the page loads it reads the profile, game history, achievements, friends an
   games: Array<{  // List of games played
     gameId: string;  // ID of the game
     status: string;  // Current status
+    gameType: 'PVP' | 'PVE';  // Match type
     color: number;  // Seat color
     rank: number | null;  // Position in the ranking
     piecesCaptured: number;  // Pieces knocked off
     piecesInGoal: number;  // Pieces finished (0-4)
+    ratingDelta: number;  // Rating change from this game
     startedAt: string;  // When the game started
     endedAt: string | null;  // When the game ended
     participants: Array<{  // Everyone who played
       username: string;  // Player's username
       avatarStyle: string | null;  // Avatar style name
+      hasAvatarPhoto?: boolean;  // Whether a custom photo is uploaded
       color: number;  // Seat color
       rank: number | null;  // Position in the ranking
       piecesInGoal: number;  // Pieces finished (0-4)
@@ -98,7 +102,9 @@ When the page loads it reads the profile, game history, achievements, friends an
 {
   id: string;  // Unique ID
   username: string;  // Player's username
+  displayName?: string;  // Name shown in the game
   avatarStyle: string | null;  // Avatar style name
+  hasAvatarPhoto?: boolean;  // Whether a custom photo is uploaded
   rating: number;  // Player's rating (score)
   friendsSince: string;  // When the friendship started
   status: 'online' | 'playing' | 'offline';  // Current status

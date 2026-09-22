@@ -21,7 +21,7 @@
 
 The Auth module handles all authentication concerns for the Ludo Transcendence application. It supports the following flows:
 
-1. **Password-based auth with email verification** — users register with a username/email/password. No session is created until the email verification link is clicked. Login requires either no 2FA or an emailed code.
+1. **Password-based auth with email verification** — users register with a username/email/password and are sent a verification link, which records the address as verified. Sign-in accepts the password whether or not the address has been verified. Login requires either no 2FA or an emailed code.
 2. **Two-factor authentication (2FA)** — email-code-based 2FA. When enabled, login requires a password (factor one) plus a 6-digit emailed code (factor two).
 3. **Refresh-token sessions** — a short-lived access token (15 min) plus a long-lived, revocable refresh token (7 days) stored in an httpOnly cookie, with silent rotation via a `/refresh` endpoint.
 4. **Password reset** — forgot-password emails a one-time link; reset-password redeems it with a new password.
@@ -39,7 +39,7 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | File | Role |
 |------|------|
 | `auth.module.ts` | NestJS module — registers Passport, JwtModule, all strategies, and exports them for other modules |
-| `auth.controller.ts` | HTTP routes: register, verify-email, login, 2fa/verify, refresh, forgot-password, reset-password, logout, me, 2FA settings, and 3 OAuth flows |
+| `auth.controller.ts` | HTTP routes: register, verify-email, login, 2fa/verify, refresh, forgot-password, reset-password, logout, me, profile read/update, password change, account deletion, 2FA settings, and 3 OAuth flows |
 | `auth.service.ts` | Core business logic: password hashing (bcrypt), JWT issuance, OAuth validation, 2FA orchestration, email verification |
 | `jwt.strategy.ts` | Passport strategy that extracts JWT from the `token` cookie |
 | `jwt-auth.guard.ts` | `@UseGuards(JwtAuthGuard)` decorator — protects routes behind JWT |
@@ -53,7 +53,7 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `oauth.guards.ts` | Guard classes: `GoogleAuthGuard`, `GithubAuthGuard`, `FortyTwoAuthGuard` — pick strategy per request host |
 | `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset links (degrades to console logging without SMTP config) |
 | `session.service.ts` | Redis-backed refresh-token management with rotation and revocation |
-| `twofactor.service.ts` | Redis-backed 2FA challenge management: signup verification tokens, password-reset tokens, login codes. Idempotent — a live challenge is reused (no duplicate email) |
+| `twofactor.service.ts` | Redis-backed short-lived auth state, stored hashed and single-use: signup verification tokens (`verify:`), password-reset tokens (`reset:`) and 2FA login challenges (`2fa:`) |
 | `dto/register.dto.ts` | Validation schema for `POST /api/auth/register` |
 | `dto/login.dto.ts` | Validation schema for `POST /api/auth/login` |
 | `dto/forgot-password.dto.ts` | Validation schema for `POST /api/auth/forgot-password` |
@@ -63,6 +63,7 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `dto/password.rules.ts` | Shared password policy constants used by RegisterDto and ResetPasswordDto |
 | `dto/update-profile.dto.ts` | Validation schema for profile updates |
 | `dto/change-password.dto.ts` | Validation schema for `PATCH /api/auth/profile/password` |
+| `dto/delete-account.dto.ts` | Validation schema for `DELETE /api/auth/profile` (optional current password + required acknowledgement) |
 
 
 ---
@@ -150,6 +151,7 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `GET` | `/api/auth/profile` | JWT | Full profile for the Edit-Profile card (email, providers, hasPassword) |
 | `PATCH` | `/api/auth/profile` | JWT | Update profile (username, display name, email) |
 | `PATCH` | `/api/auth/profile/password` | JWT | Change password while logged in (needs current password) |
+| `DELETE` | `/api/auth/profile` | JWT | Permanently delete the account (password-verified) |
 | `GET` | `/api/auth/2fa` | JWT | Get current user's 2FA preference |
 | `PATCH` | `/api/auth/2fa` | JWT | Toggle the user's 2FA preference |
 | `GET` | `/api/auth/google` | None | Redirect to Google OAuth |
@@ -230,7 +232,7 @@ sequenceDiagram
     User->>Site: Enter username (or email) + password, click Log in
     Site->>Server: POST /api/auth/login
     Server->>DB: Look up the account
-    alt Wrong password / unknown user / email not verified
+    alt Wrong password / unknown user
         Server-->>Site: Error message
         Site-->>User: Show the error
     else Correct, 2FA off
@@ -384,7 +386,7 @@ sequenceDiagram
 
 Concise decision trees showing every code path through each auth operation, including error branches.
 
-> Every error that the user can see includes a `code` (for example `AUTH_USERNAME_TAKEN`), and the frontend translates it into the selected language. See [API-list.md](../API-list.md) → Error responses for the full list. The HTTP status codes below are unchanged.
+> Every error that the user can see includes a `code` (for example `AUTH_USERNAME_TAKEN`), and the frontend translates it into the selected language. See [API-list.md](../API-list.md) → Error responses for the full list.
 
 ### Registration Path
 
@@ -397,7 +399,7 @@ POST /api/auth/register
   ├── Prisma user.create() — with nested achievement.create (1:1 flags row)
   ├── TwoFactorService.createVerifyToken(userId)
   ├── MailService.sendVerification(email, ...)
-  └── Return { message: 'Account created — check your email...' }
+  └── Return { message: 'Account created : check your email to verify your address.' }
 ```
 
 ### Login Path
@@ -407,10 +409,9 @@ POST /api/auth/login
   ├── Validate LoginDto
   ├── Find user by username OR email → 401 if not found
   ├── bcrypt.compare(password, hash) → 401 if mismatch
-  ├── Check emailVerified → 403 if not verified
   ├── If 2FA enabled:
-  │   ├── TwoFactorService.startChallenge(userId)  // returns { pendingToken, code, fresh }
-  │   ├── MailService.send2faCode(email, code)     // only if fresh — no duplicate email
+  │   ├── TwoFactorService.startChallenge(userId)  // returns { pendingToken, code }
+  │   ├── MailService.send2faCode(email, code)     // every call emails a fresh code
   │   └── Return { twoFactorRequired: true, pendingToken }
   └── If 2FA disabled:
       ├── SessionService.issue(userId) → refreshToken
@@ -468,18 +469,22 @@ POST /api/auth/reset-password
 
 ```
 GET /api/auth/{provider}
-  └── Redirect to provider consent screen
+  ├── TunnelAwareAuthGuard picks the local or ngrok strategy from the Host header
+  ├── With a valid access-token cookie it signs a 10-minute oauth-link token into the provider `state`
+  └── Redirect to the provider consent screen
 
 GET /api/auth/{provider}/callback
+  ├── Guard failures → /login?error=access_denied, ?error=oauth_failed, or ?error=email-in-use
   ├── Exchange code for access token + profile
-  ├── Extract verified email from profile
+  ├── Extract an email the provider has verified (Google, GitHub) or the 42 address
   ├── validateOAuthLogin():
   │   ├── Check existing Account → return linked user
   │   ├── Check email match → link provider to existing user
   │   └── Create new user + account
-  ├── If no verified email → redirect to /login?error=no-verified-email
-  ├── If 2FA disabled → issueSession → set cookies → redirect to {FRONTEND_URL}/home
-  └── If 2FA enabled → startTwoFactor → send code → redirect to {FRONTEND_URL}/2fa?token=...
+  ├── If the oauth-link token matched the session → redirect to /profile (no new session)
+  ├── If 2FA is off → issueSession → set cookies → redirect to {frontend-url}/home
+  ├── If 2FA is on and the provider gave no email → redirect to /login?error=add-email-2fa
+  └── If 2FA is on with an email → startTwoFactor → send code → redirect to {frontend-url}/2fa?token=...
 ```
 
 ### Authenticated Request Path
@@ -540,7 +545,7 @@ All configuration is read from environment variables — the root `.env` (compos
 | `NGROK_GOOGLE_CALLBACK_URL` | NgrokGoogleStrategy (reuses `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) |
 | `NGROK_GITHUB_CALLBACK_URL` | NgrokGithubStrategy (reuses `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`) |
 | `NGROK_FORTYTWO_CALLBACK_URL` | NgrokFortyTwoStrategy (reuses `FORTYTWO_CLIENT_ID` / `FORTYTWO_CLIENT_SECRET`) |
-| `FRONTEND_URL` | AuthController (OAuth redirect target for local requests, defaults to `https://localhost:8443`) |
+| `FRONTEND_URL` | AuthController (OAuth redirect target for local requests; required, the example `.env` sets `https://localhost:8443`) |
 | `NGROK_FRONTEND_URL` | AuthController (OAuth redirect target when the request Host contains `ngrok`) |
 | `SMTP_CREDENTIALS` | MailService (format: `[smtp.gmail.com]:587 address@gmail.com:app-password`) |
 | `REDIS_PASSWORD` | SessionService, TwoFactorService |

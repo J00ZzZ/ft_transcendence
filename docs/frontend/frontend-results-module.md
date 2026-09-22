@@ -23,10 +23,7 @@ modal overlay (`ResultsModal`). It shows:
 2. **Outcome handling** — the right label for a victory, a defeat or an abandoned match.
 3. **Exit** — returns to the lobby or the home page after the game.
 
-> **Note:** The old standalone `/results` route and `src/pages/Results.tsx` page
-> have been **removed** (the route line in `App.tsx` is commented out). Results now
-> render through `src/components/ResultsModal.tsx`, which `Game.tsx` opens when the
-> engine emits `game_ended`.
+Results render through `src/components/ResultsModal.tsx`, which `Game.tsx` opens when the engine emits `game_ended`.
 
 
 ---

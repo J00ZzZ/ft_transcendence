@@ -200,7 +200,7 @@ sequenceDiagram
 ```
 
 `has: false` is why a delete produces **no 404s**: every client drops straight back to DiceBear
-without asking for an image that no longer exists.
+without asking for an image that does not exist.
 
 ### 3. Render decision (`UserAvatar`)
 
@@ -352,5 +352,5 @@ Then in the browser, with DevTools open:
 - **Uploads are checked by MIME and magic bytes, not decoded.** An unusual image with a valid
   signature can still fail to decode in the browser; the `broken` marker handles that case instead of
   retrying it.
-- **`PlayerMeta.username` is still the display name.** Avatars use `userId` and no longer depend on
+- **`PlayerMeta.username` is still the display name.** Avatars use `userId` and do not depend on
   it, but other checks that compare `playerMeta.username` with `user?.username` break after a rename.

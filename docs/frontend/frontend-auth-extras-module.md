@@ -140,14 +140,17 @@ Step two of password reset.
 Both pages enforce the same policy as registration:
 
 ```typescript
-// frontend/src/validatePassword.ts
-export function passwordError(password: string): string | null {
-  if (password.length < 12 || password.length > 72) return 'Password must be 12-72 characters'
-  if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter'
-  if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter'
-  if (!/\d/.test(password)) return 'Password must contain a number'
-  if (!/[^A-Za-z0-9]/.test(password)) return 'Password must contain a special character'
-  return null
+// frontend/src/validatePassword.ts — mirror of backend dto/password.rules.ts
+const PASSWORD_MIN = 12;
+const PASSWORD_MAX = 72;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
+
+export function passwordError(pw: string): string | null {
+  if (pw.length < PASSWORD_MIN) return `Password must be at least ${PASSWORD_MIN} characters`;
+  if (pw.length > PASSWORD_MAX) return `Password must be at most ${PASSWORD_MAX} characters`;
+  if (!PASSWORD_REGEX.test(pw))
+    return 'Password needs an uppercase letter, a lowercase letter, a number, and a special character';
+  return null;
 }
 ```
 

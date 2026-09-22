@@ -18,8 +18,8 @@
 
 These pages are the entry point to the app. They are:
 
-1. **Login** — identifier (username or email), password, OAuth (Open Authorization) buttons, and two-factor authentication (2FA) support.
-2. **Signup** — username, email and password fields, plus a confirm-password field that must match.
+1. **Login** — identifier (username or email), password, OAuth (Open Authorization) buttons, and two-factor authentication (2FA) support. It also shows one-shot notices carried in the query string (`verified`, `reset`, `error`) that arrive from email links and OAuth callbacks.
+2. **Signup** — username, email and password fields, plus a confirm-password field that must match. On success the form is replaced by a "check your inbox" confirmation screen.
 
 Both pages use the `RetroAuthLayout` container and share the same styling: the retro/cyber theme and the provider buttons.
 
@@ -111,7 +111,7 @@ sequenceDiagram
 
 ### 2. Signup Flow
 
-Sequence of steps when a user creates an account. The backend sends a verification email, and no session exists until that email is verified.
+Sequence of steps when a user creates an account. The backend sends a verification email and returns no session; the page then swaps the form for a confirmation screen.
 ```mermaid
 sequenceDiagram
     participant User
@@ -120,15 +120,15 @@ sequenceDiagram
     participant API as Backend
 
     User->>Signup: Type username, email, password + confirm
-    Signup->>Signup: Check the two passwords match
-    alt Passwords don't match
-        Signup->>Signup: Show "passwords do not match"
-    else They match
+    Signup->>Signup: Check the password rule and that the two passwords match
+    alt Rule broken or passwords don't match
+        Signup->>Signup: Show the message
+    else They are accepted
         Signup->>Store: Call register()
         Store->>API: POST /api/auth/register
         alt Account created
             API-->>Store: "check your email"
-            Signup->>Signup: Go to the login page
+            Signup->>Signup: Show the "check your inbox" screen
         else Error (for example, username taken)
             API-->>Store: error
             Signup->>Signup: Show the error
@@ -180,10 +180,11 @@ onSubmit(e)
 onSubmit(e)
   ├── e.preventDefault()
   ├── If submitting → return
+  ├── If passwordError(password) → setError(the password rule message)
   ├── If password !== confirm → setError('Passwords do not match')
   ├── register(username, password, email)
   │   ├── POST /api/auth/register
-  │   │   ├── 200 → navigate('/login') (the page shows a "check your email" notice; no session yet)
+  │   │   ├── 200 → setSent(true) (the form is replaced by the "check your inbox" screen; no session is created)
   │   │   └── error → setError(message)
   └── setSubmitting(false)
 ```
