@@ -131,8 +131,10 @@ export class SocketHandlers {
           this.userIdMap.get(gameId)?.get(previousColor) === userId
         ) {
           this.userIdMap.get(gameId)?.delete(previousColor);
+          await this.store.clearSeatUser(gameId, previousColor);
         }
         this.userIdMap.get(gameId)?.set(color as PlayerColor, userId);
+        await this.store.setSeatUser(gameId, color as PlayerColor, userId);
         socket.data.playerColor = color as PlayerColor;
       } catch (error) {
         socket.emit('error', `Color selection failed: ${error}`);

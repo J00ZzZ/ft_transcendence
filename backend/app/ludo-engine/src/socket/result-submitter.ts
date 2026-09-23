@@ -45,13 +45,13 @@ export class ResultSubmitter {
 
       const participants = [];
       for (const player of state.players) {
-        // Players who aborted/left via End Game (status 'exited') are pruned
-        // from the board and must NOT receive a definitive result or rating :
-        // they didn't finish the match, so no outcome is recorded for them.
-        if (player.status === 'exited') continue;
+        if (player.status === 'exited' || player.status === 'inactive') continue;
         const stats = { ...player.stats };
-        const userId =
-          matchData?.[`seatUser_${player.color}`] || this.userIdMap.get(gameId)?.get(player.color);
+        const userId = player.isBot
+          ? `bot-${player.color}`
+          : player.userId ||
+            this.store.seatUserFrom(matchData, player.color) ||
+            this.userIdMap.get(gameId)?.get(player.color);
         if (!userId) {
           console.error(
             `Game ${gameId}: no account recorded for seat ${player.color}; ` +

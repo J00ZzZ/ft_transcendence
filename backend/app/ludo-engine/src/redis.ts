@@ -172,6 +172,23 @@ export class RedisGameStore {
     await this.client.hdel(this.matchKey(gameId), 'idleSince');
   }
 
+  // Who played a colour, used for the end-of-game result
+  private seatUserField(color: PlayerColor): string {
+    return `seatUser_${color}`;
+  }
+
+  async setSeatUser(gameId: string, color: PlayerColor, userId: string): Promise<void> {
+    await this.client.hset(this.matchKey(gameId), this.seatUserField(color), userId);
+  }
+
+  async clearSeatUser(gameId: string, color: PlayerColor): Promise<void> {
+    await this.client.hdel(this.matchKey(gameId), this.seatUserField(color));
+  }
+
+  seatUserFrom(matchData: Record<string, string> | null, color: PlayerColor): string | undefined {
+    return matchData?.[this.seatUserField(color)];
+  }
+
   // FREE a non-host seat on abort: delete the slot from the match hash so the room
   // can hand it to someone else. The host seat is never cleared.
   // See docs/ludo-engine/ludo-engine-lobby-module.md (Seat reserve and free).
