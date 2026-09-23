@@ -50,7 +50,15 @@ export class ResultSubmitter {
         // they didn't finish the match, so no outcome is recorded for them.
         if (player.status === 'exited') continue;
         const stats = { ...player.stats };
-        const userId = this.userIdMap.get(gameId)?.get(player.color) || `bot-${player.color}`;
+        const userId =
+          matchData?.[`seatUser_${player.color}`] || this.userIdMap.get(gameId)?.get(player.color);
+        if (!userId) {
+          console.error(
+            `Game ${gameId}: no account recorded for seat ${player.color}; ` +
+              `refusing to submit so the result is not filed against a fabricated user.`,
+          );
+          return;
+        }
         participants.push({
           userId,
           color: player.color.toUpperCase(),
@@ -62,7 +70,7 @@ export class ResultSubmitter {
       }
 
       const engineApiKey = getEngineApiKey();
-      await fetch(`${BACKEND_URL}/api/game/end`, {
+      const res = await fetch(`${BACKEND_URL}/api/game/end`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,6 +78,10 @@ export class ResultSubmitter {
         },
         body: JSON.stringify({ gameId, participants }),
       });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error(`Game ${gameId}: /api/game/end rejected ${res.status}: ${body}`);
+      }
     } catch (err) {
       console.error('Failed to submit game result:', err);
     }

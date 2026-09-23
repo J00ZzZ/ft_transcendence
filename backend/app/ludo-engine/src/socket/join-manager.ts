@@ -68,6 +68,9 @@ export class JoinManager {
             this.userIdMap.set(effectiveGameId, new Map());
           }
           this.userIdMap.get(effectiveGameId).set(effectiveColor, effectiveUserId);
+          await this.store.updateMatchData(effectiveGameId, {
+            [`seatUser_${effectiveColor}`]: effectiveUserId,
+          });
         }
 
         let state = await this.store.loadGameState(effectiveGameId);
@@ -237,11 +240,11 @@ export class JoinManager {
           player.hasAvatarPhoto = false;
         }
 
-        // Register in userIdMap
         if (!this.userIdMap.has(gameId)) {
           this.userIdMap.set(gameId, new Map());
         }
         this.userIdMap.get(gameId).set(slotColor, botUserId);
+        await this.store.updateMatchData(gameId, { [`seatUser_${slotColor}`]: botUserId });
 
         // Instantiate bot
         this.getOrCreateBot(gameId, slotColor, this.engine, this.store);
