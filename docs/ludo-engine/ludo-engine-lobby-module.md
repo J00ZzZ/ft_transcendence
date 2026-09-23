@@ -93,7 +93,7 @@ left.
 | Event | Redis `match:{gameId}` | Engine GameState | Client roster |
 |-------|------------------------|------------------|---------------|
 | Player leaves a waiting room | `reserveMatchSeat()` sets `player<N>_left`; the id and colour stay | seat parked as `inactive` | seat hidden |
-| Player leaves a live game via End Game | `clearMatchSeat()` deletes `player<N>_id`, `player<N>_color`, `player<N>_left` | seat parked as `exited` | seat shows as gone |
+| Player leaves a live game via End Game | `clearMatchSeat()` deletes `player<N>_id`, `player<N>_color`, `player<N>_left` and `seatUser_<color>` | seat parked as `exited` | seat shows as gone |
 | Backend abort (`POST /api/game/:id/abort`) | the match is marked `ABORTED`; individual seats are not cleared | — | room drops out of the listings |
 | Player rejoins | the backend's `joinMatch` userId lookup finds the reserved slot and returns the same colour | seat back to `active` | seat returns |
 | Idle-abort timer fires | the room is gone | — | room closed |

@@ -39,7 +39,7 @@ The engine core enforces the game rules. It runs inside the `ludo-engine` servic
 | `engine.ts` | `LudoEngine` class — state machine, turn logic, dice rolling, piece movement, per-game locks |
 | `types.ts` | Type definitions: `GameState`, `PlayerMeta`, `Piece`, `LegalMove`, `MoveResult`, `GameEvent` |
 | `move-validator.ts` | Legal move computation based on board geometry |
-| `turn.ts` | `applyMoveOutcome` — mirrors the move into stats, checks the win condition, and advances the turn |
+| `turn.ts` | `applyMoveOutcome` — mirrors the move into stats, keeps each seat's `piecesInGoal` count in step with the board, checks the win condition, and advances the turn |
 | `board-mapper.ts` | Board geometry — safe zones, track positions, goal entries |
 | `redis.ts` | `RedisGameStore` — Redis persistence layer |
 | `bot.ts` | Heuristic bot AI |
@@ -335,8 +335,8 @@ move_piece(pieceId)
   ├── executeMove → move the piece; resolve any captures immediately (captured pieces → base)
   ├── recordMove (history) + moveCounter++
   ├── Check win condition (all 4 pieces at step 57)
-  │   ├── Win → status='finished', emit game_ended
-  │   └── No win → sync piecesInGoal
+  │   ├── Win → sync the winner's piecesInGoal, status='finished', emit game_ended
+  │   └── No win → sync the mover's piecesInGoal
   │       ├── Roll was 6 OR move captured → same player rolls again (bonus roll)
   │       └── Roll 1-5, no capture → advance turn to next player
   ├── Clear pendingLegalMoves + pendingDiceValue

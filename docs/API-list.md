@@ -2390,6 +2390,6 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 
 - **Auth:** All auth endpoints use httpOnly cookies. Set by login, 2FA verify, OAuth completion, and refresh; cleared by logout. No `Authorization: Bearer` header is used.
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
-- **Bot seats:** the account id is `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
+- **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
 - **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
 - **Rate limiting:** Auth endpoints (`register`, `login`) have throttler guard enabled.

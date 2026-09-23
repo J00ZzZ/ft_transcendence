@@ -74,18 +74,18 @@ When the page loads it reads the profile, game history, achievements, friends an
     gameId: string;  // ID of the game
     status: string;  // Current status
     gameType: 'PVP' | 'PVE';  // Match type
-    color: number;  // Seat color
+    color: string;  // Seat color
     rank: number | null;  // Position in the ranking
     piecesCaptured: number;  // Pieces knocked off
     piecesInGoal: number;  // Pieces finished (0-4)
     ratingDelta: number;  // Rating change from this game
     startedAt: string;  // When the game started
     endedAt: string | null;  // When the game ended
-    participants: Array<{  // Everyone who played
+    participants: Array<{  // Every human who played; a game against bots lists only you
       username: string;  // Player's username
       avatarStyle: string | null;  // Avatar style name
       hasAvatarPhoto?: boolean;  // Whether a custom photo is uploaded
-      color: number;  // Seat color
+      color: string;  // Seat color
       rank: number | null;  // Position in the ranking
       piecesInGoal: number;  // Pieces finished (0-4)
     }>;

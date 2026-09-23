@@ -70,8 +70,11 @@ class RedisGameStore {
   async scanGameKeys(): Promise<string[]>                                                              // SCAN all game:* hashes (skips the :moves lists)
   async setIdleSince(gameId: string, now: number): Promise<void>                                       // Stamp idle time (room < 2 seated), once
   async clearIdleSince(gameId: string): Promise<void>                                                  // Clear the idle stamp (room ≥ 2 seated)
-  async clearMatchSeat(gameId: string, color: PlayerColor): Promise<void>                              // Free a non-host seat (delete its row)
+  async clearMatchSeat(gameId: string, color: PlayerColor): Promise<void>                              // Free a non-host seat (delete its row and account record)
   async reserveMatchSeat(gameId: string, color: PlayerColor): Promise<void>                            // Reserve a non-host seat (set player{N}_left)
+  async setSeatUser(gameId: string, color: PlayerColor, userId: string): Promise<void>                 // Record which account took a seat
+  async clearSeatUser(gameId: string, color: PlayerColor): Promise<void>                               // Drop a seat account record
+  seatUserFrom(matchData: Record<string, string> | null, color: PlayerColor): string | undefined       // Read a seat account from a match hash
   async abortMatch(gameId: string): Promise<void>                                                      // Mark a match ABORTED with a short TTL
 
   // Teardown / publish
@@ -236,7 +239,9 @@ sequenceDiagram
 
 ### How bots are identified
 
-Bots are stored as real `User` rows with ids `bot-<color>` (e.g. `bot-green`).
+A bot is not an account: its user id is the literal string `bot-<color>`
+(`bot-green`), and it leaves no `User` row. That id lives in the `match:{gameId}`
+hash, in the engine's game state and in the engine JWT.
 Each process has one helper that answers "is this a bot?" by checking the `bot-`
 prefix: `isBotUserId()` in `socket/auth.ts` inside the engine, and
 `isBotUserId()` in `common/bot.ts` inside the backend. The backend's copy is
@@ -329,15 +334,15 @@ So a PvE game costs only a few hundred extra bytes over PvP in Redis — the
 bots do **not** multiply the state. The extra footprint from bots shows up
 outside Redis:
 
-- **PostgreSQL:** each bot is a real `User` row (`bot-<color>`) — a handful of
-  small rows per game.
+- **PostgreSQL:** nothing. A bot is not an account, so a finished game writes no
+  rows for it.
 - **Engine memory:** one cached `LudoBot` object per bot color (a few hundred
   bytes each), kept for the whole match in `botMap`.
 - **Timers:** one `setTimeout` per game for bot turns — never one per bot, so
   bot count does not add timers.
 
-The short version: **bots add a tiny fixed cost (a few hundred bytes of Redis,
-a few small DB rows, a small object each) — they do not scale the state.** Even
+The short version: **bots add a tiny fixed cost (a few hundred bytes of Redis
+and one small cached object each) — they do not scale the state.** Even
 with 3 bots the whole game is still a ~2–3 KB JSON document.
 
 ### What if the board also had to be built?
