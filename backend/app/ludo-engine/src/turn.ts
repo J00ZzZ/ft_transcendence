@@ -58,8 +58,8 @@ export function applyMoveOutcome(
     state.winner = winner;
     state.resultDetail = 'four_pieces';
   } else {
-    // Game continues: refresh the mover's piecesInGoal (display) and reset
-    // hasRolled so the next turn starts clean.
+    // Game continues: keep the mover's piece count in step with the board and
+    // reset hasRolled so the next turn starts clean.
     const mover = state.players.find((p) => p.color === result.color);
     const sixBonus = diceValue === 6;
     if (mover) {
