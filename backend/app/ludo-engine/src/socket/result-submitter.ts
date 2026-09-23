@@ -45,20 +45,26 @@ export class ResultSubmitter {
 
       const participants = [];
       for (const player of state.players) {
+        // Only seats still in the game are reported, and a bot has no account to
+        // record a result for.
         if (player.status === 'exited' || player.status === 'inactive') continue;
+        if (player.isBot) continue;
+
         const stats = { ...player.stats };
-        const userId = player.isBot
-          ? `bot-${player.color}`
-          : player.userId ||
-            this.store.seatUserFrom(matchData, player.color) ||
-            this.userIdMap.get(gameId)?.get(player.color);
+        const userId =
+          player.userId ||
+          this.store.seatUserFrom(matchData, player.color) ||
+          this.userIdMap.get(gameId)?.get(player.color);
+
+        // No account for a seat that is still in the game: report the rest of
+        // the room rather than filing the result against a made-up user.
         if (!userId) {
           console.error(
-            `Game ${gameId}: no account recorded for seat ${player.color}; ` +
-              `refusing to submit so the result is not filed against a fabricated user.`,
+            `Game ${gameId}: no account recorded for seat ${player.color}; skipping this seat.`,
           );
-          return;
+          continue;
         }
+
         participants.push({
           userId,
           color: player.color.toUpperCase(),
@@ -67,6 +73,11 @@ export class ResultSubmitter {
           piecesCaptured: stats.captures,
           piecesInGoal: stats.piecesInGoal,
         });
+      }
+
+      if (participants.length === 0) {
+        console.error(`Game ${gameId}: no participant accounts resolved; nothing to submit.`);
+        return;
       }
 
       const engineApiKey = getEngineApiKey();

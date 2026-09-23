@@ -1370,7 +1370,7 @@ so no fresh token is minted for a seat that can never move again.
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
 
-Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authenticated via `x-engine-key` header.
+Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authenticated via `x-engine-key` header. The payload lists the **human seats that finished**: bots and seats nobody took are not sent.
 
 **Headers:** `x-engine-key: <ENGINE_API_KEY>`  
 **Body:**
@@ -1380,7 +1380,7 @@ Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authen
   "gameId": "uuid",
   "participants": [
     {
-      "userId": "string (or 'bot-<color>' for bot seats)",
+      "userId": "string (account id)",
       "color": "'RED'|'GREEN'|'YELLOW'|'BLUE'",
       "rank": 1,
       "piecesCaptured": 3,
@@ -1401,11 +1401,11 @@ Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authen
 
 ```
 
-**Errors:** 400 if `gameId` missing, or `participants` missing / < 2 entries. Re-sending the same `gameId` is safe (idempotent — returns `"Game already processed"` without double-awarding points).
+**Errors:** 400 if `gameId` is missing, `participants` is missing or empty, or a PvP result carries fewer than 2 entries. Re-sending the same `gameId` is safe (idempotent — returns `"Game already processed"` without double-awarding points).
 
 **Side effects:**
-- Writes `game` + `game_participant` rows to Postgres
-- Updates each non-bot participant's `User` row: `rating` (clamped at 0), `highestRating`, `wins`, `losses`, `humanWins`, `botWins`, `winStreak`, `bestWinStreak`, `pveGameStreak` (scoring via `ratingDeltaFor()`)
+- Writes the `game` row and one `game_participant` row per participant (humans only)
+- Updates each participant's `User` row: `rating` (clamped at 0), `highestRating`, `wins`, `losses`, `humanWins`, `botWins`, `winStreak`, `bestWinStreak`, `pveGameStreak` (scoring via `ratingDeltaFor()`)
 - Evaluates achievements for all participants (fires unlock notifications)
 - Sends a `match_finished` notification to every human participant
 - Updates the Redis `leaderboard:global` sorted set

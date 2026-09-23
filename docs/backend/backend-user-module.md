@@ -85,7 +85,7 @@ The User module manages public user profiles, game history, and avatar images.
   ratingDelta: number;  // Rating earned for this game (never negative)
   startedAt: string;  // When the game started
   endedAt: string | null;  // When the game ended
-  participants: Array<{  // Everyone who played
+  participants: Array<{  // Every human who played
     username: string;  // Player's username
     displayName: string;  // Player's display name
     avatarStyle: string;  // Avatar style name

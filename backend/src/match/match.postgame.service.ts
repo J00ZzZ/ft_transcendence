@@ -52,8 +52,8 @@ export class MatchPostgameService {
   async processGameEnd(data: GameEndPayload) {
     const { gameId, participants } = data;
     if (!gameId) throw new BadRequestException('gameId is required');
-    if (!Array.isArray(participants) || participants.length < 2) {
-      throw new BadRequestException('participants array is required (min 2)');
+    if (!Array.isArray(participants) || participants.length === 0) {
+      throw new BadRequestException('participants array is required');
     }
 
     // Idempotency guard: an engine retry after a network blip hits `existing`
@@ -66,6 +66,13 @@ export class MatchPostgameService {
     const endedAt = Date.now();
     const gameType = (matchData.gameType || 'PVP') as 'PVP' | 'PVE';
     const inviteCode = matchData.inviteCode || null;
+
+    // The engine reports human finishers only. A PvE game has a single human
+    // (its opponents are bots, which leave no rows), while a PvP room always
+    // finishes with two or more, so fewer means a seat went missing.
+    if (gameType === 'PVP' && participants.length < 2) {
+      throw new BadRequestException('a PvP result needs at least 2 participants');
+    }
 
     await this.prisma.db.$transaction(async (tx) => {
       const game = await tx.game.create({
@@ -80,23 +87,10 @@ export class MatchPostgameService {
       });
 
       for (const p of participants) {
-        // Bots must exist as real User rows (GameParticipant.user_id FK).
-        // Upsert guarantees the row so the transaction can't roll back
-        // and void the human's PvE results.
-        if (isBotUserId(p.userId)) {
-          await tx.user.upsert({
-            where: { id: p.userId },
-            update: {},
-            create: {
-              id: p.userId,
-              username: p.userId, // "bot-green" etc. : unique, clearly a bot
-              // displayName is required + unique on User (feature-update-profile
-              // branch); bot rows reuse the same id so it stays unique.
-              displayName: p.userId,
-              achievement: { create: { id: crypto.randomUUID() } },
-            },
-          });
-        }
+        // Bots leave no rows: the engine already drops them, and this guard
+        // keeps a stray bot id out of the insert below (user_id is a foreign
+        // key, so an unknown id would roll the whole transaction back).
+        if (isBotUserId(p.userId)) continue;
 
         await tx.gameParticipant.create({
           data: {
@@ -110,10 +104,7 @@ export class MatchPostgameService {
           },
         });
 
-        // POINTS CALCULATION (per participant; bots are recorded for
-        // history/FK but their rating is never touched)
-        if (isBotUserId(p.userId)) continue;
-
+        // POINTS CALCULATION : every participant left here is a human.
         const isWinner = p.rank === 1;
 
         const ratingDelta = ratingDeltaFor({

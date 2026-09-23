@@ -19,7 +19,7 @@ The Profile page (`/profile`) shows a user's public profile with statistics, rec
 
 1. **Profile header** — username, status indicator, avatar initials, rating and the date the account was created.
 2. **Stats grid** — wins, losses, win rate, best streak.
-3. **Recent matches** — each game with the opponent names, the result (victory, defeat or draw), pieces in goal and the date.
+3. **Recent matches** — each game with the other human players' names, the result (victory, defeat or draw), pieces in goal and the date. A game against bots lists only you.
 4. **Friends panel** — friends with their online status and a rating badge; shown only on your own profile.
 5. **Avatar actions (own profile)** — the `EDIT AVATAR`, `RESET` and `EDIT PROFILE` buttons, and below them a **message area with a fixed height**. The area shows upload and reset errors in red, and the photo-load warning (`profile.photoLoadError`) in amber. Because the height is fixed, a longer translation in Malay or French wraps onto more lines without moving the content below it.
 
