@@ -95,7 +95,7 @@ input/output. Each event is documented in full below; see
 | `socket/post-game.ts` | End-of-game flow — post-game timeout and room teardown |
 | `socket/event-publisher.ts` | `EventPublisher` — publishes each engine event to the Redis `game:{gameId}` channel |
 | `socket/redis-broadcaster.ts` | `RedisBroadcaster` — forwards Redis `game:*` messages into the matching Socket.IO room |
-| `socket/result-submitter.ts` | POST /api/game/end callback to backend |
+| `socket/result-submitter.ts` | POST /api/game/end callback to backend — submits the human seats that finished; skips a seat whose account cannot be recovered and logs the colour; posts nothing when no account resolves; reports the piece count read from the board rather than from a cached tally |
 
 
 ---

@@ -44,6 +44,11 @@ The **match metadata hash** (`match:{gameId}`) tracks seats — `player1_id`,
 roster and ready flags live in the engine GameState (`state.players` +
 `state.readyPlayers`), which `emitLobbyUpdate` broadcasts to clients.
 
+Beside the per-slot fields the hash holds one account record per seat,
+`seatUser_<color>`. It is written when the seat is taken, kept in step when a
+player changes colour, and removed when the seat is freed, so the end of the game
+can resolve which account played a colour.
+
 
 ---
 ---
