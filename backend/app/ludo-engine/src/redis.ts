@@ -204,6 +204,7 @@ export class RedisGameStore {
       `player${slotIndex + 1}_id`,
       `player${slotIndex + 1}_color`,
       `player${slotIndex + 1}_left`,
+      this.seatUserField(color),
     );
     await this.setIdleSince(gameId, Date.now());
   }

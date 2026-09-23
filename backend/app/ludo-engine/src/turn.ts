@@ -1,6 +1,14 @@
-import type { GameState, MoveResult, PlayerColor } from './types';
+import type { GameState, MoveResult, PlayerColor, PlayerMeta } from './types';
 import { MoveValidator } from './move-validator';
 import { advanceTurnInState } from './player-handler';
+
+// Keep a seat's display count and its per-game tally in step with the board, so
+// the end-game payload reports the pieces that are actually home.
+function syncPiecesInGoal(state: GameState, player: PlayerMeta): void {
+  const inGoal = MoveValidator.countPiecesInGoal(state, player.color);
+  player.piecesInGoal = inGoal;
+  player.stats.piecesInGoal = inGoal;
+}
 
 // Apply a move's outcome: sync piece mirrors, bump the counter, run the win
 // check, update stats/bonus, and advance the turn (or re-roll on 6/capture).
@@ -40,11 +48,9 @@ export function applyMoveOutcome(
     // Seal the final state: mark the game finished, stamp the winner's
     // completion stats, and set resultDetail so the end-card / result
     // submission can label the finish reason ('four_pieces').
-    const piecesInGoal = MoveValidator.countPiecesInGoal(state, winner);
     const winnerPlayer = state.players.find((p) => p.color === winner);
     if (winnerPlayer) {
-      winnerPlayer.stats.piecesInGoal = piecesInGoal;
-      winnerPlayer.piecesInGoal = piecesInGoal;
+      syncPiecesInGoal(state, winnerPlayer);
       winnerPlayer.isFinished = true;
       winnerPlayer.finishedAt = new Date().toISOString();
     }
@@ -57,7 +63,7 @@ export function applyMoveOutcome(
     const mover = state.players.find((p) => p.color === result.color);
     const sixBonus = diceValue === 6;
     if (mover) {
-      mover.piecesInGoal = MoveValidator.countPiecesInGoal(state, result.color);
+      syncPiecesInGoal(state, mover);
       mover.hasRolled = false;
       // bonusRoll tells the frontend to let the SAME player roll again.
       mover.bonusRoll = sixBonus || result.captured;

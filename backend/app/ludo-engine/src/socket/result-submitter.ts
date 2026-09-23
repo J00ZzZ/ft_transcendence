@@ -2,6 +2,7 @@ import type { LudoEngine } from '../engine';
 import type { RedisGameStore } from '../redis';
 import type { PlayerColor } from '../types';
 import { BACKEND_URL } from './auth';
+import { MoveValidator } from '../move-validator';
 
 function getEngineApiKey(): string {
   return process.env.ENGINE_API_KEY || 'dev-engine-key';
@@ -65,13 +66,23 @@ export class ResultSubmitter {
           continue;
         }
 
+        // The board is the source of truth for the piece count. The seat meta and
+        // the per-game tally are caches, so any disagreement is logged.
+        const piecesInGoal = MoveValidator.countPiecesInGoal(state, player.color);
+        if (piecesInGoal !== stats.piecesInGoal) {
+          console.warn(
+            `Game ${gameId}: seat ${player.color} pieces-in-goal mismatch ` +
+              `(board ${piecesInGoal}, tally ${stats.piecesInGoal})`,
+          );
+        }
+
         participants.push({
           userId,
           color: player.color.toUpperCase(),
           rank: player.color === state.winner ? 1 : 2,
           totalTurns: stats.turns,
           piecesCaptured: stats.captures,
-          piecesInGoal: stats.piecesInGoal,
+          piecesInGoal,
         });
       }
 
