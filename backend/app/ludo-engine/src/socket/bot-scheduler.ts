@@ -1,6 +1,7 @@
-import { LudoEngine } from '../engine';
-import { RedisGameStore } from '../redis';
-import { LudoBot, isBotPlayer } from '../bot';
+import type { LudoEngine } from '../engine';
+import type { RedisGameStore } from '../redis';
+import type { LudoBot } from '../bot';
+import { isBotPlayer } from '../bot';
 import type { PlayerColor } from '../types';
 
 // BotTurnScheduler owns bot turn timing: one timer per game (never stacked),
@@ -26,14 +27,14 @@ export class BotTurnScheduler {
     // Cancel an old timer for this game so we never stack overlapping bot
     // turns (safer than relying on takeTurn's phase guard alone).
     if (this.botTurnTimers.has(gameId)) {
-      clearTimeout(this.botTurnTimers.get(gameId)!);
+      clearTimeout(this.botTurnTimers.get(gameId));
     }
     const timer = setTimeout(() => {
       this.botTurnTimers.delete(gameId);
       this.store
         .loadGameState(gameId)
         .then((state) => {
-          if (!state || state.status !== 'active') return;
+          if (state?.status !== 'active') return;
           // Pause-air guard: while a bot-mode game is paused, the in-flight bot
           // may finish its chain, but no further triggers run once the turn
           // moves past pauseTurnOwner.

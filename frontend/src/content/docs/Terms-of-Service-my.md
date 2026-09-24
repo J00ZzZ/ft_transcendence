@@ -5,7 +5,10 @@
 
 Syarat Perkhidmatan ini ("Syarat") mengawal penggunaan anda terhadap aplikasi web ft-Transcendence (RetroLudo '42) ("Apl"). Dengan mencipta akaun atau menggunakan Apl, anda bersetuju untuk diikat oleh Syarat ini. Jika anda tidak bersetuju, sila jangan gunakan Apl.
 
+
 ---
+---
+
 
 ## 1. Tentang perkhidmati
 
@@ -18,7 +21,10 @@ Apl adalah permainan Ludo pelbagai pemain dalam talian berasaskan pelayar. Ia me
 
 Apl disediakan untuk tujuan pendidikan/pembiakan dan dijalankan oleh Tim. Anda mengakui bahawa Apl mungkin berjalan pada konfigurasi pembangunan yang dipasang sendiri.
 
+
 ---
+---
+
 
 ## 2. Akaun anda
 
@@ -27,7 +33,10 @@ Apl disediakan untuk tujuan pendidikan/pembiakan dan dijalankan oleh Tim. Anda m
 - Jika anda log masuk dengan pembekal ketiga (Google, GitHub, atau 42), anda bersetuju untuk diikat oleh syarat pembekal tersebut dan mematuhi **dasar** penggunaannya.
 - Jika anda adalah muda, dengan mendaftar ke Apl, anda mengesahkan bahawa anda mendapat kebenaran ibu/bapa atau penjaga undang-undang untuk menggunakan Apl.
 
+
 ---
+---
+
 
 ## 3. Penggunaan yang boleh diterima
 
@@ -41,7 +50,10 @@ Anda bersetuju **tidak** untuk:
 - Mengganggu, mengancam, atau menyalahgunai pengguna lain, termasuk melalui cara yang berada di luar Apl yang berkaitan dengan penggunaan Apl.
 - Mengganggu keseronokan pemain lain dalam Apl.
 
+
 ---
+---
+
 
 ## 4. Kandungan dan kelakuan pengguna
 
@@ -49,18 +61,29 @@ Anda bersetuju **tidak** untuk:
 - Sebarang kandungan yang anda muat naik (cth., avatar) mestilah milik anda untuk digunakan dan tidak boleh melanggar undang-undang atau hak pihak ketiga. Apl tidak menawarkan mesej teks/chat yang dihasilkan pengguna.
 - Tim berhak untuk mengeluarkan akaun atau kandungan mana-mana yang melanggar Syarat ini.
 
+
 ---
+---
+
 
 ## 5. Hak milik intelek
 
 - Apl, termasuk perisian, reka bentuk, dan jenama, disediakan sebagai sebahagian daripada projek pelajar sekolah 42. Apl dilesenkan di bawah **lesen GPL-3.0** (lihat fail `LICENSE` projek).
 - Tiada apa-apa dalam Syarat ini memindahkan kepemilikan anda terhadap Apl, teknologi asas, atau kod sumbernya.
 
+
 ---
+---
+
 
 ## 6. Privasi
 
 Penggunaan anda terhadap Apl adalah tertakluk kepada **Dasar Privasi** kami, yang menerangkan bagaimana kami mengendalikan data peribadi anda mengikut Akta Perlindungan Data Peribadi Malaysia 2010 (PDPA). Sila baca.
+
+
+---
+---
+
 
 ## 7. Permainan dan permainan adil
 
@@ -68,14 +91,20 @@ Penggunaan anda terhadap Apl adalah tertakluk kepada **Dasar Privasi** kami, yan
 - Kami berhak untuk membetulkan kesilapan dalam keputusan atau kedudukan yang direkodkan.
 - Kami mungkin menangguhkan atau mengeluarkan akaun yang terlibat dalam penipuan, manipulasi pertandingan, atau amalan yang tidak adil.
 
+
 ---
+---
+
 
 ## 8. Ketersediaan dan perubahan
 
 - Kami mungkin mengemaskini, mengubah, atau menghentikan sebarang fungsi Apl pada bila-bila masa, dengan atau tanpa notis.
 - Kami tidak bertanggungjawab atas sebarang gangguan atau ketiadaan ketersediaan Apl.
 
+
 ---
+---
+
 
 ## 9. Penghad tanggungjawab
 
@@ -83,14 +112,20 @@ Apl disediakan **“dalam keadaan apa adanya”** dan **“dengan apa yang terse
 
 Tiada apa-apa dalam Syarat ini yang mengehadkan atau mengecualikan tanggungjawab untuk tindakan jenayah, termasuk kesalahan di bawah **Akta Jenayah Komputer 1997** (cth., akses tidak dibenar kepada sistem atau program komputer, pengubahsuan tidak dibenar terhadap kandungananya, atau komunikasi salah data). Pengguna yang cubit atau melakukan kesalahan sedemikian tetap secara peribadi bertanggungjawab.
 
+
 ---
+---
+
 
 ## 10. Penamunggalan
 
 - Anda boleh berhenti menggunakan Apl pada bila-bila masa. Menghapuskan akaun anda menghapuskan data peribadi anda dan log keluar dari semua peranti — lihat Dasar Privasi.
 - Kami mungkin menangguhkan atau menamatkan akses anda ke Apl jika anda melanggar Syarat ini.
 
+
 ---
+---
+
 
 ## 11. Undang-undang yang diguna pakai
 
@@ -98,13 +133,19 @@ Syarat ini diatur oleh undang-undang **Malaysia**. Seebagainya perselisihan akan
 
 Apl tersedia dalam Bahasa Inggeris, Melayu, dan Perancis. Syarat ini disediakan dalam Bahasa Inggeris, yang akan menjadi **versi kanonik/pengawal**. Sebarang terjemahan disediakan untuk tujuan mudah semata-mata, dan jika terdapat sebarang konflik atau ketidakselarasan antara versi Bahasa Inggeris dan sebarang terjemahan, versi Bahasa Inggeris akan digunakan.
 
+
 ---
+---
+
 
 ## 12. Hubungi kami
 
 Untuk sebarang soalan tentang Syarat ini, sila hubungi Tim melalui saluran perhubungan projek (seperti yang disenaraikan dalam README projek).
 
+
 ---
+---
+
 
 ## 13. Perubahan kepada Syarat ini
 

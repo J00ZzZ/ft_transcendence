@@ -12,7 +12,10 @@
 - [Data Structures](#data-structures) — Redis key patterns and value formats
 - [Dependencies](#dependencies) — External dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,10 +23,13 @@ The Redis Infrastructure module provides the persistence and messaging layer for
 
 1. **Game state persistence** — stores active game state in Redis so games survive engine restarts and players can reconnect.
 2. **Move history** — keeps the last 200 moves per game in a list.
-3. **Match metadata** — a hash per match holding seats, colors, ready flags, and status (the lobby source of truth).
+3. **Match metadata** — a hash per match holding the seats, colors, and status (the lobby source of truth; readiness lives in the game state blob).
 4. **Pub/sub messaging** — publishes game events to Redis channels for cross-instance broadcasting.
 
+
 ---
+---
+
 
 ## Files
 
@@ -33,7 +39,10 @@ The Redis Infrastructure module provides the persistence and messaging layer for
 | `socket/event-publisher.ts` | `EventPublisher` — serialises each `GameEvent` into a pub/sub payload and calls `store.publish()` |
 | `socket/redis-broadcaster.ts` | `RedisBroadcaster` — `PSUBSCRIBE game:*`, then forwards each message to the matching Socket.IO room |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -41,6 +50,11 @@ The Redis Infrastructure module provides the persistence and messaging layer for
 
 ```typescript
 class RedisGameStore {
+  // Connections
+  async connect(): Promise<void>                                          // Open the command and subscriber connections
+  async disconnect(): Promise<void>                                       // Close both connections
+  async getAvatarMeta(userId: string): Promise<{ has: boolean; style?: string } | null>  // Read the cached avatar facts
+
   // Main state (hash field "state")
   async createGame(gameId: string, activeColors?: PlayerColor[]): Promise<void>   // Create a fresh game with all 16 pieces in prison
   async loadGameState(gameId: string): Promise<GameState | null>                                       // Load the full GameState (single HGET)
@@ -53,9 +67,14 @@ class RedisGameStore {
   async getMatchData(gameId: string): Promise<Record<string, string> | null>                           // Read the match hash (seats, colors, status)
   async updateMatchData(gameId: string, fields: Record<string, string>): Promise<void>                 // Update specific match-hash fields
   async scanMatchKeys(): Promise<string[]>                                                             // SCAN all match:* hashes
+  async scanGameKeys(): Promise<string[]>                                                              // SCAN all game:* hashes (skips the :moves lists)
   async setIdleSince(gameId: string, now: number): Promise<void>                                       // Stamp idle time (room < 2 seated), once
   async clearIdleSince(gameId: string): Promise<void>                                                  // Clear the idle stamp (room ≥ 2 seated)
-  async clearMatchSeat(gameId: string, color: PlayerColor): Promise<void>                              // Remove a non-host player's seat from the room
+  async clearMatchSeat(gameId: string, color: PlayerColor): Promise<void>                              // Free a non-host seat (delete its row and account record)
+  async reserveMatchSeat(gameId: string, color: PlayerColor): Promise<void>                            // Reserve a non-host seat (set player{N}_left)
+  async setSeatUser(gameId: string, color: PlayerColor, userId: string): Promise<void>                 // Record which account took a seat
+  async clearSeatUser(gameId: string, color: PlayerColor): Promise<void>                               // Drop a seat account record
+  seatUserFrom(matchData: Record<string, string> | null, color: PlayerColor): string | undefined       // Read a seat account from a match hash
   async abortMatch(gameId: string): Promise<void>                                                      // Mark a match ABORTED with a short TTL
 
   // Teardown / publish
@@ -64,7 +83,10 @@ class RedisGameStore {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -91,14 +113,21 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Engine as LudoEngine
-    participant Store as RedisGameStore
+    participant Pub as EventPublisher
+    participant Redis as Redis channel game:{gameId}
+    participant Cast as RedisBroadcaster
+    participant Room as Socket.IO room {gameId}
 
-    Engine->>Store: recordMove(gameId, move)
-    Store->>Store: Append the move to the game's history
-    Store-->>Engine: done
+    Engine->>Pub: emit a GameEvent (roll, move, exit, …)
+    Pub->>Redis: PUBLISH game:{gameId} (JSON payload)
+    Redis-->>Cast: message on the game:* pattern
+    Cast->>Room: io.to(gameId).emit(event.type, payload)
 ```
 
+
 ---
+---
+
 
 ## What Redis Spawns Per Game Session
 
@@ -110,7 +139,7 @@ session creates exactly three keys:
 |-----|------|---------------|
 | `game:{gameId}` | Hash | **One** field `state` = the whole game state as one JSON blob (the one true copy) |
 | `game:{gameId}:moves` | List | Last 200 moves (LPUSH + LTRIM), for replay/turn-log |
-| `match:{gameId}` | Hash | Lobby info: seats (`player{1-4}_id/color`), `status`, `gameType`, `inviteCode`, `idleSince` |
+| `match:{gameId}` | Hash | Lobby directory: `id`, `status`, `gameType`, `playerCount`, `seatColors`, `inviteCode` (PvP only), `createdAt`, `startedAt`, `idleSince`, one seat row per slot (`player{1-4}_id`, `player{1-4}_color`, `player{1-4}_left`), and one `seatUser_<color>` field per seat holding the account that took it (keyed by colour, not by slot) |
 
 Readiness is stored inside the game `state` blob (`state.readyPlayers`), not in the match hash.
 
@@ -123,7 +152,7 @@ them or gives them a short expiry.
 flowchart LR
     G["Game session<br/>gameId"] --> K1[("game:{gameId}<br/>Hash — field 'state'<br/>= GameState JSON")]
     G --> K2[("game:{gameId}:moves<br/>List — last 200 moves")]
-    G --> K3[("match:{gameId}<br/>Hash — seats, ready, status")]
+    G --> K3[("match:{gameId}<br/>Hash — seats, status")]
     G --> C["game:{gameId}<br/>pub/sub channel"]
 ```
 
@@ -134,7 +163,10 @@ On top of the three keys, each game also has a Redis pub/sub channel
 to it; `RedisBroadcaster` picks it up and passes it to the Socket.IO room, so
 all clients stay in sync even across several engine instances.
 
+
 ---
+---
+
 
 ## How the Engine Handles Multiple Bots
 
@@ -149,11 +181,11 @@ const botMap = new Map<string, Map<PlayerColor, LudoBot>>();
 
 export function getOrCreateBot(gameId, color, engine, store): LudoBot {
   if (!botMap.has(gameId)) botMap.set(gameId, new Map());
-  const gameBots = botMap.get(gameId)!;
+  const gameBots = botMap.get(gameId);
   if (!gameBots.has(color)) {
     gameBots.set(color, new LudoBot(gameId, color, engine, store));
   }
-  return gameBots.get(color)!;
+  return gameBots.get(color);
 }
 ```
 
@@ -167,12 +199,12 @@ from Redis each turn** via `loadGameState`. That keeps bots stateless and cheap.
 Bots never act on their own. The `SocketServer` tells them when to play:
 
 ```text
-game_started  → triggerBotTurn(gameId, BOT_THINK_MS)          // 500ms "thinking"
-piece_moved   → triggerBotTurn(gameId, path.length*220 + 500) // wait for the move animation
-dice_rolled   → if no legal moves → triggerBotTurn(gameId, 750 + 500)
+game_started  → botScheduler.schedule(gameId, BOT_THINK_MS)          // 500 ms thinking pause
+piece_moved   → botScheduler.schedule(gameId, path.length * 220 + 500) // wait for the move animation
+dice_rolled   → if no legal moves → botScheduler.schedule(gameId, 750 + 500)
 ```
 
-`triggerBotTurn` keeps **one timer per game** (`botTurnTimers`): it cancels the
+`BotTurnScheduler.schedule` keeps **one timer per game** (`botTurnTimers`): it cancels the
 old timer before starting a new one, so bot turns never overlap. When the timer
 fires, it checks the current turn is a bot (`isBotPlayer`), gets the bot from
 `getOrCreateBot`, and calls `bot.takeTurn()`.
@@ -207,12 +239,19 @@ sequenceDiagram
 
 ### How bots are identified
 
-Bots are stored as real `User` rows with ids `bot-<color>` (e.g. `bot-green`).
-The helper `isBotUserId()` (`common/bot.ts`) is the **one place** that answers
-"is this a bot?" — the engine, the match postgame scorer, and the achievements
-service all use it, so they never disagree.
+A bot is not an account: its user id is the literal string `bot-<color>`
+(`bot-green`), and it leaves no `User` row. That id lives in the `match:{gameId}`
+hash, in the engine's game state and in the engine JWT.
+Each process has one helper that answers "is this a bot?" by checking the `bot-`
+prefix: `isBotUserId()` in `socket/auth.ts` inside the engine, and
+`isBotUserId()` in `common/bot.ts` inside the backend. The backend's copy is
+used by the match postgame scorer and the achievements service, so those two
+always agree; the engine's copy keeps the engine free of backend imports.
+
 
 ---
+---
+
 
 ## Piece-Level State: Why No Board Is Ever Built
 
@@ -295,15 +334,15 @@ So a PvE game costs only a few hundred extra bytes over PvP in Redis — the
 bots do **not** multiply the state. The extra footprint from bots shows up
 outside Redis:
 
-- **PostgreSQL:** each bot is a real `User` row (`bot-<color>`) — a handful of
-  small rows per game.
+- **PostgreSQL:** nothing. A bot is not an account, so a finished game writes no
+  rows for it.
 - **Engine memory:** one cached `LudoBot` object per bot color (a few hundred
   bytes each), kept for the whole match in `botMap`.
 - **Timers:** one `setTimeout` per game for bot turns — never one per bot, so
   bot count does not add timers.
 
-The short version: **bots add a tiny fixed cost (a few hundred bytes of Redis,
-a few small DB rows, a small object each) — they do not scale the state.** Even
+The short version: **bots add a tiny fixed cost (a few hundred bytes of Redis
+and one small cached object each) — they do not scale the state.** Even
 with 3 bots the whole game is still a ~2–3 KB JSON document.
 
 ### What if the board also had to be built?
@@ -343,7 +382,10 @@ saves part of that and still duplicates the piece positions. The piece-node
 model already *is* the occupancy map: **16 nodes with a `step` field answer
 "where is everything?" without ever building a board.**
 
+
 ---
+---
+
 
 ## Data Structures
 
@@ -353,7 +395,7 @@ model already *is* the occupancy map: **16 nodes with a `step` field answer
 |---------|------|-----|-------------|
 | `game:{gameId}` | Hash | 86400s (24h) | One field `state` = serialized GameState JSON |
 | `game:{gameId}:moves` | List | — | Move history, trimmed to 200 entries |
-| `match:{gameId}` | Hash | 3600s (aborted) | Match metadata: `player{1-4}_id`, `player{1-4}_color`, `status`, `gameType`, `inviteCode`, `idleSince`. **Co-owned** — mutated by both the engine (via `RedisGameStore` helpers) and Nest (via `match/*.service.ts`). The backend reads `game:{gameId}` state via `isSeatFinalization()` only to check seat liveness; it never writes to `game:*`. |
+| `match:{gameId}` | Hash | 3600s (aborted) | Lobby directory: `id`, `status`, `gameType`, `playerCount`, `seatColors`, `inviteCode` (PvP only), `createdAt`, `startedAt`, `idleSince`, one seat row per slot (`player{1-4}_id`, `player{1-4}_color`, `player{1-4}_left`), and one `seatUser_<color>` field per seat holding the account that took it (keyed by colour, not by slot). **Co-owned** — mutated by both the engine (via `RedisGameStore` helpers) and Nest (via `match/*.service.ts`). The backend reads `game:{gameId}` state through `isSeatFinalized()` only to check seat liveness; it never writes to `game:*`. |
 
 ### Value Format
 
@@ -373,7 +415,10 @@ Game state is stored as JSON under the `state` field of the game hash:
 }
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -406,7 +451,10 @@ publish(gameId, message)
   └── PUBLISH game:{gameId} <message>
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -414,7 +462,10 @@ publish(gameId, message)
 |-----------|---------|
 | `ioredis` | Redis client for Node.js — supports pub/sub, pipelining, hashes, and lists |
 
+
 ---
+---
+
 
 ## What Pub/Sub Is (plain English)
 

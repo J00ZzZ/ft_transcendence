@@ -8,7 +8,10 @@
 - [Core Logic / Flow](#core-logic--flow) — Data fetching, and when it repeats
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -16,13 +19,16 @@ The Profile page (`/profile`) shows a user's public profile with statistics, rec
 
 1. **Profile header** — username, status indicator, avatar initials, rating and the date the account was created.
 2. **Stats grid** — wins, losses, win rate, best streak.
-3. **Recent matches** — each game with the opponent names, the result (victory, defeat or draw), pieces in goal and the date.
+3. **Recent matches** — each game with the other human players' names, the result (victory, defeat or draw), pieces in goal and the date. A game against bots lists only you.
 4. **Friends panel** — friends with their online status and a rating badge; shown only on your own profile.
 5. **Avatar actions (own profile)** — the `EDIT AVATAR`, `RESET` and `EDIT PROFILE` buttons, and below them a **message area with a fixed height**. The area shows upload and reset errors in red, and the photo-load warning (`profile.photoLoadError`) in amber. Because the height is fixed, a longer translation in Malay or French wraps onto more lines without moving the content below it.
 
 When the page loads it reads the profile, game history, achievements, friends and leaderboard rank. It reads them again when the username changes or when the edit modal closes. It does **not** repeat on a timer.
 
+
 ---
+---
+
 
 ## Files
 
@@ -33,7 +39,10 @@ When the page loads it reads the profile, game history, achievements, friends an
 | `src/store.tsx` | `useApp` for authentication state, presence and API (Application Programming Interface) calls |
 | `src/theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` styles |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -45,6 +54,7 @@ When the page loads it reads the profile, game history, achievements, friends an
   username: string;  // Player's username
   displayName?: string;  // Name shown in the game
   avatarStyle: string | null;  // Avatar style name
+  hasAvatarPhoto: boolean;  // Whether a custom photo is uploaded
   rating: number;  // Player's rating (score)
   highestRating: number;  // Best rating ever reached
   wins: number;  // Games won
@@ -63,16 +73,19 @@ When the page loads it reads the profile, game history, achievements, friends an
   games: Array<{  // List of games played
     gameId: string;  // ID of the game
     status: string;  // Current status
-    color: number;  // Seat color
+    gameType: 'PVP' | 'PVE';  // Match type
+    color: string;  // Seat color
     rank: number | null;  // Position in the ranking
     piecesCaptured: number;  // Pieces knocked off
     piecesInGoal: number;  // Pieces finished (0-4)
+    ratingDelta: number;  // Rating change from this game
     startedAt: string;  // When the game started
     endedAt: string | null;  // When the game ended
-    participants: Array<{  // Everyone who played
+    participants: Array<{  // Every human who played; a game against bots lists only you
       username: string;  // Player's username
       avatarStyle: string | null;  // Avatar style name
-      color: number;  // Seat color
+      hasAvatarPhoto?: boolean;  // Whether a custom photo is uploaded
+      color: string;  // Seat color
       rank: number | null;  // Position in the ranking
       piecesInGoal: number;  // Pieces finished (0-4)
     }>;
@@ -89,14 +102,19 @@ When the page loads it reads the profile, game history, achievements, friends an
 {
   id: string;  // Unique ID
   username: string;  // Player's username
+  displayName?: string;  // Name shown in the game
   avatarStyle: string | null;  // Avatar style name
+  hasAvatarPhoto?: boolean;  // Whether a custom photo is uploaded
   rating: number;  // Player's rating (score)
   friendsSince: string;  // When the friendship started
   status: 'online' | 'playing' | 'offline';  // Current status
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -139,7 +157,10 @@ sequenceDiagram
     Profile->>Profile: Re-render with the data (no repeating timer)
 ```
 
+
 ---
+---
+
 
 ## Achievements (own profile)
 
@@ -163,7 +184,10 @@ Your own profile renders the 13 achievements defined by `ACHIEVEMENTS_DEF` in `P
 
 Hotseat games never count towards any achievement. The badge/tab counter shows `unlocked / 13`.
 
+
 ---
+---
+
 
 ## Dependencies
 

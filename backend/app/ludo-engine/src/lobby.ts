@@ -1,5 +1,5 @@
-import { RedisGameStore } from './redis';
-import { EventPublisher } from './socket/event-publisher';
+import type { RedisGameStore } from './redis';
+import type { EventPublisher } from './socket/event-publisher';
 import type { PlayerColor } from './types';
 
 const SLOT_COLORS: PlayerColor[] = ['blue', 'red', 'green', 'yellow'];
@@ -19,7 +19,7 @@ export class LobbyManager {
   // LudoEngine.handlePlayerSelectColor.
   async handleSelectColor(gameId: string, userId: string, color: PlayerColor): Promise<void> {
     const data = await this.store.getMatchData(gameId);
-    if (!data || data.status !== 'WAITING') {
+    if (data?.status !== 'WAITING') {
       throw new Error('Game is not in waiting state');
     }
 
@@ -45,7 +45,7 @@ export class LobbyManager {
     if (currentColor === color) return; // already has this color
 
     const takenBy = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].find(
-      (id, idx) => id && id !== userId && (data[`player${idx + 1}_color`] as string) === color,
+      (id, idx) => id && id !== userId && data[`player${idx + 1}_color`] === color,
     );
 
     if (takenBy) {

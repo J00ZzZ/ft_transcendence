@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for push/replace navigation
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -19,7 +22,10 @@ The router is small and custom-built, using `window.location` and React's `useSy
 2. **Navigation** — `navigate(to, { replace })` changes the URL, scrolls back to the top and tells every subscriber to re-render.
 3. **No React Router** — kept minimal on purpose, to avoid the extra dependency.
 
+
 ---
+---
+
 
 ## Files
 
@@ -27,7 +33,10 @@ The router is small and custom-built, using `window.location` and React's `useSy
 |------|------|
 | `src/router.tsx` | Router implementation — `useRoute`, `navigate`, `Route` type |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -51,7 +60,10 @@ export function navigate(to: string, opts?: { replace?: boolean }): void
 | `to` | `string` | Target path (for example `/gamelobby`) |
 | `opts.replace` | `boolean` | If true, uses `replaceState` instead of `pushState` |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -87,7 +99,10 @@ sequenceDiagram
     Pages->>User: Show the page for the previous address
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -110,7 +125,10 @@ useRoute()
   └── Returns { path, query }
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision tree for move selection
 - [Dependencies](#dependencies) — Internal dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -18,11 +21,14 @@ The Bot AI module provides an automated opponent for single-player (PvE) games. 
 1. **Always takes captures** — if any legal move captures an opponent piece, it takes the first one.
 2. **Frees pieces from jail on a 6** — if the dice is 6, it prefers moving a piece out of the base.
 3. **Scores the remaining moves** — otherwise it ranks each move and picks the highest score.
-4. **Mimics a human** — it waits ~1.2s before moving so the dice animation can play.
+4. **Paces its moves** — it waits about 1.2 seconds before moving so the dice animation can play.
 
 Bot turns are scheduled by the `SocketServer` (not by the bot itself) so two bot turns never overlap.
 
+
 ---
+---
+
 
 ## Files
 
@@ -30,7 +36,10 @@ Bot turns are scheduled by the `SocketServer` (not by the bot itself) so two bot
 |------|------|
 | `bot.ts` | `LudoBot` class + `getOrCreateBot()` / `isBotPlayer()` helpers |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -67,7 +76,10 @@ The backend writes the id and the engine reads it, so the two copies must be
 changed together. The backend keeps the list of modules that filter bots — see
 [`../backend/backend-database-schema-system.md`](../backend/backend-database-schema-system.md) → Bots.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -86,8 +98,8 @@ sequenceDiagram
     alt No piece can move
         Bot-->>Game: Pass the turn
     else Moves available
-        Bot->>Bot: Pick the best move (capture > free from jail on 6 > most points)
-        Bot->>Bot: Wait ~1.2 seconds (so the dice animation shows)
+        Bot->>Bot: Pick the best move (capture > free from jail on 6 > highest score)
+        Bot->>Bot: Wait about 1.2 seconds (so the dice animation shows)
         Bot->>Engine: Make the move
         Engine-->>Bot: result
         alt The game is over
@@ -100,16 +112,16 @@ sequenceDiagram
 
 ### Choosing Between Several Moves
 
-When there are multiple options, the bot checks them in order — the first rule that fits wins. It never over-thinks it:
+When there are multiple options, the bot checks them in order — the first rule that fits wins. There is no deeper evaluation than these rules.
 
 ```mermaid
 flowchart TD
-    A["The bot can move more than one piece"] --> B{"Can it knock an opponent piece off the board?"}
-    B -- "Yes" --> C["Do that! Capturing is always the best move"]
+    A["The bot can move more than one piece"] --> B{"Can it capture an opponent piece?"}
+    B -- "Yes" --> C["Capture it: a capture is always the best move"]
     B -- "No" --> D{"Did it roll a 6?"}
-    D -- "Yes" --> E{"Is any piece stuck in the starting area?"}
-    E -- "Yes" --> F["Get a piece out of the starting area"]
-    E -- "No" --> G["Give each possible move points, then pick the move with the most points"]
+    D -- "Yes" --> E{"Is any piece still in the base?"}
+    E -- "Yes" --> F["Move a piece out of the base"]
+    E -- "No" --> G["Score each possible move and pick the highest"]
     D -- "No" --> G
     C --> H["Move the chosen piece"]
     F --> H
@@ -118,7 +130,7 @@ flowchart TD
 
 ### Example: a real board decision
 
-Say it's **Green**'s turn and the bot rolls a **4**. Green has three pieces on the track and none can capture, so the bot scores each option. Landing squares that are safe zones (shared positions `1, 9, 14, 22, 27, 35, 40, 48`) get a `+500` bonus, and each piece earns `+10` per step of progress:
+For example, it is **Green**'s turn and the bot rolls a **4**. Green has three pieces on the track and none can capture, so the bot scores each option. A landing square that is a safe zone gets a `+500` bonus, and each piece earns `+10` per step of progress. Safe zones are the shared track positions `1, 9, 14, 22, 27, 35, 40, 48`; a piece's own step is offset onto that shared loop, so green's step 9 sits on position 22 and green's step 14 sits on position 27.
 
 ```mermaid
 flowchart LR
@@ -141,7 +153,10 @@ flowchart LR
 
 The bot picks **option 2** (highest score, `640`) and moves G0 to step 14. In real games the same priority chain decides first — if any move could capture, it would take that move before scoring anything.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -149,6 +164,7 @@ The bot picks **option 2** (highest score, `640`) and moves G0 to step 14. In re
 ```
 selectBestMove(legalMoves, state, diceValue)
   ├── No legal moves → return null (pass turn)
+  ├── Exactly one legal move → return it
   ├── Capture moves exist (isCapture) → return first capture
   ├── diceValue === 6 and a move from===0 exists → return it (free from jail)
   └── Otherwise score each move:
@@ -171,7 +187,10 @@ takeTurn()
   └── Return whether the game is still active
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

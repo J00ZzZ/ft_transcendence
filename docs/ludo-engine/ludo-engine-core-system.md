@@ -10,11 +10,14 @@
 - [Dependencies](#dependencies) — Internal services this module relies on
 - [Configuration](#configuration) — Environment variables
 
+
 ---
+---
+
 
 ## Overview
 
-The engine core is the game's referee: it runs inside the `ludo-engine` service and is the single source of truth for all game state. The engine:
+The engine core enforces the game rules. It runs inside the `ludo-engine` service and is the single source of truth for all game state. The engine:
 
 1. **Manages game state** — moves games through `waiting` → `active` → `finished`.
 2. **Validates moves** — uses `MoveValidator` to work out which moves are legal.
@@ -24,7 +27,10 @@ The engine core is the game's referee: it runs inside the `ludo-engine` service 
 6. **Saves state** — writes to Redis via `RedisGameStore` so a restart doesn't lose the game.
 7. **Serializes operations** — a per-game lock ensures roll/move never run on top of each other.
 
+
 ---
+---
+
 
 ## Files
 
@@ -33,7 +39,7 @@ The engine core is the game's referee: it runs inside the `ludo-engine` service 
 | `engine.ts` | `LudoEngine` class — state machine, turn logic, dice rolling, piece movement, per-game locks |
 | `types.ts` | Type definitions: `GameState`, `PlayerMeta`, `Piece`, `LegalMove`, `MoveResult`, `GameEvent` |
 | `move-validator.ts` | Legal move computation based on board geometry |
-| `turn.ts` | `applyMoveOutcome` — mirrors the move into stats, checks the win condition, and advances the turn |
+| `turn.ts` | `applyMoveOutcome` — mirrors the move into stats, keeps each seat's `piecesInGoal` count in step with the board, checks the win condition, and advances the turn |
 | `board-mapper.ts` | Board geometry — safe zones, track positions, goal entries |
 | `redis.ts` | `RedisGameStore` — Redis persistence layer |
 | `bot.ts` | Heuristic bot AI |
@@ -41,7 +47,10 @@ The engine core is the game's referee: it runs inside the `ludo-engine` service 
 | `lobby.ts` | Lobby management — color selection with seat swap (ready gate is in player-handler.ts) |
 | `index.ts` | Entry point — starts Socket.IO server on port 3001 |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -69,7 +78,7 @@ export interface Piece {
 export interface PlayerMeta {
   color: PlayerColor;    // Seat color
   status: 'active' | 'exited' | 'inactive' | 'disconnected';  // Player lifecycle state
-  username: string;      // Seat/display name
+  username: string;      // Immutable account name (bots: `bot-<color>`)
   displayName?: string;  // Optional display name
   userId?: string;       // Immutable account id (avatar key); absent for bots/hotseat seats
   hasAvatarPhoto: boolean;  // Whether the account has an uploaded photo (from the backend's Redis cache)
@@ -104,9 +113,9 @@ reaches the departed seat.
 **The explicit pause flag is PvP-only.** When a PvP player drops during their *own* turn
 (`handlePlayerDisconnect`), the game also sets `state.paused` / `state.pauseTurnOwner` so clients can
 render a "waiting to reconnect" banner immediately. PvE and hotseat never pause: they are
-single-instance games with one remote-less human, so the only two states are *running* and
-*aborted* — their disconnect still arms the long (1h) single-instance window, and expiry tears the
-room down. The pause is cleared in three places: `handlePlayerReconnect` (seat restored, same turn
+single-instance games with one human and no remote opponent, so the only two states are *running*
+and *aborted* — their disconnect still arms the long (1h) single-instance window, and expiry tears
+the room down. The pause is cleared in three places: `handlePlayerReconnect` (seat restored, same turn
 resumes with its pending dice/moves), `finalizeDeparture` (seat pruned, turn advances to the next
 playable seat), and the re-arm check in `join-manager` (defensive, owner-only). While paused,
 `rollDice`, `movePiece`, and bot turns are all rejected, so nobody can act on a frozen board.
@@ -116,11 +125,33 @@ roster (`emitLobbyUpdate`) and the client's pilot list both filter out, and its 
 flagged as reserved rather than deleted, so `joinMatch` sends the player back to the same colour.
 Aborting frees the seat outright instead. Either way the room's idle-abort timer is restarted, and
 the host's seat is never touched. Because the seat is restored to `active` on rejoin, `isFinished`
-is deliberately left untouched on this path : a stale "finished" flag would make the player look
+is deliberately left untouched on this path: a stale "finished" flag would make the player look
 already done at game start.
 
 A player who leaves a **live game** is parked as `exited` with `isFinished` set, because the
 post-game result logic prunes on that status.
+
+A grace window is only opened for a seat that can actually come back. A seat cannot be resumed
+once it is `exited` or the match is finished, because every one of its pieces is parked at
+`step = -1`. Parking such a seat in `disconnectedPlayers` would let a later `join_game` take the
+reconnect branch and flip it back to `active` with all four pieces still at `-1`; `MoveValidator`
+skips `step < 0`, so that seat could never produce a legal move and its turn would auto-pass forever.
+
+The reset on turn advance is deliberate. The turn-scoped snapshot (`turnPhase`, `pendingLegalMoves`,
+`pendingDiceValue`, `pendingIsFirstRoll`) belongs to the player who just finished. Leaving it behind
+stranded the next player whenever a seat was pruned mid-`WAITING_FOR_MOVE`: the new player could
+neither roll (`Invalid turn phase`) nor move a piece, freezing the game. `rollDice` also resets these
+on its own paths, but doing it in `advanceTurnInState` makes the invariant hold for every caller.
+
+**Quorum.** `hasQuorum(state)` is the single predicate that decides whether a room can continue: it
+requires at least two seats that are both `active` and not bots. Bots never count, so a PvE room is
+not kept alive by its bot seats. When a departure drops the room below that count, `teardownRoom`
+runs: it emits `game_expired`, marks the match `ABORTED`, deletes the engine game state, and calls
+the in-memory cleanup callback (which clears `userIdMap`, bots, and per-game locks).
+
+**Source files.** `firstActiveColor`, `advanceTurnInState`, `handlePlayerDisconnect`,
+`handlePlayerReconnect`, `expireDisconnectedPlayer`, `finalizeDeparture`, `teardownRoom`, and
+`hasQuorum` all live in `backend/app/ludo-engine/src/player-handler.ts`.
 
 ### GameState
 
@@ -186,15 +217,20 @@ export type GameEvent =
   | { type: 'piece_moved'; gameId; result: MoveResult }                                         // A piece moved; full MoveResult payload
   | { type: 'game_ended'; gameId; winner; resultDetail }                                        // Game finished; winner + reason
   | { type: 'game_started'; gameId }                                                            // Game transitioned from waiting → active
-  | { type: 'player_exited'; gameId; color }                                                    // A player left / was removed
+  | { type: 'game_expired'; gameId }                                                            // Room torn down (quorum lost, single-instance expiry, idle lobby)
+  | { type: 'player_exited'; gameId; color }                                                    // A player left the game, or the server pruned the seat
   | { type: 'player_aborted'; gameId; color; username }                                         // A player aborted the game
   | { type: 'player_disconnected'; gameId; color }                                              // A player's connection dropped
-  | { type: 'player_reconnected'; gameId; color }                                               // A player reconnected
+  | { type: 'player_reconnected'; gameId; color; displayName? }                                 // A player reconnected (displayName carries a rename)
+  | { type: 'state_update'; gameId; state: GameState }                                          // Full state frame after a prune or a pause change
   | { type: 'color_selected'; gameId; userId; color }                                           // A player picked a color in the lobby
   | { type: 'lobby_update'; gameId; players };                                                  // Lobby seats changed
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -226,7 +262,7 @@ sequenceDiagram
 
     Player->>Engine: Click a piece to move it
     Engine->>Engine: Check the move is legal
-    Engine->>Engine: Move the piece, knock out any enemy on that cell
+    Engine->>Engine: Move the piece; any opponent piece on that cell goes back to base
     Engine->>Engine: Did all 4 pieces reach home?
     alt Yes — player wins
         Engine-->>Player: game_ended (winner)
@@ -240,26 +276,31 @@ sequenceDiagram
     end
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
 ### Dice Roll Path
 ```
 roll_dice()
+  ├── Reject if the game is paused (a disconnect grace window is open)
   ├── Validate game active, turnPhase WAITING_FOR_ROLL, caller is current player
   ├── Roll 1-6
   ├── 6 → consecutiveSixes++ ; otherwise reset to 0
   ├── Third consecutive 6 → forfeit turn (forfeited: true), advance, return
   ├── 6 → bonusRoll = true
   ├── pendingLegalMoves = MoveValidator.getLegalMoves(...)
+  ├── No legal moves → clear pending moves; a first-roll 6 keeps the turn, otherwise advance
   ├── turnPhase = WAITING_FOR_MOVE
   └── Emit dice_rolled { value, legalMoves, bonusRoll }
 ```
 
 #### The dice math (mulberry32)
 
-`rollDice` doesn't use `Math.random()` directly — it seeds `mulberry32`, a tiny
+`rollDice` doesn't use `Math.random()` directly — it seeds `mulberry32`, a small
 32-bit PRNG (`seededRand` in `engine.ts`), and draws once per roll:
 
 ```ts
@@ -274,7 +315,7 @@ return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // 3. uniform float in [0, 1)
   keeps the arithmetic in 32-bit range — JS numbers are float64 and lose
   integer precision past 2^53.
 - **Scramble** — the counter alone follows a simple pattern, so XOR-shifts
-  move bits to new positions and `Math.imul` (32-bit multiply) mixes them:
+  move bits to new positions and `Math.imul` (32-bit multiply) combines them:
   a small change in the seed produces a completely different output.
 - **Normalize** — `>>> 0` makes the result unsigned; dividing by 2^32 gives
   an even spread over [0, 1). `Math.floor(rand() * 6) + 1` turns that into
@@ -288,20 +329,24 @@ each roll gives that roll its own separate stream, so other code using
 ### Move Piece Path
 ```
 move_piece(pieceId)
+  ├── Reject if the game is paused (a disconnect grace window is open)
   ├── Validate game active and turnPhase = WAITING_FOR_MOVE
   ├── Verify pieceId is in pendingLegalMoves (server snapshot from the roll)
   ├── executeMove → move the piece; resolve any captures immediately (captured pieces → base)
   ├── recordMove (history) + moveCounter++
   ├── Check win condition (all 4 pieces at step 57)
-  │   ├── Win → status='finished', emit game_ended
-  │   └── No win → sync piecesInGoal
+  │   ├── Win → sync the winner's piecesInGoal, status='finished', emit game_ended
+  │   └── No win → sync the mover's piecesInGoal
   │       ├── Roll was 6 OR move captured → same player rolls again (bonus roll)
   │       └── Roll 1-5, no capture → advance turn to next player
   ├── Clear pendingLegalMoves + pendingDiceValue
   └── saveGameState; emit piece_moved (+ game_ended if finished)
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -320,12 +365,15 @@ Module-level constants in the engine's support files — edit at the top of each
 | Constant | File | Default | What it controls |
 |----------|------|---------|------------------|
 | `DISCONNECT_GRACE_MS` | `player-handler.ts` | 45 s | PvP reconnect window before a disconnected player is pruned |
-| `SINGLE_SOCKET_DISCONNECT_GRACE_MS` | `player-handler.ts` | 1 h | Bot-mode reconnect window before the game auto-aborts |
+| `SINGLE_SOCKET_DISCONNECT_GRACE_MS` | `player-handler.ts` | 1 h | Single-instance (PvE/hotseat) reconnect window before the game auto-aborts |
 
 > `player-handler.ts` adds a hardcoded `+1000` ms buffer to the PvP grace
 > period so the prune timer fires just after the reconnect deadline.
 
+
 ---
+---
+
 
 ## Configuration
 

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/prisma/client';
+import type { GameType, PlayerColor } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 loadEnv({ path: join(__dirname, '..', '..', '.env') });
@@ -13,10 +14,9 @@ const HOUR = 3600_000;
 const MINUTE = 60_000;
 const now = Date.now();
 
-// Demo-data script for two specific accounts (harleyhxng, harleynghxedu):
-// sets their stats/achievements, replays their match history, and wires
-// their friendships. Run manually with ts-node; ignores accounts that
-// don't exist.
+// Demo data for two accounts (harleyhxng, harleynghxedu): their stats,
+// achievements, match history, and friendships. Run manually with ts-node;
+// accounts that do not exist are skipped.
 async function main() {
   console.log('🚀 Injecting distinct pilot profiles for harleyhxng & harleynghxedu...');
 
@@ -219,18 +219,22 @@ async function main() {
           startedAt: new Date(now - m.ago),
           endedAt: new Date(now - m.ago + 18 * MINUTE),
           status: 'COMPLETED',
-          gameType: m.type as any,
+          gameType: m.type as GameType,
           participants: {
-            create: m.parts
-              .filter((p) => p.uid)
-              .map((p) => ({
-                id: randomUUID(),
-                user_id: p.uid!,
-                color: p.c as any,
-                rank: p.r,
-                piecesCaptured: p.cap,
-                piecesInGoal: p.goal,
-              })),
+            create: m.parts.flatMap((p) =>
+              p.uid
+                ? [
+                    {
+                      id: randomUUID(),
+                      user_id: p.uid,
+                      color: p.c as PlayerColor,
+                      rank: p.r,
+                      piecesCaptured: p.cap,
+                      piecesInGoal: p.goal,
+                    },
+                  ]
+                : [],
+            ),
           },
         },
       });
@@ -395,18 +399,22 @@ async function main() {
           startedAt: new Date(now - m.ago),
           endedAt: new Date(now - m.ago + 16 * MINUTE),
           status: 'COMPLETED',
-          gameType: m.type as any,
+          gameType: m.type as GameType,
           participants: {
-            create: m.parts
-              .filter((p) => p.uid)
-              .map((p) => ({
-                id: randomUUID(),
-                user_id: p.uid!,
-                color: p.c as any,
-                rank: p.r,
-                piecesCaptured: p.cap,
-                piecesInGoal: p.goal,
-              })),
+            create: m.parts.flatMap((p) =>
+              p.uid
+                ? [
+                    {
+                      id: randomUUID(),
+                      user_id: p.uid,
+                      color: p.c as PlayerColor,
+                      rank: p.r,
+                      piecesCaptured: p.cap,
+                      piecesInGoal: p.goal,
+                    },
+                  ]
+                : [],
+            ),
           },
         },
       });

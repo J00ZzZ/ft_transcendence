@@ -5,7 +5,10 @@
 
 This Privacy Policy explains how the ft-Transcendence (RetroLudo '42) web application ("the App", "we", "us") collects, uses, discloses, and protects your personal data. It is prepared in accordance with the **Malaysian Personal Data Protection Act 2010 ("PDPA")** and its guiding principles: General, Notice and Choice, Disclosure, Security, Retention, Data Integrity, and Access.
 
+
 ---
+---
+
 
 ## 1. What personal data we collect
 
@@ -23,7 +26,10 @@ The App collects only the data needed to provide the game and its account featur
 
 We do **not** collect payment card details, location data, or any data from children under the age of 13. The App is a game and does not perform automated profiling beyond displaying game statistics you already see.
 
+
 ---
+---
+
 
 ## 2. Notice and choice (consent)
 
@@ -32,7 +38,10 @@ By creating an account and using the App, you consent to the collection and use 
 - You may withdraw consent by deleting your account at any time (see Section 7).
 - Where optional data is involved (e.g., uploading an avatar, linking an OAuth method), it is collected only on your express choice.
 
+
 ---
+---
+
 
 ## 3. How we use your data
 
@@ -47,7 +56,10 @@ We use your personal data solely to:
 
 We do **not** sell, rent, or trade your personal data, and we do not use it for marketing or advertising.
 
+
 ---
+---
+
 
 ## 4. Disclosure
 
@@ -59,7 +71,10 @@ Your data is disclosed only as needed to operate the App:
 
 We do not transfer your personal data outside of the purposes described here without your consent, except where required to provide the service.
 
+
 ---
+---
+
 
 ## 5. Security
 
@@ -74,13 +89,19 @@ We apply reasonable technical and organisational safeguards to protect your data
 
 Because the App is a self-hosted development/evaluation project, the deployment uses a **self-signed TLS certificate**; the connection is still encrypted, but it is not validated by public certificate authorities. You should not use the App to store highly sensitive data.
 
+
 ---
+---
+
 
 ## 6. Retention
 
 We keep your personal data only for as long as your account exists and as needed to provide the features you use. Ephemeral data (live match state, presence, notifications, temporary security tokens) is held in memory with automatic expiry. When you delete your account, your personal data is removed (see Section 7).
 
+
 ---
+---
+
 
 ## 7. Data integrity, access, and correction (your rights under PDPA)
 
@@ -98,19 +119,28 @@ Under the PDPA you have the right to:
 
 For any access, correction, or other request, contact the Team (see Section 9).
 
+
 ---
+---
+
 
 ## 8. Data integrity
 
 We take reasonable steps to ensure the personal data we hold is accurate, complete, and not misleading, and we correct or update it when you notify us or edit it yourself.
 
+
 ---
+---
+
 
 ## 9. Contact
 
 For any questions, complaints, or requests relating to your personal data under the PDPA, please contact the Team through the project's contact channels (as listed in the project's README).
 
+
 ---
+---
+
 
 ## 10. Changes to this Policy
 

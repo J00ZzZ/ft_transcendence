@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for dice roll and piece selection
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Game page (`/game`) is the real-time gameplay screen. It has:
 
 > **Note:** The Game page is fully real-time. It connects to the engine on the page's own origin (`/socket.io/`), sends `join_game`, `roll_dice` and `move_piece`, and renders state updates from the engine (`game_joined`, `dice_rolled`, `piece_moved`, `game_ended` and others). Game state is dispatched into `game/reducer.ts`; see `socket.ts` for the complete event contract.
 
+
 ---
+---
+
 
 ## Files
 
@@ -35,7 +41,10 @@ The Game page (`/game`) is the real-time gameplay screen. It has:
 | `src/game/types.ts` | GameState, PlayerColor, LegalMove, MoveResult and others |
 | `src/socket.ts` | Socket.IO client — `connectSocket()`, typed Server/Client event maps |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -67,7 +76,10 @@ type Seat =
 type PlayerColor = 'red' | 'green' | 'yellow' | 'blue'
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -125,7 +137,10 @@ sequenceDiagram
     end
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -164,7 +179,10 @@ on 'game_ended' { winner, resultDetail }
   └── Open the ResultsModal overlay in-game
 ```
 
+
 ---
+---
+
 
 ## Implementation Notes
 
@@ -172,11 +190,17 @@ on 'game_ended' { winner, resultDetail }
 - **Duplicate-move guard.** `pendingMoveRef` is set as soon as `move_piece` is sent, and cleared when the server replies with `piece_moved` or a rejection. Without it, a second click on a piece that still looks legal, before the reply arrives, sends a duplicate `move_piece` that the engine rejects with "Invalid turn phase".
 - **`canRoll` also requires `status === 'active'`.** This closes a short race condition (two operations competing in timing) at the end of a game: the winning move can leave the other roll inputs looking usable for one render before `game_ended` arrives, which would let a click through as a "Game not active" rejection.
 - **Seat identity on the first render.** For a PvP (player versus player) joiner, `ck === view.myColor` can be out of date until the server replies: the engine assigns the seat through `lobby_update` → `my_color_changed`, which may arrive after the first render, so the seat briefly appears to belong to someone else. The page also accepts a direct `playerMeta.username === user.username` match (the same check the active-game pilot card uses) so it recognises the seat immediately.
-- **Refresh safety for cached matches.** After a browser refresh, a very old cached `activeMatch` (saved before `mode` and `playerCount` were part of the create response) can arrive with no `mode`. The page reads it again from `GET /api/games/mine`, so a hotseat or PvE (player versus environment) game can never be treated as a plain PvP rejoin.
+- **Refresh safety for cached matches.** After a browser refresh, a cached `activeMatch` can arrive with no `mode`. The page reads it again from `GET /api/games/mine`, so a hotseat or PvE (player versus environment) game can never be treated as a plain PvP rejoin.
 - **`dice_rolled` is matched to the turn before the event** (`game/reducer.ts`). On the no-move and third-six-forfeit paths the engine advances `currentTurn` before it emits, so the event's own `currentTurn` can already name the *next* player while the rolled value belongs to the player who rolled.
 - **Bot names are translated.** Engine bots are named `bot-<color>`; `localizedBotName(t, name)` turns that into a translated "bot-<colour>", so rosters and results never show a raw English bot id (names that do not match are returned unchanged). Used by this page and `ResultsModal`.
+- **`nextTurn` mirrors the engine's turn advance** (`game/reducer.ts`). It walks `state.players[]` in order and gives the turn to the next seat that has not left. A disconnected seat with an open grace window holds the turn, so the prediction must not skip past it; otherwise the board would name the wrong pilot in control between the move and the next server frame.
+- **The waiting-for-reconnect banner has two triggers** (`pages/Game.tsx`). Either the engine set `paused` (a PvP player dropped during their own turn, so the pending dice and moves are frozen), or the turn is parked on a disconnected seat (they dropped during another player's turn and play continued until the turn reached them). While either holds, `isMyTurn` is false and `canRoll` is blocked, so no action can be sent on a frozen board. PvE and hotseat never pause.
+- **An exited seat renders as gone but stays in the list.** Its pieces are off the board and it can never hold the turn, so the pilot card greys it out and never marks it as in control. The row itself is kept because the results card needs the full roster.
+
 
 ---
+---
+
 
 ## Dependencies
 

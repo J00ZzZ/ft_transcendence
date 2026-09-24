@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { MatchCreatorService } from './match.creator.service';
-export { ENGINE_WS_URL } from './match.creator.service';
 import { MatchPlayerService } from './match.player.service';
 import { MatchQueryService } from './match.query.service';
 import { MatchPostgameService, type GameEndPayload } from './match.postgame.service';

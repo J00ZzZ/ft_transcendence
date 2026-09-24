@@ -60,9 +60,8 @@ const MINUTE = 60_000;
 const now = Date.now();
 
 // Database seed script: wipes and repopulates Users, Achievements,
-// Friendships and a sample Game with 28 demo players across rating tiers,
-// plus Redis leaderboard entries. Run via `prisma db seed` (see
-// prisma.config.ts).
+// Friendships, a sample Game, and Redis leaderboard entries with 28 demo
+// players across rating tiers. Run via `prisma db seed`.
 async function main() {
   console.log('🌱 Seeding Ludo database with expanded 28-player Cyber Roster...');
 
@@ -75,7 +74,13 @@ async function main() {
   const pwd = await hashPassword();
 
   // Create All Seed Players
-  const createdUsers: any[] = [];
+  type SeedUser = { id: string; username: string };
+  const createdUsers: SeedUser[] = [];
+  const requireUser = (username: string): SeedUser => {
+    const found = createdUsers.find((u) => u.username === username);
+    if (!found) throw new Error(`Seed user not found: ${username}`);
+    return found;
+  };
   for (let i = 0; i < SEED_PLAYERS.length; i++) {
     const p = SEED_PLAYERS[i];
     const user = await prisma.user.create({
@@ -129,7 +134,7 @@ async function main() {
   // the wins-based formulas above can't reach (achTheDiceLoveMe needs
   // botWins >= 3, achLoveTheMachine needs pveGameStreak, etc.)
   await prisma.achievement.update({
-    where: { userId: createdUsers.find((u) => u.username === 'Viper_X').id },
+    where: { userId: requireUser('Viper_X').id },
     data: {
       achFirstBlood: true,
       achOnFire: true,
@@ -210,9 +215,9 @@ async function main() {
   for (const target of targetsForRequests) {
     // 1. Incoming Pending Friend Requests sent TO target
     const requestSenders = [
-      createdUsers.find((u) => u.username === 'RetroRider'),
-      createdUsers.find((u) => u.username === 'TurboSnack'),
-      createdUsers.find((u) => u.username === 'CyberSamurai'),
+      requireUser('RetroRider'),
+      requireUser('TurboSnack'),
+      requireUser('CyberSamurai'),
     ].filter(Boolean);
 
     for (const sender of requestSenders) {
@@ -231,12 +236,12 @@ async function main() {
 
     // 2. Active Accepted Comrades for target
     const friendList = [
-      createdUsers.find((u) => u.username === 'Viper_X'),
-      createdUsers.find((u) => u.username === 'NeonKnight'),
-      createdUsers.find((u) => u.username === 'Alice'),
-      createdUsers.find((u) => u.username === 'StarLord'),
-      createdUsers.find((u) => u.username === 'PixelMage'),
-      createdUsers.find((u) => u.username === 'CircuitBreaker'),
+      requireUser('Viper_X'),
+      requireUser('NeonKnight'),
+      requireUser('Alice'),
+      requireUser('StarLord'),
+      requireUser('PixelMage'),
+      requireUser('CircuitBreaker'),
     ].filter(Boolean);
 
     for (const f of friendList) {

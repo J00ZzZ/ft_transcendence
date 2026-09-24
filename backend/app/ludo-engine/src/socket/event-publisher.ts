@@ -1,5 +1,5 @@
-import { RedisGameStore } from '../redis';
-import { GameEvent } from '../types';
+import type { RedisGameStore } from '../redis';
+import type { GameEvent } from '../types';
 
 // EventPublisher: the only place that publishes game lifecycle events. Each
 // engine event goes to Redis pub/sub so every client receives it.
@@ -13,7 +13,7 @@ export class EventPublisher {
 
     switch (event.type) {
       case 'dice_rolled':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'dice_rolled',
@@ -27,7 +27,7 @@ export class EventPublisher {
         break;
 
       case 'piece_moved':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'piece_moved',
@@ -37,7 +37,7 @@ export class EventPublisher {
         break;
 
       case 'game_ended':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'game_ended',
@@ -48,7 +48,7 @@ export class EventPublisher {
         break;
 
       case 'player_exited':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'player_exited',
@@ -58,7 +58,7 @@ export class EventPublisher {
         break;
 
       case 'game_started':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'game_started',
@@ -71,7 +71,7 @@ export class EventPublisher {
       // lobby). Emitted by teardownRoom so every surviving client leaves the
       // dead room cleanly.
       case 'game_expired':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'game_expired',
@@ -81,7 +81,7 @@ export class EventPublisher {
         break;
 
       case 'color_selected':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'color_selected',
@@ -93,7 +93,7 @@ export class EventPublisher {
         break;
 
       case 'lobby_update':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'lobby_update',
@@ -104,7 +104,7 @@ export class EventPublisher {
         break;
 
       case 'player_aborted':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'player_aborted',
@@ -115,7 +115,7 @@ export class EventPublisher {
         break;
 
       case 'player_disconnected':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'player_disconnected',
@@ -125,7 +125,7 @@ export class EventPublisher {
         break;
 
       case 'state_update':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'state_update',
@@ -135,7 +135,7 @@ export class EventPublisher {
         break;
 
       case 'player_reconnected':
-        this.store.publish(
+        void this.store.publish(
           gameId,
           JSON.stringify({
             type: 'player_reconnected',

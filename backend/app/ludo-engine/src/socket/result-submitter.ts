@@ -1,7 +1,8 @@
-import { LudoEngine } from '../engine';
-import { RedisGameStore } from '../redis';
+import type { LudoEngine } from '../engine';
+import type { RedisGameStore } from '../redis';
 import type { PlayerColor } from '../types';
 import { BACKEND_URL } from './auth';
+import { MoveValidator } from '../move-validator';
 
 function getEngineApiKey(): string {
   return process.env.ENGINE_API_KEY || 'dev-engine-key';
@@ -45,24 +46,53 @@ export class ResultSubmitter {
 
       const participants = [];
       for (const player of state.players) {
-        // Players who aborted/left via End Game (status 'exited') are pruned
-        // from the board and must NOT receive a definitive result or rating :
-        // they didn't finish the match, so no outcome is recorded for them.
-        if (player.status === 'exited') continue;
+        // Only seats still in the game are reported, and a bot has no account to
+        // record a result for.
+        if (player.status === 'exited' || player.status === 'inactive') continue;
+        if (player.isBot) continue;
+
         const stats = { ...player.stats };
-        const userId = this.userIdMap.get(gameId)?.get(player.color) || `bot-${player.color}`;
+        const userId =
+          player.userId ||
+          this.store.seatUserFrom(matchData, player.color) ||
+          this.userIdMap.get(gameId)?.get(player.color);
+
+        // No account for a seat that is still in the game: report the rest of
+        // the room rather than filing the result against a made-up user.
+        if (!userId) {
+          console.error(
+            `Game ${gameId}: no account recorded for seat ${player.color}; skipping this seat.`,
+          );
+          continue;
+        }
+
+        // The board is the source of truth for the piece count. The seat meta and
+        // the per-game tally are caches, so any disagreement is logged.
+        const piecesInGoal = MoveValidator.countPiecesInGoal(state, player.color);
+        if (piecesInGoal !== stats.piecesInGoal) {
+          console.warn(
+            `Game ${gameId}: seat ${player.color} pieces-in-goal mismatch ` +
+              `(board ${piecesInGoal}, tally ${stats.piecesInGoal})`,
+          );
+        }
+
         participants.push({
           userId,
           color: player.color.toUpperCase(),
           rank: player.color === state.winner ? 1 : 2,
           totalTurns: stats.turns,
           piecesCaptured: stats.captures,
-          piecesInGoal: stats.piecesInGoal,
+          piecesInGoal,
         });
       }
 
+      if (participants.length === 0) {
+        console.error(`Game ${gameId}: no participant accounts resolved; nothing to submit.`);
+        return;
+      }
+
       const engineApiKey = getEngineApiKey();
-      await fetch(`${BACKEND_URL}/api/game/end`, {
+      const res = await fetch(`${BACKEND_URL}/api/game/end`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,6 +100,10 @@ export class ResultSubmitter {
         },
         body: JSON.stringify({ gameId, participants }),
       });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error(`Game ${gameId}: /api/game/end rejected ${res.status}: ${body}`);
+      }
     } catch (err) {
       console.error('Failed to submit game result:', err);
     }

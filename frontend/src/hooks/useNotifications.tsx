@@ -12,7 +12,7 @@ import { useApp } from '../store';
 import { apiFetch } from '../api';
 import { applyAvatarChange } from '../avatarCache';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// **Types**
 
 export type NotificationType =
   | 'friend_request'
@@ -49,7 +49,7 @@ interface NotificationsContextValue {
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
-// ─── Provider ────────────────────────────────────────────────────────────────
+// **Provider**
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useApp();
@@ -57,10 +57,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Notification[]>([]);
   const esRef = useRef<EventSource | null>(null);
 
-  // ── Unread count (derived) ───────────────────────────────────────────────
+  // **Unread count (derived)**
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // ── Fetch existing unread notifications on mount / login ─────────────────
+  // **Fetch existing unread notifications on mount / login**
   useEffect(() => {
     if (!user) {
       setNotifications([]);
@@ -81,13 +81,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  // ── SSE connection ───────────────────────────────────────────────────────
+  // **SSE (Server-Sent Events) connection**
   useEffect(() => {
-    // Depend on the stable id, not the whole user object: avatar upload/reset
-    // call setUser({ ...user, hasAvatarPhoto }) on success, which changes the
-    // object identity, tears down this stream and re-opens it. A profile_updated
-    // published during that reconnect window was dropped, so the avatar toast
-    // popped only intermittently.
+    // Depend on the stable id, not the whole user object: setUser on avatar
+    // upload changes object identity, which would reopen this stream and drop
+    // any profile_updated published during the reconnect.
     const userId = user?.id;
     if (!userId) {
       esRef.current?.close();
@@ -105,7 +103,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           if (!event.data) return;
           const notification: Notification = JSON.parse(event.data);
           if (notification.id) {
-            // Global broadcasts are TRANSIENT — toast only, never the bell/unread
+            // Global broadcasts are SHORT-LIVED/TRANSIENT — toast only, never the bell/unread
             // badge. The actor also skips their own announcement (they already
             // get the persisted `profile_updated` toast instead).
             if (notification.type === 'display_name_changed') {
@@ -114,7 +112,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
               setToasts((prev) => [notification, ...prev]);
               return;
             }
-            // Friend presence is TRANSIENT — toast only, never the bell/unread
+            // Friend presence is SHORT-LIVED/TRANSIENT — toast only, never the bell/unread
             // badge (the backend sends these via notifyTransient, so they aren't
             // persisted). Skip the actor's own tabs defensively.
             if (notification.type === 'friend_online' || notification.type === 'friend_offline') {
@@ -123,7 +121,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
               setToasts((prev) => [notification, ...prev]);
               return;
             }
-            // Avatar photo changes are TRANSIENT state updates — no bell entry,
+            // Avatar photo changes are SHORT-LIVED/TRANSIENT state updates — no bell entry,
             // no toast. The event carries the new state, so every open
             // <UserAvatar> for that user flips immediately, with no request.
             if (notification.type === 'avatar_changed') {
@@ -164,7 +162,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────
+  // **Actions**
 
   /** Mark a single notification as read (removes from bell badge count). */
   const markRead = useCallback((id: string) => {
@@ -198,7 +196,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }
 
-// ─── Hook ────────────────────────────────────────────────────────────────────
+// **Hook**
 
 export function useNotifications(): NotificationsContextValue {
   const ctx = useContext(NotificationsContext);

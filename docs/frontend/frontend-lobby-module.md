@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for seat management and game start
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The lobby is at `/gamelobby` (`LudoLobby.tsx`), with a separate table/room scree
 
 > **Note:** The lobby communicates with the real backend. Creating a match returns engine credentials (`gameId`, `token`, `engineUrl`), which the Game page uses to connect through Socket.IO.
 
+
 ---
+---
+
 
 ## Files
 
@@ -31,7 +37,10 @@ The lobby is at `/gamelobby` (`LudoLobby.tsx`), with a separate table/room scree
 | `src/pages/LudoLobby.tsx` | Main lobby page (`/gamelobby`) — mode/seat setup, match creation |
 | `src/pages/Lobby.tsx` | Table view (`/gamelobby/table`) — room state, ready, invites |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -58,7 +67,10 @@ export type PlayerCount = 2 | 3 | 4
 export const BOT_POOL = ['Rook', 'Bishop', 'Knight', 'Castle', 'Duke', 'Marla', 'Otto', 'Vex']
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -100,7 +112,10 @@ sequenceDiagram
     end
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -139,13 +154,19 @@ addPlayer(i)
   └── seats[i] = { type: 'player', name }
 ```
 
+
 ---
+---
+
 
 ## How Seat Colours Are Sent
 
 For hotseat and PvE, the created game is exactly the occupied seats (the host is always seat 0 / blue, then each added local player or bot in seat order). `Lobby.tsx` therefore sends the **exact** `seatColors` list rather than a count. Without it, the engine's `playerCount`-based default fills the gaps again and brings back seats the user deliberately skipped.
 
+
 ---
+---
+
 
 ## Dependencies
 

@@ -108,9 +108,7 @@ export function Game() {
   const userRef = useRef(user);
   userRef.current = user;
 
-  // ------------------------------------------------------------------------
-  // CRT & AUDIO CONTROLS
-  // ------------------------------------------------------------------------
+  // **CRT & AUDIO CONTROLS**
   const [crtEnabled, setCrtEnabled] = useState(true);
   const [soundMuted, setSoundMuted] = useState(retroAudio.muted);
   const [isAbortModalOpen, setIsAbortModalOpen] = useState(false);
@@ -591,10 +589,8 @@ export function Game() {
       setLastResult(buildAbandonedResult());
       setShowResultsModal(true);
     });
-    // Our seat's grace window expired before this join reached the engine, so
-    // the engine refused to seat us (there are no pieces left on the board).
-    // Show the same end-of-match card the other teardown paths use instead of
-    // leaving a board we can never act on.
+    // Our seat's grace window expired before this join reached the engine, so it
+    // refused to seat us. Show the end-of-match card instead of a dead board.
     socket.on('seat_expired', () => {
       setLastResult(buildAbandonedResult());
       setShowResultsModal(true);
@@ -855,13 +851,9 @@ export function Game() {
   }
 
   const isHotseat = activeMatch.mode === 'hotseat';
-  // Waiting-for-reconnect banner. Two triggers:
-  //  1. The engine set `paused` (a PvP player dropped during their OWN turn —
-  //     pending dice/moves are frozen until they return).
-  //  2. The turn is parked on a disconnected seat (they dropped during another
-  //     player's turn; play continued and now the turn waits on them).
-  // PvE/hotseat never pause: their human is the only remote-less participant,
-  // and the 1h single-instance window aborts the room if they never return.
+  // Waiting-for-reconnect banner: either the engine set `paused` (a PvP player
+  // dropped during their own turn), or the turn is parked on a disconnected seat
+  // (they dropped during another player's turn). PvE and hotseat never pause.
   const pausedSeat =
     view.players.find((p) => p.color === view.pauseTurnOwner) ??
     view.players.find((p) => p.color === effectiveTurn && p.status === 'disconnected');
@@ -869,13 +861,9 @@ export function Game() {
   const pausedOwnerName = (() => {
     if (!isPausedForReconnect) return null;
     const color = view.pauseTurnOwner ?? effectiveTurn;
-    return (
-      localNames[color] ||
-      pausedSeat?.displayName ||
-      pausedSeat?.username ||
-      color?.toUpperCase() ||
-      'player'
-    );
+    // First non-empty candidate wins; the colour name is the final fallback.
+    const candidates = [localNames[color], pausedSeat?.displayName, pausedSeat?.username];
+    return candidates.find((name) => name) ?? color.toUpperCase();
   })();
   const activeHumanTurn = view.players.some(
     (p) => p.color === effectiveTurn && p.status === 'active' && !p.isBot,
@@ -1307,13 +1295,11 @@ export function Game() {
                     // Active game pilot card — only render participating pilots
                     if (!playerMeta || playerMeta.status === 'inactive') return null;
                     const isDisconnected = playerMeta.status === 'disconnected';
-                    // Removal is final and has to read that way: an 'exited' seat (left,
-                    // or the reconnect window expired) has no pieces left
-                    // on the board. The engine keeps the row — the results card needs it — so
-                    // it is marked as gone here rather than dropped from the list.
+                    // An exited seat is shown as gone: it has no pieces left, but
+                    // the row stays because the results card needs it.
                     const isOut = playerMeta.status === 'exited';
-                    // An out seat can never hold the turn (the engine skips it when it
-                    // advances), so never advertise it as the pilot in control.
+                    // An exited seat can never hold the turn, so never advertise it
+                    // as the pilot in control.
                     const isActiveSeat = isActive && !isOut;
                     const isHotseat = activeMatch.mode === 'hotseat';
                     const isYou = isHotseat

@@ -4,10 +4,7 @@ Reaching the app from anywhere on the internet, via ngrok. Companion doc:
 [`nginx.md`](./nginx.md).
 
 Verified directly against the current repo (`Makefile`, `backend/src/secrets.ts`,
-`backend/src/auth/oauth.guards.ts`, `backend/src/auth/auth.controller.ts`)
-rather than copied from older docs — see
-[Removed: the `TUNNEL_MODE` environment variable](#removed-the-tunnel_mode-environment-variable)
-at the bottom for the history of one variable that used to exist here.
+`backend/src/auth/oauth.guards.ts`, `backend/src/auth/auth.controller.ts`).
 
 ## Commands
 
@@ -84,13 +81,3 @@ list otherwise.
 Nothing is auto-generated (the one exception: `LAN_IP`, which `make env`
 overwrites with the machine's current address so LAN mode cannot print a
 stale URL): copy a real `.env` from a teammate.
-
-## Removed: the `TUNNEL_MODE` environment variable
-
-Earlier versions of this setup had a `TUNNEL_MODE` variable.
-`make tunnel` ran `TUNNEL_MODE=true docker compose up -d --no-deps backend`
-alongside the ngrok command, and `compose.yaml` passed it into the backend
-container. Nothing in the backend ever read it — the actual local/tunnel
-switch has always been the per-request `isTunnelRequest(host)` check
-described above — so it was deleted from the `Makefile` and `compose.yaml`.
-There is now no environment variable to set, and none is needed.

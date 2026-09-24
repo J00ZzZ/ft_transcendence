@@ -214,14 +214,12 @@ function applyMove(state: GameViewState, move: MoveResult): GameViewState {
 function nextTurn(players: GameState['players'], from: PlayerColor): PlayerColor {
   const idx = players.findIndex((x) => x.color === from);
   if (idx === -1) return from;
-  // Mirror the engine's advanceTurnInState (players-as-truth): the next seat
-  // in players[] order takes the turn unless it has left. A DISCONNECTED seat
-  // with a running grace window HOLDS the turn — the engine parks currentTurn
-  // there until it reconnects or is pruned, so the optimistic prediction must
-  // not skip past it or the board would show the wrong pilot in control.
+  // Mirror of the engine's turn advance: the next seat in players[] order takes
+  // the turn unless it has left. A disconnected seat with an open grace window
+  // holds the turn, so the prediction must not skip past it.
   for (let i = 1; i <= players.length; i++) {
     const p = players[(idx + i) % players.length];
-    if (p?.status === 'active' || p?.status === 'disconnected') return p.color;
+    if (p.status === 'active' || p.status === 'disconnected') return p.color;
   }
   return from;
 }

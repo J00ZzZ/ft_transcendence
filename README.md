@@ -130,7 +130,7 @@ All config lives in the root `.env` (`KEY=VALUE` per line), loaded into containe
 | NestJS                                     | HTTP API, dependency injection, module structure           |
 | Socket.IO                                  | WebSocket gateway and room fan-out                         |
 | Passport + JWT (httpOnly cookies) + bcrypt | OAuth 2.0 (Google, GitHub, 42), sessions, password hashing |
-| Prisma                                     | ORM, schema and migrations                                 |
+| Prisma                                     | ORM, schema and generated client                           |
 | nginx                                      | Reverse proxy and TLS termination                          |
 | Docker Compose                             | One-command reproducible stack, service isolation          |
 
@@ -151,9 +151,9 @@ and defend every choice in review.
 position, current dice value, whose turn it is, who is queued for matchmaking. Writing that
 to Postgres on every move would put transactional write load on the database for data that
 becomes worthless the moment the game ends. Redis holds it in memory; only the durable
-outcome — result, opponents, duration, rating delta — is written to Postgres. Redis also
-backs the Socket.IO adapter so broadcasts reach every client regardless of which backend
-instance holds the socket.
+outcome — result, opponents, duration, rating delta — is written to Postgres. Redis Pub/Sub
+also carries the engine's broadcasts and the notifications between processes, so a socket held
+by one process still reaches the clients served elsewhere.
 
 **Why a server-authoritative game loop.** The client never decides a dice value or validates
 a move. Every action is a request the server accepts or rejects against its own copy of the
@@ -182,9 +182,9 @@ cannot steal it. Refresh tokens (7 days) are stored hashed in Redis and rotated 
 hashed with bcrypt, so a database leak does not expose usable credentials.
 
 **Why Prisma.** Prisma keeps the database schema in one place and generates a type-safe
-client from it, so queries are checked at compile time and no SQL is written by hand. Schema
-changes are kept as committed migrations, so the database can be recreated or upgraded
-consistently on any machine.
+client from it, so queries are checked at compile time and no SQL is written by hand. The
+schema is applied with `prisma db push` on every boot, so a fresh database is built from
+`schema.prisma` consistently on any machine.
 
 ## Database Schema
 
@@ -197,7 +197,7 @@ consistently on any machine.
 | #   | Module                             | Owner      | How it was implemented                                                                                                                      |
 | --- | ---------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Framework for frontend and backend | `liyu-her` | React on the client, NestJS on the server — framework routing, state and dependency injection rather than developing functions from scratch |
-| 2   | Real-time features                 | `bleow`    | Socket.IO gateway with a Redis adapter for cross-instance broadcast; live board updates, presence, and reconnect                            |
+| 2   | Real-time features                 | `bleow`    | Socket.IO gateway with a Redis Pub/Sub bridge for cross-process broadcast; live board updates, presence, and reconnect                      |
 | 3   | Standard user management           | `hang`     | Profiles, avatar upload, friend requests, live online status                                                                                |
 | 4   | AI opponent                        | `bleow`    | Heuristic move selection — no external model, no black-box library                                                                          |
 | 5   | Web-based game                     | `bleow`    | Server-authoritative Ludo: dice RNG, turn order, captures, safe squares and exact-count home entry all resolved server-side                 |
@@ -208,13 +208,13 @@ consistently on any machine.
 
 | #   | Module                            | Owner      | How it was implemented                                                 |
 | --- | --------------------------------- | ---------- | ---------------------------------------------------------------------- |
-| 1   | ORM                               | `jow`      | Prisma — schema, relations and committed migration history             |
+| 1   | ORM                               | `jow`      | Prisma — schema, relations and a generated type-safe client             |
 | 2   | Multiple languages                | `liyu-her` | Session-based language switching across English, Malay and French      |
 | 3   | Game statistics and match history | `bleow`    | Wins, losses, rating and leaderboard, reconciled against match records |
 | 4   | Remote authentication             | `jow`      | OAuth 2.0 sign-in via Google, GitHub, and 42 Intra                     |
 | 5   | Two-factor authentication         | `jow`      | Email code verification                                                |
 | 6   | Gamification                      | `bleow`    | Achievements, badges and leaderboards                                  |
-| 7   | User activity analytics           | `liyu-her` | Insights dashboard                                                     |
+| 7   | User activity analytics           | `liyu-her` | Player insights on the Home page — stats, rank, friends, notifications |
 | 8   | Notification system               | `hang`     | Notifications on create, update and delete actions                     |
 | 9   | Custom minor module               | `jow`      | Ngrok tunneling for exposing the local stack for remote testing        |
 
@@ -230,12 +230,12 @@ consistently on any machine.
 
 ### `liyu-her`
 
-- **Built:** Frontend/backend framework setup (React + NestJS); remote players module (cross-machine play with reconnect); multiple languages module (session-based language switching across English, Malay and French); frontend design and the revamp to frontend v2; user activity analytics dashboard;
+- **Built:** Frontend/backend framework setup (React + NestJS); remote players module (cross-machine play with reconnect); multiple languages module (session-based language switching across English, Malay and French); frontend design and the revamp to frontend v2; user activity analytics (player insights on the Home page);
 - **Challenges:** As team lead, the main challenge was team management — balancing everyone's workload and morale while making sure each member could still learn from the project rather than just clearing tickets. Extracting all user-facing text and data out of the frontend so it could be translated, without breaking the pages being redesigned at the same time
 
 ### `bleow`
 
-- **Built:** Real-time features (Socket.IO gateway with Redis adapter for cross-instance broadcast, live board updates, presence, reconnect); AI opponent (heuristic move selection, no external model); web-based game (server-authoritative Ludo — dice RNG, turn order, captures, safe squares, exact-count home entry); game statistics and match history (wins/losses, rating, leaderboard); gamification (achievements, badges, leaderboards); multiplayer module (four-seat, server-enforced turn order);
+- **Built:** Real-time features (Socket.IO gateway with a Redis Pub/Sub bridge for cross-process broadcast, live board updates, presence, reconnect); AI opponent (heuristic move selection, no external model); web-based game (server-authoritative Ludo — dice RNG, turn order, captures, safe squares, exact-count home entry); game statistics and match history (wins/losses, rating, leaderboard); gamification (achievements, badges, leaderboards); multiplayer module (four-seat, server-enforced turn order);
 - **Challenges:** Debugging and smoothly integrating backend with frontend. Learning new web development languages in a short period of time since no prior background (Typescript and basic CSS). Timely and clear communication with team.
 
 ### `hang`
@@ -245,7 +245,7 @@ consistently on any machine.
 
 ### `jow`
 
-- **Built:** ORM setup (Prisma — schema, relations and committed migration history); remote authentication module (OAuth 2.0 sign-in via Google, GitHub, and 42 Intra); two-factor authentication module (email code verification); Ngrok tunneling for exposing the local stack, including a new auth setup to secure the tunnel.
+- **Built:** ORM setup (Prisma — schema, relations and a generated type-safe client); remote authentication module (OAuth 2.0 sign-in via Google, GitHub, and 42 Intra); two-factor authentication module (email code verification); Ngrok tunneling for exposing the local stack, including a new auth setup to secure the tunnel.
 - **Challenges:** Day-to-day database management and debugging OAuth provider integrations — tedious but constant work
 
 ## Resources
@@ -297,7 +297,6 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/frontend/frontend-auth-pages-module.md](docs/frontend/frontend-auth-pages-module.md)       | Login and signup pages                                     |
 | [docs/frontend/frontend-auth-extras-module.md](docs/frontend/frontend-auth-extras-module.md)     | 2FA, forgot/reset password pages                           |
 | [docs/frontend/frontend-home-module.md](docs/frontend/frontend-home-module.md)                   | Home page — stats, rank, friends, notifications            |
-| [docs/frontend/frontend-dashboard-module.md](docs/frontend/frontend-dashboard-module.md)         | Dashboard (superseded by Home)                             |
 | [docs/frontend/frontend-lobby-module.md](docs/frontend/frontend-lobby-module.md)                 | Game lobby — mode/seat setup, match creation               |
 | [docs/frontend/frontend-game-module.md](docs/frontend/frontend-game-module.md)                   | Real-time gameplay page (Socket.IO)                        |
 | [docs/frontend/frontend-results-module.md](docs/frontend/frontend-results-module.md)             | Post-game results card                                     |

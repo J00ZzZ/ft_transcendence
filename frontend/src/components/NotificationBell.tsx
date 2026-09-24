@@ -10,7 +10,7 @@ import { retroAudio } from '../utils/audio';
 import { RETRO_BTN, THEME_TRIGGER_BTN_BASE } from '../styles/tw';
 import { railButtonStyle, railHoverHandlers } from './railButton';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// **Helpers**
 
 function getNotificationTypeBadge(type: string): {
   tagKey: string;
@@ -195,7 +195,7 @@ function timeAgo(
   return t('notifications.daysAgo', { count: Math.floor(hrs / 24) });
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// **Component**
 
 export function NotificationBell({
   notifications,

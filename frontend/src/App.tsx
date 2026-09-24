@@ -34,7 +34,6 @@ const FULL_ROUTES: Record<string, () => ReactNode> = {
   '/game': () => <Game />,
   '/privacy': () => <LegalPage initialDoc="privacy" />,
   '/terms': () => <LegalPage initialDoc="terms" />,
-  // '/results': () => <Results />,
 };
 
 /** Public routes, can be reached wihout a session */

@@ -52,9 +52,7 @@ export function Leaderboard() {
   const { t } = useTranslation();
   const { user } = useApp();
 
-  // ------------------------------------------------------------------------
-  // CRT CONTROLS
-  // ------------------------------------------------------------------------
+  // **CRT CONTROLS**
   const [crtEnabled, setCrtEnabled] = useState(true);
 
   useEffect(() => {

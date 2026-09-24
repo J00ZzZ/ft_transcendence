@@ -12,7 +12,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -23,13 +26,16 @@ The Notification module delivers real-time, persisted notifications to users. It
 
 Notification types: `friend_request`, `friend_accepted`, `friend_removed`, `friend_declined`, `game_invite`, `achievement`, `match_finished`, `match_cancelled`, `profile_updated`, `display_name_changed`, `friend_online`, `friend_offline`, `avatar_changed`.
 
-> `avatar_changed` is a TRANSIENT state update rather than a notification: its payload is `{ userId, username, has, style, v, updatedAt }`. Clients use it to flip that user's avatar immediately — to the photo on upload (`has: true`) or back to the generated avatar on delete (`has: false`) — and put `v` in the photo URL so the browser is forced to fetch the new bytes. It never reaches the bell.
+> `avatar_changed` is a SHORT-LIVED/TRANSIENT state update rather than a notification: its payload is `{ userId, username, has, style, v, updatedAt }`. Clients use it to flip that user's avatar immediately — to the photo on upload (`has: true`) or back to the generated avatar on delete (`has: false`) — and put `v` in the photo URL so the browser is forced to fetch the new bytes. It never reaches the bell.
 >
 > The stream also emits a 20 s `ping` keep-alive (`SSE_HEARTBEAT_MS` in `notification.controller.ts`). This is the **server → client** direction: the SSE response sends no bytes for minutes between notifications, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the periodic frame keeps the tunnel's socket requirements satisfied and the stream is never treated as dead. It is unrelated to the **client → server** presence heartbeat (`POST /api/presence/heartbeat`, `PRESENCE_HEARTBEAT_MS`) — that is a separate request that writes nothing into this response, so it cannot keep the stream alive. Because SSE has no replay, keeping the stream up is also what stops live events from being lost. See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
 > The module is imported by `FriendsModule`, `MatchModule`, `AchievementsModule`, `PresenceModule`, `AuthModule`, and `UserModule`, which inject `NotificationService` and call `notify()` / `notifyTransient()`. It exports `NotificationService` so any module can send a notification.
 
+
 ---
+---
+
 
 ## SSE & Redis Pub/Sub transport
 
@@ -39,7 +45,7 @@ Notifications move over two linked transports:
   recipient's per-user channel (`notify:<userId>`); `broadcast()` publishes to
   the global channel (`notify:all`). Redis decouples the emitter from the SSE
   layer — any backend service can publish without knowing who is connected.
-- **SSE** is the last mile to the browser. Each open tab holds one
+- **SSE** is the final hop to the browser. Each open tab holds one
   `GET /api/notifications/stream` connection, backed by an rxjs `Subject` in
   the service's in-memory `clients` map (one user, multiple tabs ⇒ multiple
   Subjects) plus `broadcastClients` (every Subject, for `notify:all`).
@@ -52,7 +58,10 @@ unsubscribes, the service's `finalize(() => subject.complete())` completes the
 Subject, and `removeClient()` drops it from the maps and unsubscribes from the
 per-user Redis channel when the last tab for that user closes.
 
+
 ---
+---
+
 
 ## Failure contract
 
@@ -81,7 +90,10 @@ therefore guarantees:
   Subject from the in-memory maps and unsubscribes from Redis when the last tab
   for a user closes. No dead Subjects accumulate.
 
+
 ---
+---
+
 
 ## Files
 
@@ -91,7 +103,10 @@ therefore guarantees:
 | `notification.service.ts` | Redis pub/sub bridging, per-user SSE Subjects, persistence, `notify()` helper |
 | `notification.module.ts` | NestJS module — registers controller/service, exports `NotificationService` |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -126,7 +141,10 @@ export interface NotificationPayload {
 }
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -137,7 +155,10 @@ export interface NotificationPayload {
 | `PATCH` | `/api/notifications/:id/read` | JWT | Mark one notification read |
 | `POST` | `/api/notifications/read-all` | JWT | Mark all notifications read |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -161,7 +182,10 @@ sequenceDiagram
 
 When a client opens `/api/notifications/stream`, the service creates an rxjs `Subject`, adds it to a per-user array (supporting multiple tabs), and — on first tab for a user — subscribes to `notify:<userId>` on Redis. Closing the last tab unsubscribes.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -186,7 +210,10 @@ POST /api/notifications/read-all (JWT)
   └── notification.updateMany({ userId, read: false }, { read: true })
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -199,7 +226,10 @@ POST /api/notifications/read-all (JWT)
 | `secrets.ts` | Redis password (`REDIS_PASSWORD`) |
 | `JwtAuthGuard` | Protects all notification endpoints |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 

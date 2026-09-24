@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for post-game actions
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,12 +23,12 @@ modal overlay (`ResultsModal`). It shows:
 2. **Outcome handling** — the right label for a victory, a defeat or an abandoned match.
 3. **Exit** — returns to the lobby or the home page after the game.
 
-> **Note:** The old standalone `/results` route and `src/pages/Results.tsx` page
-> have been **removed** (the route line in `App.tsx` is commented out). Results now
-> render through `src/components/ResultsModal.tsx`, which `Game.tsx` opens when the
-> engine emits `game_ended`.
+Results render through `src/components/ResultsModal.tsx`, which `Game.tsx` opens when the engine emits `game_ended`.
+
 
 ---
+---
+
 
 ## Files
 
@@ -35,7 +38,10 @@ modal overlay (`ResultsModal`). It shows:
 | `src/pages/Game.tsx` | Opens the modal on `game_ended`; holds the socket connection and the `lastResult` state |
 | `src/store.tsx` | `setLastResult` / `lastResult` state |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -57,7 +63,10 @@ type LastResult = {
 } | null
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -85,7 +94,10 @@ sequenceDiagram
     Modal->>Modal: Close modal
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -105,13 +117,19 @@ ResultsModal renders
   └── Return to Lobby button → onReturnToLobby (closes modal)
 ```
 
+
 ---
+---
+
 
 ## Avatar Flags
 
 `LastResult.players` is built from client-side game state and never includes `hasAvatarPhoto`, so `ResultsModal` passes `false` for opponents and bots, and `user?.hasAvatarPhoto ?? false` for the viewer. Passing `undefined` would make `UserAvatar` request the photo URL (Uniform Resource Locator) and log a 404 for every opponent without a photo. See [frontend-components-system.md](frontend-components-system.md) → Implementation Notes.
 
+
 ---
+---
+
 
 ## Dependencies
 

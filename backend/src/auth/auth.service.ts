@@ -47,9 +47,10 @@ const formatVerifiedAt = (date: Date) =>
     timeStyle: 'short',
   }).format(date);
 
-// login()'s two outcomes, depending on the user's 2FA preference. The explicit
-// union lets the controller narrow on `twoFactorRequired` cleanly.
+// login()'s outcomes: an unverified address, a 2FA challenge, or a session.
+// The explicit union lets the controller narrow on the variant it receives.
 type LoginResult =
+  | { emailNotVerified: true }
   | { twoFactorRequired: true; pendingToken: string }
   | {
       twoFactorRequired: false;
@@ -150,8 +151,8 @@ export class AuthService implements OnModuleDestroy {
   }
 
   // Factor one of password login: match identifier (username or email) and
-  // password. With 2FA off, issues the session; with 2FA on, emails a code
-  // and returns a pending token. Called by auth.controller.ts POST /login.
+  // password. An unverified address stops here; otherwise 2FA decides between
+  // a session and an emailed code. Called by auth.controller.ts POST /login.
   async login(dto: LoginDto): Promise<LoginResult> {
     // Accept either a username or an email in the same field.
     const user = await this.prisma.db.user.findFirst({
@@ -173,6 +174,10 @@ export class AuthService implements OnModuleDestroy {
         message: 'Invalid username, email, or password',
       });
     }
+
+    // An unverified address cannot sign in. Returned as a result, not thrown:
+    // the browser logs a failed status itself, and this is a normal state.
+    if (!user.emailVerified) return { emailNotVerified: true as const };
 
     // 2FA off → password alone is enough; issue the session immediately.
     // 2FA on → password is only factor one; email a code and finish later.

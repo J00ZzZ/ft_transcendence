@@ -9,7 +9,10 @@ nginx, a NestJS REST API, a standalone real-time game engine (with an inline bot
 AI), PostgreSQL, Redis, and a Prisma Studio DB browser. A separate `frontend-dev`
 Vite HMR service is available for development only.
 
+
 ---
+---
+
 
 ## Topology
 
@@ -41,7 +44,10 @@ graph TB
 > through nginx like all other API routes. There is no direct browser→backend
 > path for auth.
 
+
 ---
+---
+
 
 ## Services
 
@@ -53,11 +59,14 @@ Images are built from `Dockerfile`s in each service directory. `db` and `redis` 
 their official images with an init script that reads secrets before `exec`ing the
 real process (`backend/app/postgres_16_db/`, `backend/app/redis/`).
 
-> **Note:** There is no separate `ludo-bot` container. The bot AI is inside the
-> `ludo-engine` process (`backend/app/ludo-engine/src/bot.ts`). The engine accepts
-> a `bot` role in the JWT and can auto-fill slots with bot players.
+> **Note:** The bot AI runs inside the `ludo-engine` process (`backend/app/ludo-engine/src/bot.ts`),
+> not in a container of its own. The engine accepts a `bot` role in the JWT and can auto-fill slots
+> with bot players.
+
 
 ---
+---
+
 
 ## Containers, images & volumes
 
@@ -100,7 +109,10 @@ without a rebuild.
 `transcendence_network` (bridge) — all containers attach to it; `db`, `redis`,
 `backend`, `ludo-engine`, and `nginx` resolve each other by service name.
 
+
 ---
+---
+
 
 ## The SPA build handoff
 
@@ -131,14 +143,17 @@ against an empty document root on first boot.
 > A failed rebuild does **not** take the site down: `publish.sh` explicitly checks
 > the build result and, on failure, keeps the last good build in `/export` rather
 > than wiping it. The log line `📦 SPA published to spa_dist` is the success
-> marker; a `❌ Build failed` line means the previously published bundle is still
+> marker; a `❌ Build failed` line means the last good build in `/export` is still
 > being served — fix the error and save again.
 
 The nginx config is **bind-mounted** from `nginx/conf/nginx.conf`, so config edits
 need only a container restart, not an image rebuild. The `Dockerfile` also `COPY`s it
 as a fallback so the image stays runnable standalone.
 
+
 ---
+---
+
 
 ## Request paths
 
@@ -165,7 +180,10 @@ selected per request from the `Host` header (`isTunnelRequest` in
 engine's real hostname or port. The inline bot AI connects internally inside the
 engine process.
 
+
 ---
+---
+
 
 ## Connection liveness (two-direction heartbeats)
 
@@ -204,22 +222,25 @@ time. Depending on the user id avoids this, because the id does not change.
 
 The client's periodic requests use named constants, so an interval can be tuned in one place.
 
-| Constant | File | What it polls | Original | Now |
-| --- | --- | --- | --- | --- |
-| `ROOM_POLL_MS` | `frontend/src/pages/LudoLobby.tsx` | the open-room list and the "am I already seated?" check (`GET /api/games/rooms`, `GET /api/games/mine`) | 1000 ms | **5000 ms** |
-| `ACTIVE_GAME_POLL_MS` | `frontend/src/components/RetroNavbar.tsx` | the rejoin banner (`GET /api/games/mine`) | 2500 ms | **10000 ms** |
+| Constant | File | Value | What it polls |
+| --- | --- | --- | --- |
+| `ROOM_POLL_MS` | `frontend/src/pages/LudoLobby.tsx` | 5000 ms | the open-room list and the "am I already seated?" check (`GET /api/games/rooms`, `GET /api/games/mine`) |
+| `ACTIVE_GAME_POLL_MS` | `frontend/src/components/RetroNavbar.tsx` | 10000 ms | the rejoin banner (`GET /api/games/mine`) |
+| `PRESENCE_HEARTBEAT_MS` | `frontend/src/store.tsx` | 20000 ms | the presence heartbeat (`POST /api/presence/heartbeat`) |
 
-Both endpoints walk the Redis `match:*` keyspace, and at 1 s the lobby alone sent 120 requests/min
-per user. The global limit is 300 requests/min per IP, so two players sharing an IP were within a few
-percent of it. At 5 s and 10 s a user on the lobby page sends about 30 requests/min (24 for the room
-list and its own check, 6 for the rejoin banner), so two players sharing an IP sit at ~60/min instead
-of ~288/min. A new room or a rejoin banner still appears within a few seconds.
-`PRESENCE_HEARTBEAT_MS` (20 s) is unchanged.
+Both room endpoints walk the Redis `match:*` keyspace, so the interval is what bounds the request
+rate. At these values a user on the lobby page sends about 30 requests/min (24 for the room list and
+its own check, 6 for the rejoin banner). Two players sharing an IP therefore sit at about 60/min,
+well under the global limit of 300 requests/min per IP. A new room or a rejoin banner appears within
+a few seconds.
 
 Measured with two tabs on the lobby page: 61 Redis `SCAN`s/min = 60 poll requests (30 per user) plus
 the engine's idle sweep, i.e. 6.8 Redis ops/s and 0.003% of one CPU core, with no throttled request.
 
+
 ---
+---
+
 
 ## Data layer
 
@@ -261,7 +282,10 @@ friends, match (creator, player, query, postgame), notification, and the avatar
 metadata cache. The engine is a separate process, so its `RedisGameStore` and
 `RedisBroadcaster` read `process.env.REDIS_PASSWORD` directly instead.
 
+
 ---
+---
+
 
 ## Backend modules
 
@@ -285,14 +309,17 @@ metadata cache. The engine is a separate process, so its `RedisGameStore` and
 2. Provider redirects the browser to the callback URL from `.env`
    (`{GOOGLE,GITHUB,FORTYTWO}_CALLBACK_URL` / `NGROK_*` variants), read at boot by
    the matching Passport strategy via `requireSecret()`.
-3. Strategy upserts `User` + `Account`, `AuthService` validates the user.
-4. If the user has 2FA enabled, an email code is sent and the browser is redirected to `{FRONTEND_URL}/2fa?token={pendingToken}`.
+3. The strategy finds or creates the `User` and `Account` rows, then `AuthService` validates the user.
+4. If the user has 2FA enabled, an email code is sent and the browser is redirected to `{frontend-url}/2fa?token={pendingToken}`, using the origin the request arrived on.
 5. If 2FA is disabled, a session is issued: a short-lived access token (15 min) and a long-lived refresh token (7 days) are set as `httpOnly`, `sameSite: lax` cookies named `token` and `refresh_token`.
-6. Browser is redirected to `FRONTEND_URL` (`https://localhost:8443`).
+6. Browser is redirected to `{frontend-url}/home` (`https://localhost:8443/home` locally).
 7. `JwtStrategy` reads the access token from `req.cookies` — `cookieParser()` in `main.ts` is required for this.
 8. When the access token expires, the SPA calls `POST /api/auth/refresh` with the `refresh_token` cookie to silently rotate the session.
 
+
 ---
+---
+
 
 ## Configuration (.env)
 
@@ -305,7 +332,10 @@ is a single lookup point over `process.env`: `secret(name)` returns `undefined` 
 `requireSecret(name)` throws at boot on a missing value. The remaining `${...}` in
 `compose.yaml` are non-secret topology values and all carry defaults.
 
+
 ---
+---
+
 
 ## Dev vs. production paths
 
@@ -320,13 +350,19 @@ events through bind mounts, and HMR silently never fires without it.
 `make dev` still brings up nginx, so the production path stays verifiable while you
 iterate against HMR.
 
+
 ---
+---
+
 
 ## Make targets
 
 See the [README](../README.md) **Commands** section for the full list of make targets.
 
+
 ---
+---
+
 
 ## Directory Layout
 

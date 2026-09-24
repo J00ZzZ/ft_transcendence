@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Friends page (`/friends`, full-screen) manages friendships. It has:
 
 > **Note:** The Friends page reads all of its data from the backend API (Application Programming Interface). It calls the endpoints below and refreshes the lists every 15 seconds.
 
+
 ---
+---
+
 
 ## Files
 
@@ -32,7 +38,10 @@ The Friends page (`/friends`, full-screen) manages friendships. It has:
 | `src/components/UserAvatar.tsx` | Player avatars |
 | `src/components/RankBadge.tsx` | Rank badges |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -41,18 +50,19 @@ type Friend = {
   id: string  // Unique ID
   username: string  // Player's username
   displayName?: string  // Name shown in the game
-  avatarStyle?: any  // Avatar style name
+  avatarStyle: string | null  // Avatar style name
   hasAvatarPhoto?: boolean  // Whether a custom photo is uploaded
-  rating?: number  // Player's rating (score)
-  friendsSince?: string  // When the friendship started
-  status?: 'online' | 'playing' | 'offline'  // Online status
+  rating: number  // Player's rating (score)
+  friendsSince: string  // When the friendship started
+  status: 'online' | 'playing' | 'offline'  // Online status
 }
 
 type FriendRequest = {
   id: string  // Unique ID
   userId: string  // ID of the user this belongs to
   username: string  // Player's username
-  avatarStyle?: any  // Avatar style name
+  displayName?: string  // Name shown in the game
+  avatarStyle: string | null  // Avatar style name
   hasAvatarPhoto?: boolean  // Whether a custom photo is uploaded
   createdAt: string  // When the record was created
 }
@@ -61,14 +71,17 @@ type BlockedUser = {
   id: string  // Unique ID
   username: string  // Player's username
   displayName?: string  // Name shown in the game
-  avatarStyle?: any  // Avatar style name
+  avatarStyle: string | null  // Avatar style name
   hasAvatarPhoto?: boolean  // Whether a custom photo is uploaded
-  rating?: number  // Player's rating (score)
+  rating: number  // Player's rating (score)
   blockedSince: string  // When the user was blocked
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -86,7 +99,10 @@ sequenceDiagram
     Page->>Page: Render active tab (Friends / Blocked)
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -97,10 +113,13 @@ Decline → POST /api/friends/decline/{requestId}
 Remove → DELETE /api/friends/remove/{friendId}
 Block  → POST /api/friends/block/{friendId}
 Unblock→ POST /api/friends/unblock/{userId}
-Invite → POST /api/friends/{friendId}/invite → store activeMatch → navigate('/gamelobby/table')
+Invite → POST /api/friends/{friendId}/invite → setActiveMatch(res) → navigate('/game?gameId={gameId}')
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 

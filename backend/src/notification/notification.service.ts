@@ -203,7 +203,7 @@ export class NotificationService implements OnModuleDestroy {
     }
   }
 
-  // TRANSIENT global broadcast (SSE toast only, never persisted) : offline
+  // SHORT-LIVED/TRANSIENT global broadcast (SSE toast only, never persisted) : offline
   // users don't see it and the bell badge is never flooded.
   async broadcast(type: NotificationType, payload: Record<string, unknown>): Promise<void> {
     const event: NotificationPayload = {
@@ -223,7 +223,7 @@ export class NotificationService implements OnModuleDestroy {
     }
   }
 
-  // TRANSIENT per-user notification (same path as notify(), no Postgres
+  // SHORT-LIVED/TRANSIENT per-user notification (same path as notify(), no Postgres
   // write) so ephemeral events can't flood the bell.
   async notifyTransient(
     userId: string,

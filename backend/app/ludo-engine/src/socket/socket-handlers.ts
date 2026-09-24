@@ -1,7 +1,7 @@
-import { LudoEngine } from '../engine';
-import { RedisGameStore } from '../redis';
-import { LudoBot } from '../bot';
-import { GameSocket } from './auth';
+import type { LudoEngine } from '../engine';
+import type { RedisGameStore } from '../redis';
+import type { LudoBot } from '../bot';
+import type { GameSocket } from './auth';
 import { JoinManager } from './join-manager';
 import { finalizeDeparture } from '../player-handler';
 import type { PlayerColor, PieceId } from '../types';
@@ -53,7 +53,7 @@ export class SocketHandlers {
       return;
     }
 
-    (async () => {
+    void (async () => {
       try {
         if (socket.data.playerColor) {
           const state = await this.store.loadGameState(gameId);
@@ -79,7 +79,7 @@ export class SocketHandlers {
       return;
     }
 
-    (async () => {
+    void (async () => {
       try {
         const state = await this.store.loadGameState(gameId);
         if (state?.status === 'active') {
@@ -101,7 +101,7 @@ export class SocketHandlers {
       return;
     }
 
-    (async () => {
+    void (async () => {
       try {
         await this.engine.handlePlayerReady(gameId, color);
       } catch (error) {
@@ -118,7 +118,7 @@ export class SocketHandlers {
       return;
     }
 
-    (async () => {
+    void (async () => {
       try {
         const previousColor = socket.data.playerColor;
         await this.engine.handlePlayerSelectColor(gameId, userId, color as PlayerColor);
@@ -131,8 +131,10 @@ export class SocketHandlers {
           this.userIdMap.get(gameId)?.get(previousColor) === userId
         ) {
           this.userIdMap.get(gameId)?.delete(previousColor);
+          await this.store.clearSeatUser(gameId, previousColor);
         }
         this.userIdMap.get(gameId)?.set(color as PlayerColor, userId);
+        await this.store.setSeatUser(gameId, color as PlayerColor, userId);
         socket.data.playerColor = color as PlayerColor;
       } catch (error) {
         socket.emit('error', `Color selection failed: ${error}`);
@@ -145,13 +147,13 @@ export class SocketHandlers {
     const color = socket.data.playerColor;
     if (!gameId || !color) return;
 
-    (async () => {
+    void (async () => {
       try {
         const state = await this.store.loadGameState(gameId);
         if (!state) return;
 
         if (state.status === 'finished') {
-          socket.leave(gameId);
+          void socket.leave(gameId);
         } else if (state.status === 'waiting') {
           // Waiting room: reversible leave via the unified chokepoint. The seat
           // is reserved (not freed) so rejoin returns the same colour.
@@ -162,7 +164,7 @@ export class SocketHandlers {
             color,
             'waiting_leave',
           );
-          socket.leave(gameId);
+          void socket.leave(gameId);
         } else if (state.status === 'active') {
           // Live game: per-player exit via the unified chokepoint.
           await finalizeDeparture(
@@ -172,7 +174,7 @@ export class SocketHandlers {
             color,
             'leave',
           );
-          socket.leave(gameId);
+          void socket.leave(gameId);
         }
       } catch (error) {
         console.error('Leave game error:', error);
@@ -187,7 +189,7 @@ export class SocketHandlers {
     const color = socket.data.playerColor;
     if (!gameId || !color) return;
 
-    (async () => {
+    void (async () => {
       try {
         await this.engine.handlePlayerDisconnect(gameId, color, this.notifyAbort);
       } catch (error) {

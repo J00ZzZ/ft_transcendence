@@ -1,8 +1,9 @@
-import { LudoEngine } from '../engine';
-import { RedisGameStore } from '../redis';
-import { LudoBot } from '../bot';
+import type { LudoEngine } from '../engine';
+import type { RedisGameStore } from '../redis';
+import type { LudoBot } from '../bot';
 import { firstActiveColor } from '../player-handler';
-import { GameSocket, isBotUserId, BOT_PREFIX } from './auth';
+import type { GameSocket } from './auth';
+import { isBotUserId, BOT_PREFIX } from './auth';
 import type { PlayerColor } from '../types';
 
 // Shared seat order : used by the join flow to map slots to colors and to
@@ -56,9 +57,9 @@ export class JoinManager {
     const isHotseat = socket.data.mode === 'hotseat';
     const effectiveColor = (!isHotseat && socket.data.tokenColor) || playerColor;
 
-    this.withGameLock(effectiveGameId, async () => {
+    void this.withGameLock(effectiveGameId, async () => {
       try {
-        socket.join(effectiveGameId);
+        void socket.join(effectiveGameId);
         socket.data.gameId = effectiveGameId;
         socket.data.playerColor = effectiveColor;
 
@@ -66,7 +67,8 @@ export class JoinManager {
           if (!this.userIdMap.has(effectiveGameId)) {
             this.userIdMap.set(effectiveGameId, new Map());
           }
-          this.userIdMap.get(effectiveGameId)!.set(effectiveColor, effectiveUserId);
+          this.userIdMap.get(effectiveGameId).set(effectiveColor, effectiveUserId);
+          await this.store.setSeatUser(effectiveGameId, effectiveColor, effectiveUserId);
         }
 
         let state = await this.store.loadGameState(effectiveGameId);
@@ -90,14 +92,12 @@ export class JoinManager {
           // progress : only a player reconnecting to their own seat may re-enter.
           // Hotseat is exempt — only 1 socket used in this game mode.
           if (state.status !== 'waiting' && !isReconnectingPlayer && !isHotseat) {
-            // A seat left as exited belongs to a player who was removed
-            // from this live match (they left, or their reconnect window expired
-            // and the prune is final). Tell its owner the seat is gone so the
-            // client can leave, instead of the generic rejection that only
-            // reaches the console and strands them on a board they cannot use.
+            // A seat left as exited belongs to a player removed from this live
+            // match. Tell its owner the seat is gone so the client leaves instead
+            // of being stranded on a board it cannot use.
             const seat = state.players.find((p) => p.color === effectiveColor);
             if (seat?.status === 'exited') {
-              socket.leave(effectiveGameId);
+              void socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
             }
@@ -113,12 +113,9 @@ export class JoinManager {
             );
             state = await this.store.loadGameState(effectiveGameId);
             if (!revived) {
-              // The grace window outlived the seat: it was pruned (or left, or
-              // the match finished) while the window was open, so every piece is
-              // parked at step -1 and there is nothing to resume. Removal is
-              // final — leave the room and tell the client its seat is gone,
-              // rather than seating a player who can never make a legal move.
-              socket.leave(effectiveGameId);
+              // The grace window outlived the seat: nothing is left to resume,
+              // so leave the room and tell the client its seat is gone.
+              void socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
             }
@@ -188,16 +185,10 @@ export class JoinManager {
           state = await this.store.loadGameState(effectiveGameId);
         }
 
-        // Resume re-arm: unfreeze a paused PvP game only when the seat it is
-        // frozen on is the one (re)joining. PvE/hotseat never pause, and any
-        // OTHER player's reconnect must not clear a pause that belongs to a
-        // seat still inside its grace window (the owner's own revive in
-        // handlePlayerReconnect already cleared it, so this is defensive).
-        if (
-          state?.status === 'active' &&
-          state.paused &&
-          state.pauseTurnOwner === effectiveColor
-        ) {
+        // Unfreeze a paused game only when the seat it is frozen on rejoins.
+        // Another player's reconnect must not clear a pause that belongs to a
+        // seat still inside its grace window.
+        if (state?.status === 'active' && state.paused && state.pauseTurnOwner === effectiveColor) {
           delete state.paused;
           delete state.pauseTurnOwner;
           delete state.pausedReason;
@@ -247,11 +238,11 @@ export class JoinManager {
           player.hasAvatarPhoto = false;
         }
 
-        // Register in userIdMap
         if (!this.userIdMap.has(gameId)) {
           this.userIdMap.set(gameId, new Map());
         }
-        this.userIdMap.get(gameId)!.set(slotColor, botUserId);
+        this.userIdMap.get(gameId).set(slotColor, botUserId);
+        await this.store.setSeatUser(gameId, slotColor, botUserId);
 
         // Instantiate bot
         this.getOrCreateBot(gameId, slotColor, this.engine, this.store);

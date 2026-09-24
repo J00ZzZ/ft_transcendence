@@ -81,17 +81,24 @@ export class AuthController {
   }
 
   // Factor one. 2FA off → session cookies; 2FA on → { pendingToken }, no
-  // session. Brute-force surface, so tightly throttled.
+  // session; an unverified address → a notice, also with no session. Brute-force
+  // surface, so tightly throttled.
   @Throttle({ default: { limit: 5, ttl: MINUTE_MS } })
   @Post('login')
   @HttpCode(200)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
+    // 200 with a code, so the browser logs no error for this normal state.
+    if ('emailNotVerified' in result) {
+      return {
+        code: 'AUTH_EMAIL_NOT_VERIFIED',
+        message: 'Verify your email address before signing in',
+      };
+    }
     if (result.twoFactorRequired) {
       return { twoFactorRequired: true, pendingToken: result.pendingToken };
     }
-    // LoginResult is discriminated on twoFactorRequired, so the early return
-    // above narrows this to the session variant.
+    // The union narrows to the session variant here, the only one left.
     this.setSessionCookies(res, result.accessToken, result.refreshToken);
     return { twoFactorRequired: false, user: result.user };
   }
@@ -162,14 +169,14 @@ export class AuthController {
     return { user: profile.user };
   }
 
-  // ---- Get full profile (used by the Edit-Profile card) ----
+  // **Get full profile (used by the Edit-Profile card)**
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Req() req: Request) {
     return this.authService.getProfile((req.user as { id: string }).id);
   }
 
-  // ---- Complete profile update (username / email / 2FA method) ----
+  // **Complete profile update (username / email / 2FA method)**
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
@@ -181,7 +188,7 @@ export class AuthController {
     };
   }
 
-  // ---- Change password while logged in ----
+  // **Change password while logged in**
   @UseGuards(JwtAuthGuard)
   @Patch('profile/password')
   async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
@@ -193,7 +200,7 @@ export class AuthController {
     );
   }
 
-  // ---- Permanently delete the account (password-verified) ----
+  // **Permanently delete the account (password-verified)**
   @UseGuards(JwtAuthGuard)
   @Delete('profile')
   @HttpCode(200)
@@ -209,7 +216,7 @@ export class AuthController {
     return { message: 'Account permanently deleted' };
   }
 
-  // ---- 2FA preference (logged-in user toggles their own) ----
+  // **2FA preference (logged-in user toggles their own)**
   @UseGuards(JwtAuthGuard)
   @Get('2fa')
   getTwoFactor(@Req() req: Request) {
@@ -222,7 +229,7 @@ export class AuthController {
     return this.authService.setTwoFactorSetting((req.user as { id: string }).id, dto.enabled);
   }
 
-  // ---- Google OAuth ----
+  // **Google OAuth**
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   googleAuth() {}
@@ -233,7 +240,7 @@ export class AuthController {
     return this.finishOAuth(req, res);
   }
 
-  // ---- GitHub OAuth ----
+  // **GitHub OAuth**
   @Get('github')
   @UseGuards(GithubAuthGuard)
   githubAuth() {}
@@ -244,7 +251,7 @@ export class AuthController {
     return this.finishOAuth(req, res);
   }
 
-  // ---- 42 OAuth ----
+  // **42 OAuth**
   @Get('42')
   @UseGuards(FortyTwoAuthGuard)
   fortyTwoAuth() {}

@@ -1,5 +1,12 @@
-import { GameState, PlayerColor, LegalMove, MovePieceOutput, PieceId, GameEvent } from './types';
-import { RedisGameStore } from './redis';
+import type {
+  GameState,
+  PlayerColor,
+  LegalMove,
+  MovePieceOutput,
+  PieceId,
+  GameEvent,
+} from './types';
+import type { RedisGameStore } from './redis';
 import { MoveValidator } from './move-validator';
 import { applyMoveOutcome } from './turn';
 import { advanceTurnInState } from './player-handler';
@@ -9,7 +16,7 @@ import {
   handlePlayerReady,
   expireDisconnectedPlayer,
 } from './player-handler';
-import { LobbyManager } from './lobby';
+import type { LobbyManager } from './lobby';
 
 // The game engine core: roll/move handling, per-game operation locking,
 // player lifecycle (disconnect/ready/exit), and event emission to the
@@ -89,7 +96,7 @@ export class LudoEngine {
   ): Promise<{ value: number; legalMoves: LegalMove[]; bonusRoll: boolean }> {
     return this.withGameLock(gameId, async () => {
       const state = await this.store.loadGameState(gameId);
-      if (!state || state.status !== 'active') {
+      if (state?.status !== 'active') {
         throw new Error('Game not active');
       }
 
@@ -103,10 +110,8 @@ export class LudoEngine {
         throw new Error('Current player has exited');
       }
 
-      // Paused for a disconnect grace window: no rolls until the paused seat
-      // reconnects (reconnect clears the pause) or is pruned (prune advances
-      // the turn). Without this gate a crafted client could act while the
-      // game is frozen for everyone else.
+      // Frozen for a disconnect grace window: no rolls until the paused seat
+      // reconnects or is pruned.
       if (state.paused) {
         throw new Error('Game is paused — waiting for player to reconnect');
       }
@@ -198,7 +203,7 @@ export class LudoEngine {
   async movePiece(gameId: string, pieceId: PieceId): Promise<MovePieceOutput> {
     return this.withGameLock(gameId, async () => {
       const state = await this.store.loadGameState(gameId);
-      if (!state || state.status !== 'active') {
+      if (state?.status !== 'active') {
         throw new Error('Game not active');
       }
 
@@ -282,7 +287,15 @@ export class LudoEngine {
     notifyAbort?: (gameId: string) => void,
   ): Promise<void> {
     return this.withGameLock(gameId, () =>
-      handlePlayerDisconnect(this.store, (e) => this.emit(e), gameId, color, notifyAbort),
+      handlePlayerDisconnect(
+        this.store,
+        (e) => {
+          this.emit(e);
+        },
+        gameId,
+        color,
+        notifyAbort,
+      ),
     );
   }
 
@@ -301,22 +314,35 @@ export class LudoEngine {
 
   async handlePlayerReady(gameId: string, color: PlayerColor): Promise<void> {
     await this.withGameLock(gameId, () =>
-      handlePlayerReady(this.store, (e) => this.emit(e), gameId, color),
+      handlePlayerReady(
+        this.store,
+        (e) => {
+          this.emit(e);
+        },
+        gameId,
+        color,
+      ),
     );
     await this.emitLobbyUpdate(gameId);
   }
 
-  // Replay a grace window's expiry under the game lock. The disconnect handler
-  // arms an in-process timer for this, which a restart loses — the server's
-  // periodic sweep calls this instead so an expired window can never leave a
-  // seat parked as 'disconnected' with the turn held on it.
+  // Replay a grace window expiry under the game lock, so the server sweep can
+  // settle windows lost to a restart.
   async expireDisconnectedPlayer(
     gameId: string,
     color: PlayerColor,
     notifyAbort?: (gameId: string) => void,
   ): Promise<void> {
     return this.withGameLock(gameId, () =>
-      expireDisconnectedPlayer(this.store, (e) => this.emit(e), gameId, color, notifyAbort),
+      expireDisconnectedPlayer(
+        this.store,
+        (e) => {
+          this.emit(e);
+        },
+        gameId,
+        color,
+        notifyAbort,
+      ),
     );
   }
 
@@ -325,7 +351,7 @@ export class LudoEngine {
       throw new Error('Lobby manager not initialized');
     }
     await this.withGameLock(gameId, () =>
-      this.lobbyManager!.handleSelectColor(gameId, userId, color),
+      this.lobbyManager.handleSelectColor(gameId, userId, color),
     );
     await this.emitLobbyUpdate(gameId);
   }

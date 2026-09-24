@@ -11,7 +11,10 @@
 - [Dependencies](#dependencies) — Internal services this module relies on
 - [Configuration / Environment](#configuration--environment) — Redis connection settings
 
+
 ---
+---
+
 
 ## Overview
 
@@ -33,7 +36,10 @@ The module provides:
 > other — see [`../architecture.md`](../architecture.md) → Connection liveness (two-direction
 > heartbeats).
 
+
 ---
+---
+
 
 ## Files
 
@@ -44,7 +50,10 @@ The module provides:
 | `presence.module.ts` | NestJS module — registers controller and service |
 | `dto/heartbeat.dto.ts` | Validation schema for the heartbeat request body |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -66,7 +75,10 @@ export type PresenceStatus = 'online' | 'playing' | 'offline';
 
 A missing Redis presence key *is* the offline state. The heartbeat TTL (45s, covering two missed ~20s beats) expires stale entries automatically.
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -76,7 +88,10 @@ A missing Redis presence key *is* the offline state. The heartbeat TTL (45s, cov
 | `DELETE` | `/api/presence/heartbeat` | JWT | Clear presence (logout) |
 | `GET` | `/api/presence/online-count` | JWT | Site-wide online user count (homepage badge) |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -112,7 +127,10 @@ sequenceDiagram
     Server->>Server: Mark the user offline
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -139,7 +157,10 @@ GET /api/presence/online-count (JWT required)
   └── 200 { count: <number of live presence keys> }
 ```
 
+
 ---
+---
+
 
 ## Additional Service Methods
 
@@ -153,7 +174,10 @@ The `PresenceService` also provides read methods used by other parts of the appl
 
 `PresenceStatus` is a type alias: `'online' | 'playing' | 'offline'`. A missing Redis key *is* the offline state — the TTL handles cleanup automatically.
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -164,7 +188,10 @@ The `PresenceService` also provides read methods used by other parts of the appl
 | `NotificationService` | Push transient `friend_online` / `friend_offline` toasts |
 | `JwtAuthGuard` | Protects all three presence endpoints |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 

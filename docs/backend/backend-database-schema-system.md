@@ -8,7 +8,10 @@
 - [Entity Relationships](#entity-relationships) — ER diagram showing model relations
 - [Indexes](#indexes) — Database indexes for query performance
 
+
 ---
+---
+
 
 ## Overview
 
@@ -18,9 +21,17 @@ The database uses PostgreSQL 16 with Prisma ORM (Prisma 7, `@prisma/adapter-pg`)
 > flags**. All per-user stats (rating, wins, streaks), avatar data, and
 > disconnect/reconnect counters live directly on **`User`**.
 
+
+---
 ---
 
+
 ## Enums
+
+
+---
+---
+
 
 ### FriendshipStatus
 
@@ -31,6 +42,11 @@ enum FriendshipStatus {
   blocked
 }
 ```
+
+
+---
+---
+
 
 ### PlayerColor
 
@@ -43,6 +59,11 @@ enum PlayerColor {
 }
 ```
 
+
+---
+---
+
+
 ### GameStatus
 
 ```prisma
@@ -51,6 +72,11 @@ enum GameStatus {
   ABANDONED
 }
 ```
+
+
+---
+---
+
 
 ### GameType
 
@@ -63,9 +89,17 @@ enum GameType {
 
 > There is no `UserStatus` enum — presence is a runtime Redis concern (see `backend-presence-module.md`), with `'online' | 'playing' | 'offline'` derived from the presence key TTL.
 
+
+---
 ---
 
+
 ## Models
+
+
+---
+---
+
 
 ### User
 
@@ -100,7 +134,10 @@ data, and disconnect/reconnect counters.
 
 **Relations:** `accounts`, `notifications`, `achievement` (1:1), `gameParticipants`, `sentFriendships`, `receivedFriendships`
 
+
 ---
+---
+
 
 ### Achievement
 
@@ -115,7 +152,10 @@ avatar data (those live on `User`).
 
 **Relations:** `user` (1:1, back-reference)
 
+
 ---
+---
+
 
 ### Account
 
@@ -130,7 +170,10 @@ OAuth provider links, one row per provider per user.
 
 **Relations:** `user` (back-reference)
 
+
 ---
+---
+
 
 ### Game
 
@@ -147,7 +190,10 @@ Historical results only — live matchmaking state is stored in Redis, not here.
 
 **Relations:** `participants` (GameParticipant[])
 
+
 ---
+---
+
 
 ### GameParticipant
 
@@ -157,7 +203,7 @@ One row per player per game.
 |-------|------|------------|-------------|
 | `id` | String | UUID, PK | Unique identifier |
 | `game_id` | String | FK | Owning game |
-| `user_id` | String | FK | Player (bots use `bot-<color>` synthetic ids) |
+| `user_id` | String | FK | Player (human accounts only; bots are never written) |
 | `color` | PlayerColor | | Seat color |
 | `rank` | Int | | Final placement (1st-4th) |
 | `piecesCaptured` | Int | Default: 0 | Pieces knocked off |
@@ -165,14 +211,19 @@ One row per player per game.
 
 **Relations:** `game`, `user`
 
+
 ---
+---
+
 
 ### Bots
 
-A bot is not a separate table: bots are stored as real `User` rows whose id is
-the literal string `bot-<color>` (`bot-red`, `bot-green`, `bot-yellow`,
-`bot-blue`). The row exists because `GameParticipant.user_id` is a foreign key to
-`User.id`, so every seeded seat must reference a real user.
+Bots are not stored: a bot's id is the literal string `bot-<color>`
+(`bot-red`, `bot-green`, `bot-yellow`, `bot-blue`), built per seat from
+`BOT_PREFIX + color`. That id lives in the `match:*` hashes, in the engine's game
+state and in the engine JWT, and it never reaches Postgres. The engine reports
+only the human seats that finished, and `match.postgame` skips a bot id before it
+writes anything.
 
 `backend/src/common/bot.ts` defines `BOT_PREFIX` and `isBotUserId()`. The engine
 process keeps its own copy of both in `socket/auth.ts`, so bot identity must be
@@ -182,11 +233,14 @@ Modules that must tell humans from bots:
 
 | Module | What it does with bots |
 |--------|------------------------|
-| Match (`match.creator`, `match.player`, `match.postgame`) | Builds bot seats as `BOT_PREFIX + color`; excludes bots from seat and invite lists; skips them for rating, scoring, winner selection and persisted results, so a bot never gets an Elo change, a win/loss tally or a leaderboard entry |
-| Achievements (`achievements.service`) | Skips bot participants, so games against bots never unlock human achievements |
+| Match (`match.creator`, `match.player`, `match.postgame`) | Builds bot seats as `BOT_PREFIX + color`; excludes bots from seat and invite lists; skips them for rating, scoring, winner selection and persisted results, so a bot never gets an Elo change, a win/loss tally, a game row or a leaderboard entry |
+| Achievements (`achievements.service`) | Skips a bot `user_id`, so a bot never collects achievements (games against bots still count toward the human's own bot-win achievements) |
 | Leaderboard (`leaderboard.service`) | Excludes bots when it rebuilds from Postgres, using `startsWith BOT_PREFIX` in the query plus `!isBotUserId()` in memory |
 
+
 ---
+---
+
 
 ### Friendship
 
@@ -200,7 +254,10 @@ Modules that must tell humans from bots:
 
 **Relations:** `user` (SentFriendships), `friend` (ReceivedFriendships)
 
+
 ---
+---
+
 
 ### Notification
 
@@ -217,7 +274,10 @@ Persisted notifications backing the SSE stream and the bell dropdown.
 
 **Relations:** `user` (back-reference)
 
+
 ---
+---
+
 
 ## Entity Relationships
 
@@ -313,7 +373,10 @@ erDiagram
     }
 ```
 
+
 ---
+---
+
 
 ## Indexes
 

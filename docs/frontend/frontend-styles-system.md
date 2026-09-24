@@ -8,7 +8,10 @@
 - [Core Logic / Flow](#core-logic--flow) — How a theme change reaches the screen
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -20,7 +23,10 @@ Styling is split between CSS files and TypeScript constants, with a clear rule f
 
 **Themes are handled entirely in CSS.** No JavaScript reads theme names to pick colors — a component never checks "which theme is active".
 
+
 ---
+---
+
 
 ## Files
 
@@ -32,7 +38,10 @@ Styling is split between CSS files and TypeScript constants, with a clear rule f
 | `src/theme.ts` | Small TypeScript constants tied to the theme (`STATUS_STYLE`, `goldText`, `BOT_POOL`) |
 | `src/store.tsx` | Owns the `theme` state and applies `data-theme` to `<html>` |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -60,7 +69,10 @@ Both `:root`/`[data-theme='synthwave']`, `[data-theme='win95']` and `[data-theme
 
 Because every theme defines every token, a component only ever references `var(--accent-cyan)` (and so on) and the correct color appears for the active theme.
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -82,7 +94,10 @@ sequenceDiagram
 2. `retrowave.css` defines each token set twice: once on `:root, [data-theme='synthwave']` (the default) and once per other theme. Changing one attribute on `<html>` switches every color, font and shadow in the application at once.
 3. Components and `tw.ts` constants only reference tokens (`var(--accent-pink)`) or use Tailwind arbitrary variants such as `[[data-theme=win95]_&]:…` when one theme needs a different structure.
 
+
 ---
+---
+
 
 ## Dependencies
 

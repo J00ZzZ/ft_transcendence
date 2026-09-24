@@ -11,7 +11,10 @@
 - [Dependencies](#dependencies) — npm packages and internal services this module relies on
 - [Configuration / Environment](#configuration--environment) — Environment variables and secrets
 
+
 ---
+---
+
 
 ## Overview
 
@@ -28,9 +31,12 @@ The App Bootstrap module is the root of the NestJS application. It does three th
    - `MatchModule` — matchmaking, rooms, ludo-engine callbacks
    - `PresenceModule` — online/offline presence
    - `NotificationModule` — notifications
-3. **Reads configuration** via `secrets.ts` — every value is read straight from environment variables. Containers get the root `.env` through `compose.yaml`'s `env_file`; host-side scripts load it with `dotenv` (no mounted secret files anymore).
+3. **Reads configuration** via `secrets.ts` — every value is read straight from environment variables. Containers get the root `.env` through `compose.yaml`'s `env_file`; host-side scripts load it with `dotenv`.
+
 
 ---
+---
+
 
 ## Files
 
@@ -41,7 +47,10 @@ The App Bootstrap module is the root of the NestJS application. It does three th
 | `prisma.service.ts` | Injectable PrismaClient wrapper with `onModuleInit`/`onModuleDestroy` lifecycle hooks |
 | `secrets.ts` | Utility functions `secret()`, `requireSecret()` and `isTunnelRequest()` for reading configuration from environment variables |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -61,7 +70,10 @@ function requireSecret(key: string): string;             // Throws if missing
 function isTunnelRequest(host: string | undefined): boolean;  // True when Host contains "ngrok"
 ```
 
+
 ---
+---
+
 
 ## API Endpoints
 
@@ -69,7 +81,10 @@ function isTunnelRequest(host: string | undefined): boolean;  // True when Host 
 |--------|------|------|-------------|
 | `GET` | `/health` | None | Database connectivity health check |
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -79,7 +94,7 @@ Sequence of steps when the NestJS application starts up — middleware registrat
 ```mermaid
 sequenceDiagram
     participant Command as Start command (npm run start)
-    participant App as App.ts
+    participant App as main.ts
 
     Command->>App: Start the backend
     App->>App: Trust the proxy headers
@@ -96,17 +111,17 @@ Sequence of steps when a client hits `GET /health` — verifies database connect
 ```mermaid
 sequenceDiagram
     participant User
-    participant App as App.ts
+    participant App as main.ts
     participant DB as Database
 
     User->>App: Ask for /health
-    App->>DB: Run a tiny "is the database alive?" query
+    App->>DB: Run a connectivity query (`SELECT 1`)
     alt Database OK
         DB-->>App: yes
-        App-->>User: 200 { status: "ok" }
+        App-->>User: 200 { status: "ok", timestamp }
     else Database down
         DB-->>App: error
-        App-->>User: 500 { status: "error" }
+        App-->>User: 500 { status: "error", timestamp }
     end
 ```
 
@@ -147,12 +162,12 @@ sequenceDiagram
 ```
 
 `PrismaService` connects through a `pg` connection pool (`max: 5`) wrapped in
-`PrismaPg`, both built from `DATABASE_URL`. An earlier build also carried a
-commented-out hosted-Postgres branch for Vercel (`ACCELERATE_URL`); it was
-removed, because this deployment runs Docker Compose and nothing sets that
-variable.
+`PrismaPg`, both built from `DATABASE_URL`.
+
 
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -186,7 +201,10 @@ secret(name)        → process.env[name]  // undefined when unset
 requireSecret(name) → process.env[name]  // throws when unset
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -202,7 +220,10 @@ requireSecret(name) → process.env[name]  // throws when unset
 | `reflect-metadata` | TypeScript decorator support |
 | `rxjs` | Reactive extensions for NestJS |
 
+
 ---
+---
+
 
 ## Configuration / Environment
 
@@ -210,5 +231,4 @@ requireSecret(name) → process.env[name]  // throws when unset
 |----------|---------|---------|
 | `NODE_ENV` | `development` | Access-cookie `secure` flag (AuthController); compose overrides it to `production` in containers |
 | `DATABASE_URL` | (from `.env`) | PrismaService database connection |
-| *(no secret files)* | — | Config values come from environment variables only (root `.env`); there is no `SECRETS_DIR` or mounted secret file anymore |
 | `PORT` | 3000 | HTTP server listen port (hardcoded in main.ts) |

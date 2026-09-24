@@ -27,7 +27,12 @@ async function main() {
   // Clear existing friendships for all users to ensure fresh bidirectional links
   await prisma.friendship.deleteMany({});
 
-  const createdFriendships: any[] = [];
+  const createdFriendships: Array<{
+    id: string;
+    userId: string;
+    friendId: string;
+    status: 'accepted';
+  }> = [];
   const addedPairs = new Set<string>();
 
   for (const mainUser of allUsers) {

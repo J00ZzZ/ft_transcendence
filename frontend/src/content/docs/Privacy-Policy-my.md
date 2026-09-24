@@ -5,7 +5,10 @@
 
 Dasar Privasi ini menjelaskan bagaimana aplikasi web ft-Transcendence (RetroLudo '42) ("Apl", "kami", "kami") mengumpulkan, menggunakan, menggenapi, dan melindungi data peribadi anda. Ia disediakan mengikut **Akta Perlindungan Data Peribadi Malaysia 2010 ("PDPA")** dan prinsip-prinsip panduannya: Umum, Notis dan Pilihan, Penggenapan, Keselamatan, Penyimpanan, Integriti Data, dan Akses.
 
+
 ---
+---
+
 
 ## 1. Apakah data peribadi yang kami kumpulkan
 
@@ -23,7 +26,10 @@ Apl ini hanya mengumpulkan data yang diperlukan untuk menyediakan permainan dan 
 
 Kami **tidak** mengumpulkan butiran kad pembayaran, data lokasi, atau sebarang data daripada kanak-kanak di bawah umur 13 tahun. Apl ini adalah permainan dan tidak melakukan profil automatik melebihi menampilkan statistik permainan yang anda sudah lihat.
 
+
 ---
+---
+
 
 ## 2. Notis dan pilihan (persetujuan)
 
@@ -32,7 +38,10 @@ Dengan mencipta akaun dan menggunakan Apl, anda bersetuju dengan pengumpulan dan
 - Anda boleh menarik semula persetujuan dengan menghapuskan akaun anda pada bila-bila masa sahaja (lihat Bahagian 7).
 - Di mana data pilihan terlibat (cth., memuat naik avatar, menghubungkan kaedah OAuth), data tersebut hanya dikumpulkan berdasarkan pilihan anda yang jelas.
 
+
 ---
+---
+
 
 ## 3. Bagaimana kami menggunakan data anda
 
@@ -47,7 +56,10 @@ Kami menggunakan data peribadi anda semata-mata untuk:
 
 Kami **tidak** menjual, menyewa, atau menukar data peribadi anda, dan kami tidak menggunakannya untuk pemasaran atau pengiklanan.
 
+
 ---
+---
+
 
 ## 4. Penggenapan
 
@@ -58,6 +70,11 @@ Data anda hanya dikongsikan sejumlah yang diperlukan untuk mengoperasikan Apl:
 - **Pematuhan undang-undang**: kami mungkin mencelupkan data jika diperlukan oleh undang-undang atau pihak berkuasa yang kompeten.
 
 Kami tidak memindahkan data peribadi anda di luar skop yang diterangkan di sini tanpa persetujuan anda, kecuali di mana diperlukan untuk menyediakan perkhidmatan.
+
+
+---
+---
+
 
 ## 5. Keselamatan
 
@@ -72,13 +89,19 @@ Kami menerapkan langkah-langkah teknikal dan organisasi yang munasabat untuk mel
 
 Oleh kerana Apl ini adalah projek pembangunan/pembiakan yang dipasang sendiri, penerapan menggunakan **sijil TLS sendiri yang ditandatangani**; sambungan masih dienkripsi, tetapi tidak divalidasi oleh pihak berkuasa sijil awam. Anda tidak sepatutnya menggunakan Apl ini untuk menyimpan data yang sangat sensitif.
 
+
 ---
+---
+
 
 ## 6. Penyimpanan
 
 Kami menyimpan data peribadi anda hanya selama akaun anda masih wujud dan seangkatan yang diperlukan untuk menyediakan ciri-ciri yang anda gunakan. Data ephemer (keadaan pertandingan langsung, kehadiran, notifikasi, token keselamatan sementara) disimpan dalam memori dengan tamat tempoh automatik. Apabila anda menghapuskan akaun anda, data peribadi anda akan dihapuskan (lihat Bahagian 7).
 
+
 ---
+---
+
 
 ## 7. Integriti data, akses, dan pembetulan (hak anda di bawah PDPA)
 
@@ -96,19 +119,28 @@ Di bawah PDPA, anda berhak untuk:
 
 Untuk mana-mana permintaan akses, pembetulan, atau lain-lain, hubungi Tim (lihat Bahagian 9).
 
+
 ---
+---
+
 
 ## 8. Integriti data
 
 Kami mengambil langkah-langkah yang munasabat untuk memastikan data peribadi yang kami simpan adalah tepat, lengkap, dan tidak mengelirukan, dan kami membetulkan atau mengemaskininya apabila anda memberitahu kami atau mengeditnya sendiri.
 
+
 ---
+---
+
 
 ## 9. Hubungi kami
 
 Untuk sebarang soalan, aduan, atau permintaan yang berkaitan dengan data peribadi anda di bawah PDPA, sila hubungi Tim melalui saluran perhubungan projek (seperti yang disenaraikan dalam README projek).
 
+
 ---
+---
+
 
 ## 10. Perubahan kepada Dasar ini
 

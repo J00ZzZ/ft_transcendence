@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The Leaderboard page (`/leaderboard`, full-screen) shows players in rank order. 
 
 > **Note:** The Leaderboard reads live data from the leaderboard API (Application Programming Interface) at `GET /api/leaderboard?mode=global&limit=50`; there is no mock data. Translated text comes from `locales/*`, under the `leaderboard` namespace.
 
+
 ---
+---
+
 
 ## Files
 
@@ -33,7 +39,10 @@ The Leaderboard page (`/leaderboard`, full-screen) shows players in rank order. 
 | `src/components/RankBadge.tsx` | Rank tier badges |
 | `src/utils/ranks.ts` | `getRankTier` rating → tier mapping |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -42,6 +51,7 @@ The Leaderboard page (`/leaderboard`, full-screen) shows players in rank order. 
 ```typescript
 type LeaderboardEntry = {
   rank: number  // Position in the ranking
+  id: string  // Immutable user id, the key avatars are looked up by
   username: string  // Player's username
   displayName?: string  // Name shown in the game
   rating: number  // Player's rating (score)
@@ -54,7 +64,10 @@ type LeaderboardEntry = {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -72,7 +85,10 @@ sequenceDiagram
     Page->>Page: Highlight current user (myRank)
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -85,13 +101,15 @@ sequenceDiagram
   └── getRankTier(rating) → tier badge per row
 ```
 
+
 ---
+---
+
 
 ## Dependencies
 
 | Dependency | Purpose |
 |-----------|---------|
-| `api.ts` | Typed request helpers |
 | `store.tsx` | `useApp` for current user |
 | `utils/ranks.ts` | Rank tier badges |
 | `i18n.ts` | `useTranslation` (`leaderboard.*` keys) |

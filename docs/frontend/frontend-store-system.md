@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for authentication and game state changes
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -22,7 +25,10 @@ The store is one React Context provider (`AppProvider`) that holds all global UI
 5. **Helpers** — `addBot`, `removeBot`, `addPlayer`, `removePlayer`, `startGame`, `roll`, `endTurn`, `settingOn`, `toggleSetting`.
 6. **Session keep-alive** — a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is still waiting for a response. This is the **client → server** direction only, and it shows that the browser session is still active; keeping the notification SSE stream alive runs the other way and is handled server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
+
 ---
+---
+
 
 ## Files
 
@@ -30,7 +36,10 @@ The store is one React Context provider (`AppProvider`) that holds all global UI
 |------|------|
 | `src/store.tsx` | `AppProvider`, `useApp` hook, all state and actions |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -157,7 +166,10 @@ export const SETTING_DEFAULTS: Record<string, boolean> = {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -187,10 +199,14 @@ sequenceDiagram
     Store->>Store: Loading finished
 
     Note over App,API: Logging in
-    App->>Store: login(username, password)
+    App->>Store: login(identifier, password)
     Store->>API: POST /api/auth/login
-    API-->>Store: user info
-    Store->>Store: Save the user
+    alt Address not verified
+        API-->>Store: 200 notice, no session
+    else Otherwise
+        API-->>Store: user info, or a pending token when 2FA is on
+        Store->>Store: Save the user when a session was issued
+    end
 
     Note over App,API: Logging out
     App->>Store: logout()
@@ -221,7 +237,10 @@ sequenceDiagram
 
 > **Note:** `startGame` only builds the local seat state used by the offline/hotseat preview. For a real match, the lobby calls `POST /api/match/create` (or the PvP (player versus player) and PvE (player versus environment) shortcuts) and stores the returned `activeMatch`; the Game page then connects to the engine over Socket.IO.
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -235,15 +254,17 @@ Mount
        └── 429/5xx/network → retry up to 3× (exponential backoff, honours Retry-After),
             then leave `user` unchanged and setAuthReady(true)
 
-login(username, password)
+login(identifier, password)
   └── POST /api/auth/login
-       ├── 200 → setUser(user), return null
-       └── error → return error message
+       ├── 200 + code=AUTH_EMAIL_NOT_VERIFIED → return { error } (the translated notice)
+       ├── 200 + twoFactorRequired=false → setUser(user), return {}
+       ├── 200 + twoFactorRequired=true → return { pendingToken }
+       └── non-2xx → return { error }
 
-register(username, password, email?)
+register(username, password, email)
   └── POST /api/auth/register
-       ├── 200 → setUser(user), return null
-       └── error → return error message
+       ├── 200 → return null (no session; the account activates via the emailed link)
+       └── error → return the message
 
 logout()
   └── POST /api/auth/logout → setUser(null)
@@ -283,7 +304,10 @@ toggleSetting(key)
   └── Flip current value (settings or default)
 ```
 
+
 ---
+---
+
 
 ## `api.ts` — Refresh and Retry
 
@@ -296,7 +320,10 @@ toggleSetting(key)
 
 `store.tsx` also refreshes **early**, every 14 minutes: access tokens expire after 15 minutes (`JwtModule` `expiresIn: '15m'`), so refreshing one minute ahead keeps the presence heartbeat (and any other call) from arriving with an expired token. The 401 retry path above would still recover, but the browser logs the 401 first.
 
+
 ---
+---
+
 
 ## Dependencies
 
@@ -304,6 +331,6 @@ toggleSetting(key)
 |-----------|---------|
 | `theme.ts` | `BOT_POOL` for bot seat names |
 | `i18n.ts` | `i18n.changeLanguage` and `i18n.t` for default player names |
-| `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` for the 14-minute token refresh that runs before the token expires, and `translateErrorCode`, which turns an error code into text in the user's language |
+| `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` (called on the store's 14-minute timer, before the access token expires), and `translateErrorCode`, which turns an error code into text in the user's language |
 | `game/types.ts` | `PlayerColor` for `ActiveMatch` |
 | API (Application Programming Interface) | `/api/auth/me`, `/api/auth/login`, `/api/auth/register`, `/api/auth/logout`, `/api/auth/2fa/verify`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/2fa`, `/api/presence/heartbeat` |

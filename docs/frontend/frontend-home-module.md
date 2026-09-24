@@ -9,7 +9,10 @@
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for content display
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -24,7 +27,10 @@ The Home page is the main landing page after login (`/home`, full-screen). It al
 
 > The Home page reads all of its data from the API; there is no mock data. It uses the retro/cyber styling (`RetroNavbar`, `retrowave.css`).
 
+
 ---
+---
+
 
 ## Files
 
@@ -37,7 +43,10 @@ The Home page is the main landing page after login (`/home`, full-screen). It al
 | `src/components/RetroNavbar.tsx` | Top navigation bar |
 | `src/components/NotificationToast.tsx` | Toast notifications |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -65,7 +74,10 @@ type PlayerStats = {
 }
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -93,7 +105,10 @@ sequenceDiagram
     Note over Home: Friends widget refreshes every 12 seconds
 ```
 
+
 ---
+---
+
 
 ## Logic Paths Summary
 
@@ -109,13 +124,19 @@ sequenceDiagram
   └── Register global hotkeys
 ```
 
+
 ---
+---
+
 
 ## Hero Badge Bar
 
 The hero section shows a live site-wide badge with the number of **online players**, read from `GET /api/presence/online-count` and refreshed every 15 seconds.
 
+
 ---
+---
+
 
 ## Dependencies
 

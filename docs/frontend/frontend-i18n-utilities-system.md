@@ -8,7 +8,10 @@
 - [Core Logic / Flow](#core-logic--flow) — Language selection and legal documents
 - [Dependencies](#dependencies) — Internal and external dependencies
 
+
 ---
+---
+
 
 ## Overview
 
@@ -16,11 +19,14 @@ Supporting modules shared by every screen:
 
 1. **i18n** — `i18next` + `react-i18next` with three languages: English (`en`), Malay (`ms`), French (`fr`). The choice persists in `localStorage` under the key `lr.lang`. If the saved value is unknown or missing, the default language `en` is used.
 2. **Audio** — `RetroAudioEngine`, a Web Audio chiptune synthesizer with three built-in tracks, used by the Game page for dice/move effects (`playUiBeep`) and background music. Muting is toggled via `toggleMute()`.
-3. **Bot names** — `localizedBotName()` maps the engine's `bot-<color>` user ids to a translated "Bot <Color>" string using the `lobby.color*` i18n keys.
+3. **Bot names** — `localizedBotName()` maps the engine's `bot-<color>` user ids to a translated "bot-<color>" string using the `common.bot` label and the `lobby.color*` i18n keys.
 4. **Legal pages** — `LegalPage` renders the Privacy Policy and Terms of Service (public routes `/privacy` and `/terms`) from markdown files bundled with Vite's `?raw` imports, one variant per language.
 5. **Entry point** — `main.tsx` mounts `<App />` in `StrictMode` and imports the CSS plus `./i18n` so translations are ready before the first render.
 
+
 ---
+---
+
 
 ## Files
 
@@ -35,7 +41,10 @@ Supporting modules shared by every screen:
 | `src/utils/botName.ts` | `localizedBotName()` — `bot-<color>` → translated bot name |
 | `src/pages/LegalPage.tsx` | Privacy / Terms pages (`/privacy`, `/terms`) — markdown viewer per language |
 
+
 ---
+---
+
 
 ## Key Types / Interfaces
 
@@ -52,7 +61,10 @@ interface LegalPageProps {
 // content/docs/Terms-of-Service-{en,fr,my}.md   (?raw Vite imports)
 ```
 
+
 ---
+---
+
 
 ## Core Logic / Flow
 
@@ -69,7 +81,10 @@ flowchart LR
 2. Components call `useTranslation()`; the language selector (in `RetroNavbar`, `LegalPage`, and others) switches language at runtime via `setLang` from the store, which updates both i18next and `lr.lang`.
 3. `LegalPage` reads the route (`/privacy` or `/terms`), picks the markdown document for the current language, and renders it through `MarkdownViewer`.
 
+
 ---
+---
+
 
 ## Dependencies
 

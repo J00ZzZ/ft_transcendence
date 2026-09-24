@@ -6,9 +6,13 @@ knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
 [`tunnel.md`](./tunnel.md).
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
-`nginx/conf/app.inc`, `compose.yaml`) rather than copied from older docs —
-see [Known issue](#known-issue) at the bottom for one place where a comment
-in the code no longer matches what actually runs.
+`nginx/conf/app.inc`, `compose.yaml`). See [Known issue](#known-issue) at the
+bottom for one place where a comment in the code does not match what runs.
+
+
+---
+---
+
 
 ## The one idea that makes this simple
 
@@ -38,6 +42,11 @@ host-side debugging (`psql`, Prisma Studio, `npm run dev`'s Vite proxy).
 Nothing but nginx is ever reachable from another device — that's what makes
 [tunnel mode](./tunnel.md) need zero extra routing config of its own.
 
+
+---
+---
+
+
 ## TLS
 
 `nginx/Dockerfile` generates a self-signed cert at build time (`openssl req
@@ -49,6 +58,11 @@ restricts it to `TLSv1.2`/`TLSv1.3` and sets the standard hardening headers
 (`X-Frame-Options`, `HSTS`, a `Content-Security-Policy`, etc.) directly in
 the `server {}` block.
 
+
+---
+---
+
+
 ## Serving the SPA
 
 The frontend is a separate container (`frontend` service) that runs
@@ -58,6 +72,11 @@ a shared named volume, `spa_dist`. nginx mounts that volume read-only at
 Node/Vite process involved at runtime. `location /` uses
 `try_files $uri $uri/ /index.html` so client-side routes (React Router)
 resolve correctly on a hard refresh instead of 404ing.
+
+
+---
+---
+
 
 ## Routing table (active config, in `nginx.conf`)
 
@@ -83,6 +102,11 @@ resolve `backend`/`ludo-engine` once and cache the IP for the life of the
 nginx worker — restarting either service in dev would leave nginx stuck
 retrying an unreachable IP address until nginx itself restarted.
 
+
+---
+---
+
+
 ## Vite dev proxy (`frontend-dev`)
 
 Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.config.ts` repeats the two proxy `location` blocks from `nginx.conf`:
@@ -94,18 +118,19 @@ Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.c
 
 `VITE_IN_CONTAINER=true` (set by `Dockerfile.dev`) selects the in-container service names; otherwise the host's published ports are used. Repeating `nginx.conf` here is intentional: nginx, this dev server, and (for the engine) direct Docker DNS all behave identically, so no absolute backend URL ever leaks into the SPA and the browser never needs to know the engine's real address.
 
+
 ---
+---
+
 
 ## Known issue
 
 **`nginx/conf/app.inc` is unused configuration.** It is copied into the nginx image
 and bind-mounted by `compose.yaml`, and `nginx.conf`'s own comment claims
 *"See conf/app.inc for the actual routing (shared so the local and
-ngrok-tunnelled paths ... can't drift)"* — but `nginx.conf` never actually
-`include`s it anywhere. The real, active routing is the inline `server {}`
-block described above. `app.inc` appears to be a file left over from an earlier
-refactor (it's missing the rate-limiting locations that `nginx.conf` has,
-for instance) that was never wired up, or was replaced and never deleted.
+ngrok-tunnelled paths ... can't drift)"* — but `nginx.conf` never `include`s it
+anywhere. The real, active routing is the inline `server {}` block described
+above, which also carries the rate-limiting locations that `app.inc` lacks.
 
 Not fixed here — this is reported rather than changed, because editing the
-configuration was outside the scope of the documentation update.
+configuration is outside the scope of the documentation update.
