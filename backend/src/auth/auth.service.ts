@@ -680,6 +680,21 @@ export class AuthService implements OnModuleDestroy {
     if (linkUserId) {
       const linked = await this.prisma.db.user.findUnique({ where: { id: linkUserId } });
       if (linked) {
+        // The provider's email must not already belong to a different account
+        const linkEmail = input.email ? normalizeEmail(input.email) : undefined;
+        if (linkEmail) {
+          const linkEmailOwner = await this.prisma.db.user.findUnique({
+            where: { email: linkEmail },
+          });
+          if (linkEmailOwner && linkEmailOwner.id !== linkUserId) {
+            throw new ConflictException({
+              code: 'AUTH_EMAIL_TAKEN',
+              message:
+                'That provider account uses an email already registered to another account',
+            });
+          }
+        }
+
         await this.prisma.db.account.create({
           data: {
             id: crypto.randomUUID(),
