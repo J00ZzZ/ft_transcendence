@@ -112,9 +112,7 @@ export function RetroNavbar({
   const accountPopoverContentRef = useRef<HTMLDivElement>(null);
   const [accountPopoverPos, setAccountPopoverPos] = useState({ top: 0, left: 0 });
 
-  // Global "all sounds" mute — same retroAudio.muted flag the in-game audio
-  // toggle uses (gates music AND every UI/FX beep), not just the chiptune
-  // background track (that's the separate togglePlay()/isPlayingAudio on Home).
+  // Global "all sounds" mute — gates every UI/FX beep via retroAudio.muted.
   const toggleSound = () => {
     retroAudio.muted = !retroAudio.muted;
     setSoundMuted(retroAudio.muted);

@@ -177,68 +177,7 @@ export const COL_4 = 'col-span-4 max-[992px]:col-span-12';
 
 export const COL_8 = 'col-span-8 max-[992px]:col-span-12';
 
-// Home's "CYBERSOUND DECK": theme overrides as `&` variants, JS-chosen LED
-// classes, and the unused reel/matrix rules removed.
-export const CYBER_CASSETTE_CHASSIS =
-  "relative overflow-hidden flex flex-col gap-2 py-2.5 px-3 rounded-lg border border-[rgba(0,240,255,.4)] bg-[linear-gradient(180deg,#18092e_0%,#0c021a_100%)] shadow-[0_0_16px_rgba(0,0,0,.6),inset_0_0_12px_rgba(0,240,255,.15)] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-[linear-gradient(90deg,var(--accent-cyan),var(--accent-pink),var(--accent-yellow))] [[data-theme=win95]_&]:bg-none [[data-theme=win95]_&]:bg-[#c0c0c0] [[data-theme=win95]_&]:border-t-2 [[data-theme=win95]_&]:border-t-white [[data-theme=win95]_&]:border-l-2 [[data-theme=win95]_&]:border-l-white [[data-theme=win95]_&]:border-r-2 [[data-theme=win95]_&]:border-r-[#808080] [[data-theme=win95]_&]:border-b-2 [[data-theme=win95]_&]:border-b-[#808080] [[data-theme=win95]_&]:shadow-none [[data-theme=terminal]_&]:bg-none [[data-theme=terminal]_&]:bg-[#000500] [[data-theme=terminal]_&]:border-[#33ff33] [[data-theme=terminal]_&]:shadow-[0_0_12px_rgba(51,255,51,.25)]";
-
-export const OLED_SCREEN =
-  'flex flex-col gap-0.5 py-1.5 px-2 rounded bg-[#020008] border border-[rgba(0,240,255,.3)] [[data-theme=win95]_&]:bg-black [[data-theme=win95]_&]:border-[#808080] [[data-theme=terminal]_&]:bg-[#000a00] [[data-theme=terminal]_&]:border-[#33ff33]';
-
-export const OLED_TITLE =
-  '[font-family:var(--font-heading)] text-[0.78rem] text-(--accent-yellow) tracking-[0.5px] whitespace-nowrap overflow-hidden text-ellipsis [text-shadow:0_0_8px_rgba(255,230,0,.5)] [[data-theme=terminal]_&]:text-[#33ff33]';
-
-export const OLED_META =
-  '[font-family:var(--font-mono)] text-[0.64rem] text-(--accent-cyan) flex justify-between [[data-theme=terminal]_&]:text-[#33ff33]';
-
-export const CYBER_EQ_DECK =
-  'flex items-end justify-between h-7 py-0.5 px-1 gap-0.5 rounded bg-black/80 border border-white/[0.08]';
-
-export const CYBER_EQ_COL =
-  'flex-1 rounded-[1px] min-h-[3px] bg-[linear-gradient(0deg,#00f0ff_0%,#ffe600_65%,#ff007f_100%)] [transition:height_0.1s_ease] [[data-theme=win95]_&]:bg-none [[data-theme=win95]_&]:bg-[#00ff00] [[data-theme=terminal]_&]:bg-none [[data-theme=terminal]_&]:bg-[#33ff33] [[data-theme=terminal]_&]:shadow-[0_0_4px_#33ff33]';
-
-export const CYBER_TRANSPORT_CLUSTER =
-  'grid gap-1.5 py-1 px-1 rounded-md bg-black/40 border border-white/[0.08] [grid-template-columns:1fr_1.5fr_1fr] [[data-theme=win95]_&]:bg-[#c0c0c0] [[data-theme=win95]_&]:border-[#808080] [[data-theme=terminal]_&]:bg-[#000800] [[data-theme=terminal]_&]:border-[#33ff33]';
-
-export const CYBER_DECK_KEY =
-  'relative flex flex-col items-center justify-center py-[5px] px-1 rounded-[5px] text-(--text-main) cursor-pointer overflow-hidden bg-[linear-gradient(180deg,rgba(35,15,70,.8)_0%,rgba(15,5,35,.95)_100%)] border-[1.5px] border-[rgba(0,240,255,.35)] shadow-[0_3px_8px_rgba(0,0,0,.5),inset_0_1px_1px_rgba(255,255,255,.15)] [transition:all_0.18s_cubic-bezier(.2,.8,.2,1)] hover:border-(--accent-cyan) hover:bg-[linear-gradient(180deg,rgba(50,25,95,.9)_0%,rgba(20,8,45,.95)_100%)] hover:shadow-[0_0_12px_rgba(0,240,255,.4),inset_0_1px_1px_rgba(255,255,255,.25)] hover:-translate-y-px active:translate-y-px active:shadow-[0_2px_4px_rgba(0,0,0,.6)] [[data-theme=win95]_&]:bg-none [[data-theme=win95]_&]:bg-[#c0c0c0] [[data-theme=win95]_&]:border-t-2 [[data-theme=win95]_&]:border-t-white [[data-theme=win95]_&]:border-l-2 [[data-theme=win95]_&]:border-l-white [[data-theme=win95]_&]:border-r-2 [[data-theme=win95]_&]:border-r-[#808080] [[data-theme=win95]_&]:border-b-2 [[data-theme=win95]_&]:border-b-[#808080] [[data-theme=win95]_&]:shadow-none [[data-theme=win95]_&]:rounded-none [[data-theme=win95]_&]:text-black [[data-theme=win95]_&]:active:border-t-[#808080] [[data-theme=win95]_&]:active:border-l-[#808080] [[data-theme=win95]_&]:active:border-r-white [[data-theme=win95]_&]:active:border-b-white [[data-theme=terminal]_&]:bg-none [[data-theme=terminal]_&]:bg-[#001200] [[data-theme=terminal]_&]:border [[data-theme=terminal]_&]:border-[#33ff33] [[data-theme=terminal]_&]:text-[#33ff33] [[data-theme=terminal]_&]:shadow-[0_0_8px_rgba(51,255,51,.3)]';
-
-export const CYBER_DECK_KEY_PLAY =
-  'bg-[linear-gradient(180deg,rgba(255,0,127,.3)_0%,rgba(13,2,33,.95)_100%)] border-[1.5px] border-(--accent-pink) shadow-[0_0_12px_rgba(255,0,127,.35),inset_0_1px_2px_rgba(255,255,255,.2)] hover:border-white hover:shadow-[0_0_18px_rgba(255,0,127,.75),inset_0_1px_2px_rgba(255,255,255,.3)] hover:-translate-y-px';
-
-export const CYBER_DECK_KEY_PLAY_ACTIVE =
-  'bg-[linear-gradient(180deg,rgba(255,0,127,.6)_0%,rgba(120,0,60,.95)_100%)] border-white shadow-[0_0_18px_rgba(255,0,127,.8),inset_0_0_8px_rgba(255,255,255,.3)]';
-
-export const CYBER_KEY_ICON = 'text-[0.8rem] leading-none mb-px [text-shadow:0_0_8px_currentColor]';
-
-export const CYBER_KEY_LABEL =
-  '[font-family:var(--font-display)] font-black text-[0.6rem] tracking-[0.5px] leading-none';
-
-export const CYBER_KEY_SUB =
-  '[font-family:var(--font-mono)] text-[0.46rem] opacity-70 tracking-[0.3px] mt-px';
-
-export const CYBER_VOL_CONSOLE =
-  'flex flex-col gap-1.5 py-2 px-2.5 rounded-md bg-[rgba(10,2,28,.85)] border border-[rgba(0,240,255,.3)] shadow-[inset_0_0_10px_rgba(0,0,0,.7)] [[data-theme=win95]_&]:bg-[#c0c0c0] [[data-theme=win95]_&]:border-[#808080] [[data-theme=terminal]_&]:bg-[#000a00] [[data-theme=terminal]_&]:border-[#33ff33]';
-
-export const CYBER_FADER_TRACK_ROW = 'flex items-center gap-2';
-
-export const CYBER_VOL_STEP_BTN =
-  'w-[22px] h-[22px] rounded flex items-center justify-center p-0 cursor-pointer bg-(--bg-secondary) border border-(--border-color) text-(--accent-cyan) [font-family:var(--font-mono)] font-black text-[0.75rem] [transition:all_0.15s_ease] hover:bg-(--accent-cyan) hover:text-[#0d0221] hover:shadow-[0_0_8px_var(--accent-cyan)]';
-
-export const CYBER_VOL_LED_BAR =
-  'flex gap-[3px] flex-1 h-3.5 py-0.5 px-[3px] rounded-[3px] bg-black/70 border border-white/10 cursor-pointer';
-
-export const CYBER_VOL_LED_SEGMENT =
-  'flex-1 rounded-[1px] bg-white/[0.08] [transition:all_0.12s_ease]';
-
-const LED_THEME_OVERRIDE =
-  '[[data-theme=win95]_&]:bg-[#00ff00] [[data-theme=win95]_&]:shadow-none [[data-theme=terminal]_&]:bg-[#33ff33] [[data-theme=terminal]_&]:shadow-[0_0_4px_#33ff33]';
-
-export const LED_LIT_CYAN = `bg-[#00f0ff] shadow-[0_0_6px_#00f0ff] ${LED_THEME_OVERRIDE}`;
-
-export const LED_LIT_AMBER = `bg-[#ffe600] shadow-[0_0_6px_#ffe600] ${LED_THEME_OVERRIDE}`;
-
-export const LED_LIT_PINK = `bg-[#ff007f] shadow-[0_0_8px_#ff007f] ${LED_THEME_OVERRIDE}`;
+export const COL_12 = 'col-span-12';
 
 export const RETRO_FOOTER =
   'text-center p-5 bg-(--bg-card) [border:var(--card-border-style)] mt-5 text-[0.85rem] text-(--text-muted)';
