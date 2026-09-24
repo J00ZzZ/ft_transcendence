@@ -27,10 +27,10 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { GoogleAuthGuard, GithubAuthGuard, FortyTwoAuthGuard } from './oauth.guards';
 import { requireSecret, isTunnelRequest } from '../secrets';
 
-// Access-token cookie: JwtStrategy reads this exact name. Short-lived.
+// Access-token cookie: JwtStrategy reads this
 const ACCESS_COOKIE = 'token';
-const ACCESS_MAX_AGE_MS = 15 * 60 * 1000; // 15 min, matches JwtModule expiresIn
-// Refresh-token cookie: only the auth routes need it, so it's scoped to
+const ACCESS_MAX_AGE_MS = 15 * 60 * 1000; // 15 min
+// Refresh-token cookie, only the auth routes need it, so it's scoped to
 // /api/auth rather than sent on every API call. Long-lived.
 const REFRESH_COOKIE = 'refresh_token';
 const REFRESH_PATH = '/api/auth';
@@ -41,8 +41,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const LOCAL_FRONTEND_URL = requireSecret('FRONTEND_URL');
 const NGROK_FRONTEND_URL = requireSecret('NGROK_FRONTEND_URL');
 
-// Picked per request from the Host header : a tunnel and a local client can
-// both be live against the same backend (same signal oauth.guards.ts uses).
+// After oauth, redirect user to ngrok/local address
 function frontendUrlFor(req: Request): string {
   return isTunnelRequest(req.get('host')) ? NGROK_FRONTEND_URL : LOCAL_FRONTEND_URL;
 }
@@ -51,27 +50,20 @@ function originFromRequest(req: Request): string {
   const forwarded = req.headers['x-forwarded-proto'];
   const forwardedProto = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : '';
   const proto = forwardedProto || req.protocol || 'https';
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- intentional fallback for missing Host header
   return `${proto}://${req.get('host') || 'localhost:8443'}`;
 }
 
 @Controller('api/auth')
-// HTTP routes for everything auth-related: register/login/2FA, session
-// refresh/logout, profile updates, and the OAuth login/callback routes.
-// Delegates the actual work to AuthService.
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  // Each register call sends a real email, so the route is tightly throttled
-  // against account spam / mail bombing.
   @Throttle({ default: { limit: 3, ttl: HOUR_MS } })
+  // POST /register
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() req: Request) {
     return this.authService.register(dto, originFromRequest(req));
   }
 
-  // The emailed verification link opens in a browser tab, so it answers with a
-  // redirect to the SPA rather than JSON.
+  // GET /verify-email
   @Get('verify-email')
   async verifyEmail(@Req() req: Request, @Res() res: Response, @Query('token') token?: string) {
     const ok = await this.authService.verifyEmail(token ?? '');
@@ -80,9 +72,7 @@ export class AuthController {
     );
   }
 
-  // Factor one. 2FA off → session cookies; 2FA on → { pendingToken }, no
-  // session; an unverified address → a notice, also with no session. Brute-force
-  // surface, so tightly throttled.
+  // POST /login
   @Throttle({ default: { limit: 5, ttl: MINUTE_MS } })
   @Post('login')
   @HttpCode(200)
@@ -103,8 +93,7 @@ export class AuthController {
     return { twoFactorRequired: false, user: result.user };
   }
 
-  // Factor two. Throttled because challenge-level attempt caps can be
-  // sidestepped by starting new challenges; this bounds how fast.
+  // POST /2fa/verify
   @Throttle({ default: { limit: 5, ttl: MINUTE_MS } })
   @Post('2fa/verify')
   @HttpCode(200)
@@ -117,8 +106,8 @@ export class AuthController {
     return { user };
   }
 
-  // Silent re-auth via refresh cookie only. Looser throttle on purpose :
-  // apiFetch calls this automatically on any 401 (multi-tab users burst).
+  // POST /refresh - swaps a refresh token for new access token
+  // Reads the refresh cookie and sets both cookies again
   @Throttle({ default: { limit: 30, ttl: MINUTE_MS } })
   @Post('refresh')
   @HttpCode(200)
@@ -130,8 +119,7 @@ export class AuthController {
     return { user };
   }
 
-  // Password reset step one. Always answers with the same generic message
-  // (no account enumeration) : but sends a real email, so it's throttled.
+  // POST /forgot-password
   @Throttle({ default: { limit: 3, ttl: HOUR_MS } })
   @Post('forgot-password')
   @HttpCode(200)
@@ -139,9 +127,7 @@ export class AuthController {
     return this.authService.forgotPassword(dto.email, originFromRequest(req));
   }
 
-  // Password reset, step two: the emailed token + a new password.
-  // The reset token is a 32-byte random value, so guessing it is not feasible;
-  // this rate limit only removes the option of trying at speed.
+  // POST /reset-password
   @Throttle({ default: { limit: 5, ttl: 15 * MINUTE_MS } })
   @Post('reset-password')
   @HttpCode(200)
@@ -149,10 +135,11 @@ export class AuthController {
     return this.authService.resetPassword(dto.token, dto.password);
   }
 
+  // POST /logout
   @Post('logout')
   @HttpCode(200)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    // Revoke the refresh token server-side so it can't be reused, then drop
+    // Revoke the refresh token server-side so it can't be reused then drop
     // both cookies. clearCookie must repeat the path the cookie was set with.
     await this.authService.logout(req.cookies[REFRESH_COOKIE]);
     res.clearCookie(ACCESS_COOKIE, { path: '/' });
@@ -160,6 +147,7 @@ export class AuthController {
     return { ok: true };
   }
 
+  // useguards(JWT) are for routes that need to be logged in
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@Req() req: Request) {
@@ -169,14 +157,14 @@ export class AuthController {
     return { user: profile.user };
   }
 
-  // **Get full profile (used by the Edit-Profile card)**
+  // Get full profile (used by the Edit-Profile card)
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Req() req: Request) {
     return this.authService.getProfile((req.user as { id: string }).id);
   }
 
-  // **Complete profile update (username / email / 2FA method)**
+  // Complete profile update (username / email / 2FA method)
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
@@ -188,7 +176,7 @@ export class AuthController {
     };
   }
 
-  // **Change password while logged in**
+  // Change password while logged in
   @UseGuards(JwtAuthGuard)
   @Patch('profile/password')
   async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
@@ -200,7 +188,7 @@ export class AuthController {
     );
   }
 
-  // **Permanently delete the account (password-verified)**
+  // Permanently delete the account (password-verified)
   @UseGuards(JwtAuthGuard)
   @Delete('profile')
   @HttpCode(200)
@@ -216,7 +204,7 @@ export class AuthController {
     return { message: 'Account permanently deleted' };
   }
 
-  // **2FA preference (logged-in user toggles their own)**
+  // 2FA preference (logged-in user toggles their own)
   @UseGuards(JwtAuthGuard)
   @Get('2fa')
   getTwoFactor(@Req() req: Request) {
@@ -329,9 +317,9 @@ export class AuthController {
   // path /api/auth) httpOnly cookies after a successful login.
   private setSessionCookies(res: Response, accessToken: string, refreshToken: string) {
     const base = {
-      httpOnly: true as const,
-      sameSite: 'lax' as const,
-      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true as const, // Javascript on page cannot read
+      sameSite: 'lax' as const, // other website can't quietly make authenticated requests as us
+      secure: process.env.NODE_ENV === 'production', // HTTPS only
     };
     // Access token: path '/' so it rides along on every /api call for verification.
     res.cookie(ACCESS_COOKIE, accessToken, { ...base, path: '/', maxAge: ACCESS_MAX_AGE_MS });
