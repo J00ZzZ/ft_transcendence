@@ -20,7 +20,7 @@ export function advanceTurnInState(state: GameState): void {
   if (state.paused) {
     const pausedPlayer = state.players.find((p) => p.color === state.pauseTurnOwner);
     if (pausedPlayer?.status === 'active' || pausedPlayer?.status === 'exited') {
-      // No longer in grace window — clear pause and continue advancing
+      // Past the grace window: clear the pause and continue advancing
       delete state.paused;
       delete state.pauseTurnOwner;
       delete state.pausedReason;

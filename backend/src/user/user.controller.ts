@@ -19,8 +19,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { isImageValid } from '../avatar/image-signature.util';
 
 // User routes: public profile/history plus authenticated avatar upload, fetch and
-// delete. Avatars are cacheable but revalidated (no-cache + ETag); the full
-// contract is in docs/avatar-system.md.
+// delete. Avatars are cacheable but revalidated (no-cache + ETag).
 interface UploadedAvatarFile {
   mimetype: string;
   buffer: Buffer;

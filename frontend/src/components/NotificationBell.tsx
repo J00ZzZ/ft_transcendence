@@ -228,8 +228,8 @@ export function NotificationBell({
   const list = Array.isArray(notifications) ? notifications : [];
   const count = typeof unreadCount === 'number' ? unreadCount : list.filter((n) => !n.read).length;
 
-  // Close dropdown when clicking outside (either the trigger or the
-  // portaled dropdown itself, which no longer lives inside `ref`).
+  // Close the dropdown on an outside click, on either the trigger or the
+  // portaled dropdown (the portal renders outside `ref`).
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {

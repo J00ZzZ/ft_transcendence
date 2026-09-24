@@ -12,9 +12,6 @@ import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   HERO_SUBTITLE,
@@ -235,10 +232,8 @@ export function Home() {
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // 2. Distant Sun. The disc is drawn and the scanlines are stroked through
-      //    one shared clip path: the scanline strokes are wider than the disc
-      //    is at the top, so without the clip they used to extend past the
-      //    sun's silhouette and read as black bars flanking the sun.
+      // 2. Distant Sun: the disc and its scanlines share one clip path, so a
+      //    scanline stroke cannot reach past the sun's silhouette.
       const sunY = 250;
       const sunRadius = 90;
       const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, sunRadius);
@@ -355,12 +350,8 @@ export function Home() {
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div
@@ -621,7 +612,8 @@ export function Home() {
                                 style={{
                                   padding: 2,
                                   borderRadius: 5,
-                                  background: 'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                                  background:
+                                    'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
                                   boxShadow: '0 0 8px rgba(0, 240, 255, 0.3)',
                                 }}
                               >

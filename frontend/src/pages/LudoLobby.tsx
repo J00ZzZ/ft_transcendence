@@ -12,9 +12,6 @@ import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   HERO_SUBTITLE,
@@ -227,12 +224,8 @@ export function LudoLobby() {
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`} id="crtScreen">

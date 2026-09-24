@@ -143,7 +143,6 @@ export const fr = {
     tacticalHudTitle: 'HUD TACTIQUE // TABLEAU DE BORD DU PILOTE',
     tacticalHudSubtitle: 'TÉLÉMÉTRIE DE COMBAT EN DIRECT, SUCCÈS CYBER & JOURNAUX DE RECO',
     callsignBadge: '// INDICATIF : {{username}}',
-    rankBadge: '// RANG : {{name}} ({{rating}} ELO)',
     achievementsBadge: '// SUCCÈS : {{unlocked}}/13 DÉBLOQUÉS',
     pilotDossierTitle: '👤 DOSSIER DU PILOTE // APERÇU DE L\'INDICATIF',
     combatStatusText: '// STATUT DE COMBAT : PILOTE ACTIF • {{badge}} • ELO {{rating}}',
@@ -155,15 +154,6 @@ export const fr = {
     defeatedRank: 'DÉFAITE // RANG #{{rank}}',
     combatantsCount: '{{count}} COMBATTANTS',
     cyberVaultTitle: '🏆 CYBER COFFRE // SUCCÈS ({{unlocked}}/15)',
-  },
-  ranks: {
-    mamee: 'MAMEE MONSTER',
-    milo: 'MILO DINOSAUR',
-    paddle: 'PADDLE POP',
-    honey: 'HONEY STARS',
-    choki: 'CHOKI CHOKI',
-    super: 'PADDLE POP',
-    rankTierTooltip: 'Échelon de rang : {{name}}',
   },
   notifications: {
     title: 'NOTIFICATIONS',

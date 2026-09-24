@@ -36,8 +36,7 @@ The Leaderboard page (`/leaderboard`, full-screen) shows players in rank order. 
 |------|------|
 | `src/pages/Leaderboard.tsx` | Leaderboard page — podium, rankings table, you-badge |
 | `src/components/UserAvatar.tsx` | Player avatars |
-| `src/components/RankBadge.tsx` | Rank tier badges |
-| `src/utils/ranks.ts` | `getRankTier` rating → tier mapping |
+
 
 
 ---
@@ -98,7 +97,7 @@ sequenceDiagram
   ├── GET /api/leaderboard?mode=global&limit=50
   │   ├── Success → render podium + table + you-badge
   │   └── Failure → render the empty state
-  └── getRankTier(rating) → tier badge per row
+  └── Render each row with its rank, rating and the "you" badge
 ```
 
 
@@ -111,5 +110,4 @@ sequenceDiagram
 | Dependency | Purpose |
 |-----------|---------|
 | `store.tsx` | `useApp` for current user |
-| `utils/ranks.ts` | Rank tier badges |
 | `i18n.ts` | `useTranslation` (`leaderboard.*` keys) |

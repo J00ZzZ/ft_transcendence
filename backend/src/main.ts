@@ -9,7 +9,7 @@ import { PrismaService } from './prisma.service';
 
 // Maps a failing validation (property + class-validator constraint) to a stable
 // code the frontend localizes (errors.<CODE>). Constraints without an entry keep
-// their English message, so nothing regresses. See docs/API-list.md.
+// their English message, so nothing regresses.
 const VALIDATION_CODES: Record<string, string> = {
   'username.matches': 'VALIDATION_USERNAME_FORMAT',
   'code.matches': 'VALIDATION_CODE_FORMAT',

@@ -142,7 +142,6 @@ export const ms = {
     tacticalHudTitle: 'HUD TAKTIKAL // PAPAN PEMUKA PILOT',
     tacticalHudSubtitle: 'TELEMETRI PERTEMPURAN LANGSUNG, PENCAPAIAN SIBER & LOG PENINJAUAN',
     callsignBadge: '// TANDA PANGGILAN: {{username}}',
-    rankBadge: '// PANGKAT: {{name}} ({{rating}} ELO)',
     achievementsBadge: '// PENCAPAIAN: {{unlocked}}/13 DIBUKA',
     pilotDossierTitle: '👤 DOSIER PILOT // GAMBARAN KESELURUHAN PANGGILAN',
     combatStatusText: '// STATUS PERTEMPURAN: PILOT AKTIF • {{badge}} • ELO {{rating}}',
@@ -154,15 +153,6 @@ export const ms = {
     defeatedRank: 'TEWAS // KEDUDUKAN #{{rank}}',
     combatantsCount: '{{count}} PEJUANG',
     cyberVaultTitle: '🏆 KEBAL SIBER // PENCAPAIAN ({{unlocked}}/15)',
-  },
-  ranks: {
-    mamee: 'MAMEE MONSTER',
-    milo: 'MILO DINOSAUR',
-    paddle: 'PADDLE POP',
-    honey: 'HONEY STARS',
-    choki: 'CHOKI CHOKI',
-    super: 'PADDLE POP',
-    rankTierTooltip: 'Tier Pangkat: {{name}}',
   },
   notifications: {
     title: 'PEMBERITAHUAN',

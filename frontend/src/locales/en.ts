@@ -142,7 +142,6 @@ export const en = {
     tacticalHudTitle: 'TACTICAL HUD // PILOT DASHBOARD',
     tacticalHudSubtitle: 'LIVE COMBAT TELEMETRY, CYBER ACHIEVEMENTS & RECON LOGS',
     callsignBadge: '// CALLSIGN: {{username}}',
-    rankBadge: '// RANK: {{name}} ({{rating}} ELO)',
     achievementsBadge: '// ACHIEVEMENTS: {{unlocked}}/13 UNLOCKED',
     pilotDossierTitle: '👤 PILOT DOSSIER // CALLSIGN OVERVIEW',
     combatStatusText: '// COMBAT STATUS: ACTIVE PILOT • {{badge}} • ELO {{rating}}',
@@ -154,15 +153,6 @@ export const en = {
     defeatedRank: 'DEFEATED // RANK #{{rank}}',
     combatantsCount: '{{count}} COMBATANTS',
     cyberVaultTitle: '🏆 CYBER VAULT // ACHIEVEMENTS ({{unlocked}}/15)',
-  },
-  ranks: {
-    mamee: 'MAMEE MONSTER',
-    milo: 'MILO DINOSAUR',
-    paddle: 'PADDLE POP',
-    honey: 'HONEY STARS',
-    choki: 'CHOKI CHOKI',
-    super: 'PADDLE POP',
-    rankTierTooltip: 'Rank Tier: {{name}}',
   },
   notifications: {
     title: 'NOTIFICATIONS',

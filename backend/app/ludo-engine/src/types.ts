@@ -26,7 +26,7 @@ export interface PlayerMeta {
   userId?: string;
   // Avatar facts read from the backend's Redis cache at join time (the engine
   // has no database access). False when there is no photo, so the client can
-  // skip a request that would 404. See docs/avatar-system.md.
+  // skip a request that would 404.
   hasAvatarPhoto: boolean;
   avatarStyle?: string; // dicebear style used when there is no photo
   piecesInGoal: number; // pieces that reached the goal

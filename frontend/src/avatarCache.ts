@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 // Client avatar state, keyed by the immutable user id: the state the server last
 // announced per user, a change stamp per user, and the ids whose image failed to
-// load. See docs/avatar-system.md.
+// load.
 
 export type AvatarOverride = { has: boolean; style?: string | null; v?: number };
 
@@ -34,7 +34,7 @@ export function useAvatarRevision(): number {
 
 // The server announced this user's avatar state (SSE avatar_changed, or our own
 // upload/delete). Clears any "broken" verdict so a re-upload gets one more try.
-// The stamp becomes the URL's `?v=`; see docs/avatar-system.md.
+// The stamp becomes the URL's `?v=`.
 export function applyAvatarChange(userId: string, override: AvatarOverride): void {
   if (!userId) return;
   const v = override.v ?? Date.now();

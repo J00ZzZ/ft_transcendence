@@ -149,7 +149,7 @@ export class MatchPostgameService {
     });
 
     // Post-game achievements hook : MUST never fail the game-end request.
-    // A failure only logs (see achievement-revamp.md Phase 3 failure contract).
+    // A failure only logs.
     await this.achievements.evaluateAfterGame(gameId).catch((err) => {
       console.warn(`Achievements evaluation failed for game ${gameId}:`, err);
     });

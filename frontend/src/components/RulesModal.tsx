@@ -5,7 +5,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** Full-screen overlay explaining classic Ludo rules — content sourced from docs/Ludo Rules.md. */
+/** Full-screen overlay explaining the classic Ludo rules. */
 export function RulesModal({ onClose }: Props) {
   const { t } = useTranslation();
 

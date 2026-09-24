@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { GRID_BACKGROUND, SYNTHWAVE_SUN, GRID_HORIZON, PERSPECTIVE_GRID } from '../styles/tw';
+import { GRID_BACKGROUND } from '../styles/tw';
 
 /**
- * Full-bleed Retrowave auth shell (grid + sun, glass card) matching Home.tsx.
+ * Full-bleed retrowave auth shell: shared cityscape background plus a glass card.
  */
 export function RetroAuthLayout({ tag, children }: { tag?: string; children: ReactNode }) {
   return (
@@ -19,12 +19,8 @@ export function RetroAuthLayout({ tag, children }: { tag?: string; children: Rea
         overflowX: 'hidden',
       }}
     >
-      {/* Animated 3D Synthwave Grid & Sun Background (Identical to Home page) */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* Centered glassmorphism card wrapper */}
       <div

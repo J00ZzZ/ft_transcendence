@@ -75,7 +75,6 @@ export class LudoEngine {
 
   // Seeded PRNG (mulberry32): one fresh generator per roll, seeded from
   // Math.random() so the die stream is isolated from other Math.random() use.
-  // See docs/ludo-engine/ludo-engine-core-system.md (Dice Roll → The dice math).
   private static seededRand(seed: number): () => number {
     let s = seed >>> 0;
     return () => {
@@ -220,7 +219,7 @@ export class LudoEngine {
 
       // pieceId must be in pendingLegalMoves, a snapshot taken at roll time: a
       // disconnect between roll and move is rejected here, and the capture is not
-      // re-derived. See docs/ludo-engine/ludo-engine-core-system.md (Move validation).
+      // re-derived.
       const pendingMove = state.pendingLegalMoves.find((m) => m.pieceId === pieceId);
       if (!pendingMove) {
         throw new Error('Invalid move: piece not in legal moves');

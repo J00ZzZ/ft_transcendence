@@ -13,9 +13,6 @@ import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   RETRO_WINDOW,
@@ -88,9 +85,7 @@ const STATUS_KEYS: Record<PresenceStatus, string> = {
   offline: 'friends.offline',
 };
 
-/**
- * The 13 visible achievements; see docs/frontend/frontend-profile-module.md.
- */
+/** The 13 visible achievements. */
 const ACHIEVEMENTS_DEF = [
   {
     key: 'achFirstBlood',
@@ -343,12 +338,8 @@ export function Profile() {
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`} id="crtScreen">
@@ -497,7 +488,8 @@ export function Profile() {
                         width: 260,
                         height: 260,
                         borderRadius: '50%',
-                        background: 'radial-gradient(circle, rgba(0, 240, 255, 0.4) 0%, rgba(0,0,0,0) 70%)',
+                        background:
+                          'radial-gradient(circle, rgba(0, 240, 255, 0.4) 0%, rgba(0,0,0,0) 70%)',
                         opacity: 0.25,
                         pointerEvents: 'none',
                       }}
@@ -511,7 +503,8 @@ export function Profile() {
                           style={{
                             padding: 4,
                             borderRadius: 8,
-                            background: 'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                            background:
+                              'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
                             boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)',
                           }}
                         >
@@ -772,9 +765,11 @@ export function Profile() {
                     <div
                       style={{
                         borderRadius: 10,
-                        background: 'radial-gradient(circle at center, rgba(0, 240, 255, 0.15) 0%, rgba(8, 2, 26, 0.95) 85%)',
+                        background:
+                          'radial-gradient(circle at center, rgba(0, 240, 255, 0.15) 0%, rgba(8, 2, 26, 0.95) 85%)',
                         border: '2px solid var(--accent-cyan)',
-                        boxShadow: '0 0 24px rgba(0, 240, 255, 0.35), inset 0 0 16px rgba(0, 0, 0, 0.7)',
+                        boxShadow:
+                          '0 0 24px rgba(0, 240, 255, 0.35), inset 0 0 16px rgba(0, 0, 0, 0.7)',
                         padding: '14px 18px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -802,7 +797,8 @@ export function Profile() {
                           color: '#ffffff',
                           fontFamily: 'var(--font-display)',
                           margin: '3px 0 6px',
-                          textShadow: '0 0 18px rgba(0, 240, 255, 0.6), 0 0 35px rgba(0, 240, 255, 0.3)',
+                          textShadow:
+                            '0 0 18px rgba(0, 240, 255, 0.6), 0 0 35px rgba(0, 240, 255, 0.3)',
                           lineHeight: 1,
                           letterSpacing: '0.03em',
                         }}
@@ -832,9 +828,11 @@ export function Profile() {
                     <div
                       style={{
                         borderRadius: 10,
-                        background: 'radial-gradient(circle at center, rgba(255, 215, 0, 0.15) 0%, rgba(8, 2, 26, 0.95) 85%)',
+                        background:
+                          'radial-gradient(circle at center, rgba(255, 215, 0, 0.15) 0%, rgba(8, 2, 26, 0.95) 85%)',
                         border: '2px solid #ffd700',
-                        boxShadow: '0 0 24px rgba(255, 215, 0, 0.35), inset 0 0 16px rgba(0, 0, 0, 0.7)',
+                        boxShadow:
+                          '0 0 24px rgba(255, 215, 0, 0.35), inset 0 0 16px rgba(0, 0, 0, 0.7)',
                         padding: '14px 18px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -862,7 +860,8 @@ export function Profile() {
                           color: '#ffd700',
                           fontFamily: 'var(--font-display)',
                           margin: '3px 0 6px',
-                          textShadow: '0 0 18px rgba(255, 215, 0, 0.6), 0 0 35px rgba(255, 215, 0, 0.3)',
+                          textShadow:
+                            '0 0 18px rgba(255, 215, 0, 0.6), 0 0 35px rgba(255, 215, 0, 0.3)',
                           lineHeight: 1,
                           letterSpacing: '0.03em',
                         }}
@@ -1656,7 +1655,8 @@ export function Profile() {
                                         style={{
                                           padding: 2,
                                           borderRadius: 5,
-                                          background: 'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                                          background:
+                                            'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
                                           boxShadow: '0 0 8px rgba(0, 240, 255, 0.3)',
                                         }}
                                       >

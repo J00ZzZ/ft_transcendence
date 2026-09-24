@@ -42,7 +42,7 @@ An error response has one of two shapes:
 | Code | HTTP | Meaning |
 |---|---|---|
 | `AUTH_USERNAME_TAKEN` | 409 | Username already registered |
-| `AUTH_EMAIL_TAKEN` | 409 | Email already registered |
+| `AUTH_EMAIL_TAKEN` | 409 | Email already registered, or already used by another account when linking a provider |
 | `AUTH_INVALID_CREDENTIALS` | 401 | Wrong username/email or password |
 | `AUTH_RESET_LINK_INVALID` | 401 | Reset link invalid or expired |
 | `AUTH_CODE_INVALID` | 401 | 2FA code invalid or expired |
@@ -1404,7 +1404,7 @@ Called by ludo-engine when a game finishes. 🤖 Does not require JWT — authen
 **Errors:** 400 if `gameId` is missing, `participants` is missing or empty, or a PvP result carries fewer than 2 entries. Re-sending the same `gameId` is safe (idempotent — returns `"Game already processed"` without double-awarding points).
 
 **Side effects:**
-- Writes the `game` row and one `game_participant` row per participant (humans only)
+- Writes the `Game` row and one `GameParticipant` row per participant (humans only)
 - Updates each participant's `User` row: `rating` (clamped at 0), `highestRating`, `wins`, `losses`, `humanWins`, `botWins`, `winStreak`, `bestWinStreak`, `pveGameStreak` (scoring via `ratingDeltaFor()`)
 - Evaluates achievements for all participants (fires unlock notifications)
 - Sends a `match_finished` notification to every human participant

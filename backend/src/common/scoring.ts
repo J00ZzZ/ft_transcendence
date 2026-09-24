@@ -3,7 +3,6 @@ export const WIN_BONUS_PIECE = 1;
 
 // Rating change for one finished game: each piece that reached the goal is worth
 // POINTS_PER_PIECE (half in PvE), plus WIN_BONUS_PIECE for the winner.
-// See docs/backend/backend-player-stats-module.md (Rating Delta).
 export function ratingDeltaFor(input: {
   piecesInGoal: number;
   rank: number;

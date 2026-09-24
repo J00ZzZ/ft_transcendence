@@ -49,15 +49,7 @@ export function RetroNavbar({
 }: RetroNavbarProps) {
   const { t } = useTranslation();
   const route = useRoute();
-  const {
-    user,
-    logout,
-    lang,
-    setLang,
-    twoFactor,
-    toggleTwoFactor,
-    setActiveMatch,
-  } = useApp();
+  const { user, logout, lang, setLang, twoFactor, toggleTwoFactor, setActiveMatch } = useApp();
   const currentPath = activeRoute ?? route.path;
 
   // Below `xl` (1280px) the sidebar collapses to an icon rail; labels are

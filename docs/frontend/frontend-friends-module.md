@@ -36,7 +36,7 @@ The Friends page (`/friends`, full-screen) manages friendships. It has:
 |------|------|
 | `src/pages/Friends.tsx` | Friends page — lists, requests, blocked, invite, actions |
 | `src/components/UserAvatar.tsx` | Player avatars |
-| `src/components/RankBadge.tsx` | Rank badges |
+
 
 
 ---
@@ -129,4 +129,4 @@ Invite → POST /api/friends/{friendId}/invite → setActiveMatch(res) → navig
 | `store.tsx` | `useApp` for user, setActiveMatch (invite flow) |
 | `router.tsx` | `navigate` |
 | `i18n.ts` | `useTranslation` (`friends.*` keys) |
-| `utils/ranks.ts` | Rank badges |
+

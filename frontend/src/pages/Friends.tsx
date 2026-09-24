@@ -12,9 +12,6 @@ import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   BADGE_BAR,
@@ -265,12 +262,8 @@ export function Friends() {
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div
@@ -645,7 +638,8 @@ export function Friends() {
                                     style={{
                                       padding: 2,
                                       borderRadius: 6,
-                                      background: 'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                                      background:
+                                        'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
                                       boxShadow: '0 0 10px rgba(0, 240, 255, 0.3)',
                                     }}
                                   >

@@ -1,6 +1,4 @@
-// Shared Tailwind utility strings for classes reused across components; each
-// constant is the utility equivalent of the CSS rule it replaced. Rationale
-// and per-constant notes: docs/frontend/frontend-components-system.md.
+// Shared Tailwind utility strings for classes reused across components.
 
 export const RETRO_BTN =
   'inline-flex items-center gap-1.5 px-4 py-2.5 uppercase cursor-pointer outline-none text-[0.7rem] text-[var(--text-main)] bg-[var(--btn-bg)] border-2 border-[var(--accent-cyan)] shadow-[var(--box-shadow)] [font-family:var(--font-heading)] [transition:all_0.2s_ease] hover:-translate-y-0.5 hover:shadow-[var(--btn-hover-shadow)] active:translate-y-px';
@@ -67,12 +65,6 @@ export const CRT_SCREEN = 'relative z-10 min-h-screen';
 // Synthwave cityscape background
 export const GRID_BACKGROUND =
   "fixed inset-0 w-full h-full z-0 pointer-events-none overflow-hidden bg-cover bg-center bg-no-repeat bg-[url('/synthwave-cityscape.jpeg')] after:content-[''] after:absolute after:inset-0 after:bg-[linear-gradient(to_bottom,rgba(13,2,33,0.3)_0%,rgba(13,2,33,0.5)_100%)]";
-
-export const SYNTHWAVE_SUN = 'hidden';
-
-export const PERSPECTIVE_GRID = 'hidden';
-
-export const GRID_HORIZON = 'hidden';
 
 export const APP_WRAPPER =
   'max-w-[calc(100vw-335px)] w-[calc(100%-325px)] ml-[310px] mr-auto p-[14px_20px_20px] relative z-10 box-border';

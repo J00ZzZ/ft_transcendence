@@ -14,7 +14,7 @@ interface MessageEvent {
 
 // SSE keep-alive: a named `ping` frame every 20s, not the client's presence
 // heartbeat. An idle stream gets reset and SSE has no replay, so an
-// avatar_changed sent during a reset is lost. See docs/architecture.md.
+// avatar_changed sent during a reset is lost.
 const SSE_HEARTBEAT_MS = 20_000;
 
 @Controller()

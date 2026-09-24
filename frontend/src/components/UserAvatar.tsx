@@ -84,7 +84,7 @@ export function UserAvatar({
   const fallbackSrc = dicebearAvatar(username, override?.style ?? avatarStyle);
   // The `?v=` stamp forces a real fetch: an unchanged URL can come from the
   // browser's in-memory image cache with no request, so `no-cache` never
-  // revalidates. See docs/avatar-system.md.
+  // revalidates.
   const src = usePhoto
     ? `/api/user/id/${userId}/avatar${override?.v ? `?v=${override.v}` : ''}`
     : fallbackSrc;

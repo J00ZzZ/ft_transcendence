@@ -20,7 +20,7 @@
 
 The ludo-engine exposes a Socket.IO server on port 3001. All game communication happens through events. The engine requires JWT authentication in the handshake `auth` object.
 
-The server is started by `index.ts` which calls `SocketServer.start(3001)`. The `SocketServer` class in `socket/server.ts` registers all event handlers and manages the `engine` (game state machine) and `redisGameStore` (persistence).
+The server is started by `index.ts` which calls `SocketServer.start(3001)`. The `SocketServer` class in `socket/server.ts` registers all event handlers and holds the `engine` (game state machine) and the `store` (`RedisGameStore`, persistence).
 
 
 ---

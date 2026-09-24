@@ -40,15 +40,8 @@
    GLOBAL & RESET STYLES
    -------------------------------------------------------------------------- */
 
-/* Removed a redundant `* { box-sizing; margin: 0; padding: 0 }` reset here —
-   this file is imported as a plain (unlayered) stylesheet, so that rule sat
-   outside Tailwind's cascade layers and, per the CSS layers spec, ANY
-   unlayered rule beats ANY rule in a layer (incl. `@layer utilities`)
-   regardless of specificity. It was silently zeroing out every margin/
-   padding utility class site-wide (m-*, p-*, gap unaffected). Tailwind's
-   own preflight (`@layer base`) already applies the identical reset, so
-   deleting this restores normal utility-wins-over-base cascade behavior
-   with no loss of the reset itself. */
+/* No CSS reset here; Tailwind's preflight (imported by `index.css`) supplies it.
+   This file is unlayered, so a rule added here beats every utility class. */
 
 html,
 body {
@@ -85,29 +78,11 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   SYNTHWAVE 3D ANIMATED GRID BACKGROUND
-   -------------------------------------------------------------------------- */
-
-/* Kept for GRID_BACKGROUND/SYNTHWAVE_SUN/PERSPECTIVE_GRID/GRID_HORIZON in
-   tw.ts, which apply this animation via an arbitrary `animation:` value. */
-@keyframes grid-scroll {
-  0% {
-    transform: perspective(220px) rotateX(65deg) translateY(0);
-  }
-
-  100% {
-    transform: perspective(220px) rotateX(65deg) translateY(50px);
-  }
-}
-
-/* --------------------------------------------------------------------------
    CRT MONITOR OVERLAY EFFECTS
    -------------------------------------------------------------------------- */
 
-/* Literal `.crt-screen` class must stay on the element in JSX (alongside the
-   CRT_SCREEN tw.ts constant) — the body:has(.game-page) rule below targets
-   it by name, and :has() can't be expressed as a single element's Tailwind
-   classlist. */
+/* The literal `.crt-screen` class must stay in the JSX: `body:has(.game-page)`
+   targets it by name, and no Tailwind utility expresses that. */
 .crt-screen {
   position: relative;
   z-index: 10;
@@ -136,7 +111,6 @@ body {
    HERO BANNER
    -------------------------------------------------------------------------- */
 
-
 /* Apex Champion Podium Card - Steady Constant Glow */
 
 /* --------------------------------------------------------------------------
@@ -163,15 +137,9 @@ body:has(.game-page) .crt-screen {
    RETRO MINI ARCADE CANVAS
    -------------------------------------------------------------------------- */
 
-/* Kept for ARCADE_START_OVERLAY in tw.ts, which applies these via arbitrary
-   `animation:` values. Only animates `scale` — NOT `translateX(-50%)`.
-   ARCADE_START_OVERLAY centers via Tailwind's `-translate-x-1/2`, which
-   (confirmed by testing, not assumed) sets the modern standalone CSS
-   `translate` property, not the legacy `transform` property. `translate`
-   and `transform` compose together rather than one overriding the other,
-   so a keyframe `transform: translateX(-50%) ...` here doesn't replace the
-   utility's centering offset — it adds a SECOND -50% shift on top of it,
-   pushing the whole overlay roughly its own width to the left. */
+/* Applied by ARCADE_START_OVERLAY through an arbitrary `animation:` value. Only
+   `scale` animates: Tailwind's `-translate-x-1/2` sets `translate`, which composes
+   with `transform`, so a keyframe `translateX` would add a second -50% shift. */
 @keyframes arcade-start-pulse {
   0%,
   100% {
@@ -188,7 +156,6 @@ body:has(.game-page) .crt-screen {
     transform: scale(1.02);
   }
 }
-
 
 canvas#arcadeCanvas,
 canvas#snakeCanvas {
@@ -384,41 +351,8 @@ canvas#snakeCanvas {
 }
 
 /* ==========================================================================
-   RETRO AUTH SCENE — Neon City Skyline Login
+   RESULTS TICKET ANIMATION
    ========================================================================== */
-
-/* Sunset gradient sky */
-
-/* Animated perspective grid floor */
-
-@keyframes retro-grid-scroll {
-  0% {
-    background-position-y: 0;
-  }
-
-  100% {
-    background-position-y: 50px;
-  }
-}
-
-/* Neon horizon glow line */
-
-/* Floating city building silhouettes */
-
-/* CRT scanlines overlay */
-
-/* Floating 42 holographic logo */
-
-@keyframes retro-auth-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-8px);
-  }
-}
 
 /* Kept for RESULTS_INVOICE in tw.ts, which applies this via an arbitrary
    `animation:` value. */
