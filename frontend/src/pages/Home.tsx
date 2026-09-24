@@ -199,7 +199,7 @@ export function Home() {
       hasSun: true,
       sunC1: 'rgba(255, 230, 0, 0.72)',
       sunC2: 'rgba(255, 0, 127, 0.38)',
-      sunScanline: '#070114',
+      sunScanline: 'rgba(13, 2, 33, 0.6)',
       gridColor: 'rgba(0, 240, 255, 0.45)',
       starRgb: '255, 255, 255',
       pawns: [
@@ -235,26 +235,37 @@ export function Home() {
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // 2. Distant Sun
+      // 2. Distant Sun. The disc is drawn and the scanlines are stroked through
+      //    one shared clip path: the scanline strokes are wider than the disc
+      //    is at the top, so without the clip they used to extend past the
+      //    sun's silhouette and read as black bars flanking the sun.
       const sunY = 250;
-      const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, 90);
+      const sunRadius = 90;
+      const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, sunRadius);
       sunGrad.addColorStop(0, cfg.sunC1);
       sunGrad.addColorStop(0.5, cfg.sunC2);
       sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = sunGrad;
-      ctx.beginPath();
-      ctx.arc(360, sunY, 90, Math.PI, 0, false);
-      ctx.fill();
 
-      // Sun horizon scanlines
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(360, sunY, sunRadius, Math.PI, 0, false);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.fillStyle = sunGrad;
+      ctx.fillRect(360 - sunRadius, sunY - sunRadius, sunRadius * 2, sunRadius);
+
+      // Sun horizon scanlines (kept translucent so they band the sun instead
+      // of painting solid black lines over it)
       ctx.strokeStyle = cfg.sunScanline;
       ctx.lineWidth = 2;
       for (let sy = sunY - 60; sy < sunY; sy += 8) {
         ctx.beginPath();
-        ctx.moveTo(265, sy);
-        ctx.lineTo(455, sy);
+        ctx.moveTo(360 - sunRadius, sy);
+        ctx.lineTo(360 + sunRadius, sy);
         ctx.stroke();
       }
+      ctx.restore();
 
       // 3. Floating Stars
       stars.forEach((st) => {
