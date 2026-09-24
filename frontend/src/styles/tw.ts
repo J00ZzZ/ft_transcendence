@@ -151,8 +151,6 @@ export const COL_4 = 'col-span-4 max-[992px]:col-span-12';
 
 export const COL_8 = 'col-span-8 max-[992px]:col-span-12';
 
-export const COL_12 = 'col-span-12';
-
 export const RETRO_FOOTER =
   'text-center p-5 bg-(--bg-card) [border:var(--card-border-style)] mt-5 text-[0.85rem] text-(--text-muted)';
 
