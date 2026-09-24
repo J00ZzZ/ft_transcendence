@@ -75,7 +75,7 @@ const STATUS_STYLE: Record<string, { label: string; color: string; border: strin
 
 export function Home() {
   const { t } = useTranslation();
-  const { user, theme } = useApp();
+  const { user } = useApp();
   const [legalModalDoc, setLegalModalDoc] = useState<LegalDocType | null>(null);
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
@@ -241,68 +241,26 @@ export function Home() {
     let gridOffset = 0;
     let time = 0;
 
-    // Theme-specific color palettes
-    const themeConfig = {
-      synthwave: {
-        bgTop: '#070114',
-        bgMid: '#160530',
-        bgBot: '#05010d',
-        hasSun: true,
-        sunC1: 'rgba(255, 230, 0, 0.72)',
-        sunC2: 'rgba(255, 0, 127, 0.38)',
-        sunScanline: '#070114',
-        gridColor: 'rgba(0, 240, 255, 0.45)',
-        starRgb: '255, 255, 255',
-        pawns: [
-          { label: 'RED', color: '#ff0055', x: 85, y: 350 },
-          { label: 'GREEN', color: '#00ff88', x: 230, y: 360 },
-          { label: 'YELLOW', color: '#ffe600', x: 490, y: 360 },
-          { label: 'BLUE', color: '#00f0ff', x: 635, y: 350 },
-        ],
-        marquee: '[ TRANSCENDENCE // CYBER LUDO ]',
-        marqueeColor: '#00f0ff',
-      },
-      win95: {
-        bgTop: '#000000',
-        bgMid: '#000000',
-        bgBot: '#000000',
-        hasSun: false,
-        sunC1: 'rgba(0, 0, 0, 0)',
-        sunC2: 'rgba(0, 0, 0, 0)',
-        sunScanline: '#000000',
-        gridColor: 'rgba(0, 160, 160, 0.65)',
-        starRgb: '255, 255, 255',
-        pawns: [
-          { label: 'P1-RED', color: '#ff2222', x: 85, y: 350 },
-          { label: 'P2-GRN', color: '#00cc33', x: 230, y: 360 },
-          { label: 'P3-YLW', color: '#ffee00', x: 490, y: 360 },
-          { label: 'P4-BLU', color: '#2255ff', x: 635, y: 350 },
-        ],
-        marquee: '[ DIRECTX 3D // CYBER LUDO 95 ]',
-        marqueeColor: '#00ffff',
-      },
-      terminal: {
-        bgTop: '#000800',
-        bgMid: '#001400',
-        bgBot: '#000400',
-        hasSun: true,
-        sunC1: 'rgba(0, 255, 102, 0.55)',
-        sunC2: 'rgba(0, 180, 70, 0.25)',
-        sunScanline: '#000800',
-        gridColor: 'rgba(0, 255, 102, 0.4)',
-        starRgb: '0, 255, 102',
-        pawns: [
-          { label: 'NODE:RED', color: '#00ff66', x: 85, y: 350 },
-          { label: 'NODE:GRN', color: '#33ff88', x: 230, y: 360 },
-          { label: 'NODE:YLW', color: '#00ff66', x: 490, y: 360 },
-          { label: 'NODE:BLU', color: '#33ff88', x: 635, y: 350 },
-        ],
-        marquee: '> SYS_EXEC: TRANSCENDENCE_LUDO_CORE.SH',
-        marqueeColor: '#00ff66',
-      },
+    // Synthwave color palette
+    const cfg = {
+      bgTop: '#070114',
+      bgMid: '#160530',
+      bgBot: '#05010d',
+      hasSun: true,
+      sunC1: 'rgba(255, 230, 0, 0.72)',
+      sunC2: 'rgba(255, 0, 127, 0.38)',
+      sunScanline: '#070114',
+      gridColor: 'rgba(0, 240, 255, 0.45)',
+      starRgb: '255, 255, 255',
+      pawns: [
+        { label: 'RED', color: '#ff0055', x: 85, y: 350 },
+        { label: 'GREEN', color: '#00ff88', x: 230, y: 360 },
+        { label: 'YELLOW', color: '#ffe600', x: 490, y: 360 },
+        { label: 'BLUE', color: '#00f0ff', x: 635, y: 350 },
+      ],
+      marquee: '[ TRANSCENDENCE // CYBER LUDO ]',
+      marqueeColor: '#00f0ff',
     };
-
-    const currentCfg = themeConfig[theme];
 
     // Background stars
     const stars = Array.from({ length: 65 }, () => ({
@@ -319,42 +277,40 @@ export function Home() {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Deep Canvas Background with theme gradient
+      // 1. Deep Canvas Background with gradient
       const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      bgGrad.addColorStop(0, currentCfg.bgTop);
-      bgGrad.addColorStop(0.65, currentCfg.bgMid);
-      bgGrad.addColorStop(1, currentCfg.bgBot);
+      bgGrad.addColorStop(0, cfg.bgTop);
+      bgGrad.addColorStop(0.65, cfg.bgMid);
+      bgGrad.addColorStop(1, cfg.bgBot);
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // 2. Distant Sun (only for themes with sun)
-      if (currentCfg.hasSun !== false) {
-        const sunY = 250;
-        const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, 90);
-        sunGrad.addColorStop(0, currentCfg.sunC1);
-        sunGrad.addColorStop(0.5, currentCfg.sunC2);
-        sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = sunGrad;
-        ctx.beginPath();
-        ctx.arc(360, sunY, 90, Math.PI, 0, false);
-        ctx.fill();
+      // 2. Distant Sun
+      const sunY = 250;
+      const sunGrad = ctx.createRadialGradient(360, sunY, 7, 360, sunY, 90);
+      sunGrad.addColorStop(0, cfg.sunC1);
+      sunGrad.addColorStop(0.5, cfg.sunC2);
+      sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sunGrad;
+      ctx.beginPath();
+      ctx.arc(360, sunY, 90, Math.PI, 0, false);
+      ctx.fill();
 
-        // Sun horizon scanlines
-        ctx.strokeStyle = currentCfg.sunScanline;
-        ctx.lineWidth = 2;
-        for (let sy = sunY - 60; sy < sunY; sy += 8) {
-          ctx.beginPath();
-          ctx.moveTo(265, sy);
-          ctx.lineTo(455, sy);
-          ctx.stroke();
-        }
+      // Sun horizon scanlines
+      ctx.strokeStyle = cfg.sunScanline;
+      ctx.lineWidth = 2;
+      for (let sy = sunY - 60; sy < sunY; sy += 8) {
+        ctx.beginPath();
+        ctx.moveTo(265, sy);
+        ctx.lineTo(455, sy);
+        ctx.stroke();
       }
 
       // 3. Floating Stars
       stars.forEach((st) => {
         st.y += st.speed;
         if (st.y > 260) st.y = 0;
-        ctx.fillStyle = `rgba(${currentCfg.starRgb}, ${st.alpha * (0.8 + 0.2 * Math.sin(time * 3 + st.x))})`;
+        ctx.fillStyle = `rgba(${cfg.starRgb}, ${st.alpha * (0.8 + 0.2 * Math.sin(time * 3 + st.x))})`;
         ctx.beginPath();
         ctx.arc(st.x, st.y, st.size, 0, Math.PI * 2);
         ctx.fill();
@@ -363,7 +319,7 @@ export function Home() {
       // 4. Horizon Perspective Grid
       const horizonY = 260;
       ctx.save();
-      ctx.strokeStyle = currentCfg.gridColor;
+      ctx.strokeStyle = cfg.gridColor;
       ctx.lineWidth = 1;
 
       // Horizontal grid lines moving toward camera
@@ -387,14 +343,14 @@ export function Home() {
       ctx.restore();
 
       // 5. 4-Player Army Hologram Nodes
-      const pawns = currentCfg.pawns;
+      const pawns = cfg.pawns;
 
       pawns.forEach((p, idx) => {
         const pulse = Math.sin(time * 3 + idx * 1.5) * 2.4;
         ctx.save();
         ctx.fillStyle = p.color;
-        ctx.shadowColor = theme === 'win95' ? 'transparent' : p.color;
-        ctx.shadowBlur = theme === 'win95' ? 0 : 11;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 11;
         ctx.beginPath();
         ctx.arc(p.x, p.y + pulse, 7.5, 0, Math.PI * 2);
         ctx.fill();
@@ -416,10 +372,10 @@ export function Home() {
       ctx.save();
       ctx.font = '12px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
-      ctx.fillStyle = currentCfg.marqueeColor;
-      ctx.shadowColor = currentCfg.marqueeColor;
+      ctx.fillStyle = cfg.marqueeColor;
+      ctx.shadowColor = cfg.marqueeColor;
       ctx.shadowBlur = 11;
-      ctx.fillText(currentCfg.marquee, 360, 28);
+      ctx.fillText(cfg.marquee, 360, 28);
       ctx.shadowBlur = 0;
       ctx.restore();
 
@@ -431,7 +387,7 @@ export function Home() {
     return () => {
       cancelAnimationFrame(animId);
     };
-  }, [theme]);
+  }, []);
 
   const username = user?.username ?? t('common.you');
   const displayName = user?.displayName ?? username;
@@ -531,18 +487,10 @@ export function Home() {
                     {/* Interactive Translucent Press Start Banner Overlay */}
                     <div className={ARCADE_START_OVERLAY}>
                       <span className={ARCADE_START_TITLE}>
-                        {theme === 'win95'
-                          ? t('homeExtended.pressStartTitleWin95')
-                          : theme === 'terminal'
-                            ? t('homeExtended.pressStartTitleTerminal')
-                            : t('homeExtended.pressStartTitleSynthwave')}
+                        {t('homeExtended.pressStartTitleSynthwave')}
                       </span>
                       <span className={ARCADE_START_SUB}>
-                        {theme === 'terminal'
-                          ? t('homeExtended.pressStartSubTerminal')
-                          : theme === 'win95'
-                            ? t('homeExtended.pressStartSubWin95')
-                            : t('homeExtended.pressStartSubSynthwave')}
+                        {t('homeExtended.pressStartSubSynthwave')}
                       </span>
                     </div>
 

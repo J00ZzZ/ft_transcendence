@@ -36,60 +36,6 @@
   --card-border-style: 2px solid var(--accent-pink);
 }
 
-/* Theme: Windows 95 Desktop */
-[data-theme='win95'] {
-  --bg-primary: #008080;
-  --bg-secondary: #c0c0c0;
-  --bg-card: #c0c0c0;
-  --accent-cyan: #000080;
-  --accent-pink: #800080;
-  --accent-yellow: #ffff00;
-  --accent-purple: #000080;
-  --text-main: #000000;
-  --text-muted: #404040;
-  --border-color: #ffffff;
-  --box-shadow: 2px 2px 0px #000000, inset -1px -1px 0px #000000, inset 1px 1px 0px #dfdfdf;
-  --font-heading: 'Press Start 2P', cursive;
-  --font-display: 'Orbitron', sans-serif;
-  --font-mono: 'Share Tech Mono', monospace;
-  --grid-line-color: transparent;
-  --grid-bg-glow: transparent;
-  --btn-bg: #c0c0c0;
-  --btn-hover-shadow: inset 1px 1px 0px #ffffff, inset -1px -1px 0px #000000;
-  --crt-scanline-opacity: 0.05;
-  --crt-flicker-opacity: 0.01;
-  --window-header-bg: linear-gradient(90deg, #000080, #1084d0);
-  --window-header-text: #ffffff;
-  --card-border-style: 2px solid #ffffff;
-}
-
-/* Theme: CRT Terminal (Green Phosphor) */
-[data-theme='terminal'] {
-  --bg-primary: #051005;
-  --bg-secondary: #0a1f0a;
-  --bg-card: rgba(10, 31, 10, 0.9);
-  --accent-cyan: #33ff33;
-  --accent-pink: #00cc00;
-  --accent-yellow: #aaffaa;
-  --accent-purple: #116611;
-  --text-main: #33ff33;
-  --text-muted: #22aa22;
-  --border-color: #33ff33;
-  --box-shadow: 0 0 10px rgba(51, 255, 51, 0.4), inset 0 0 10px rgba(51, 255, 51, 0.15);
-  --font-heading: 'Press Start 2P', cursive;
-  --font-display: 'Orbitron', sans-serif;
-  --font-mono: 'Share Tech Mono', monospace;
-  --grid-line-color: rgba(51, 255, 51, 0.1);
-  --grid-bg-glow: rgba(51, 255, 51, 0.05);
-  --btn-bg: #0a1f0a;
-  --btn-hover-shadow: 0 0 15px #33ff33;
-  --crt-scanline-opacity: 0.25;
-  --crt-flicker-opacity: 0.06;
-  --window-header-bg: #116611;
-  --window-header-text: #33ff33;
-  --card-border-style: 1px solid #33ff33;
-}
-
 /* --------------------------------------------------------------------------
    GLOBAL & RESET STYLES
    -------------------------------------------------------------------------- */
@@ -109,6 +55,11 @@ body {
   width: 100%;
   min-height: 100vh;
   background-color: var(--bg-primary);
+  background-image: url('/synthwave-cityscape.jpeg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text-main);
   font-family: var(--font-mono);
   overflow-x: hidden;
@@ -450,24 +401,6 @@ body:has(.game-page) .crt-screen {
   }
 }
 
-/* Kept for ARCADE_START_OVERLAY in tw.ts, which applies these via arbitrary
-   `animation:` values. See arcade-start-pulse above for why this only
-   animates `scale`, not `translateX(-50%)`. */
-@keyframes terminal-start-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 15px rgba(51, 255, 51, 0.35),
-      inset 0 0 10px rgba(51, 255, 51, 0.15);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow:
-      0 0 25px rgba(51, 255, 51, 0.65),
-      inset 0 0 15px rgba(51, 255, 51, 0.3);
-    transform: scale(1.02);
-  }
-}
 
 canvas#arcadeCanvas,
 canvas#snakeCanvas {
@@ -508,52 +441,8 @@ canvas#snakeCanvas {
   --fs-glow: rgba(255, 0, 127, 0.5);
 }
 
-[data-theme='win95'] {
-  --fs-border: #808080;
-  --fs-text: #000000;
-  --fs-accent: #000080;
-  --fs-cyan: #000080;
-  --fs-bg: #c0c0c0;
-  --fs-glow: transparent;
-}
-
-[data-theme='terminal'] {
-  --fs-border: #33ff33;
-  --fs-text: #33ff33;
-  --fs-accent: #33ff33;
-  --fs-cyan: #33ff33;
-  --fs-bg: #0a1f0a;
-  --fs-glow: rgba(51, 255, 51, 0.4);
-}
-
-/* Kept for THEME_POPOVER_MENU_ACTIVE_DOWN/_ACTIVE_UP in tw.ts, which apply
-   these via arbitrary `animation:` values. */
-@keyframes popover-slide-down {
-  0% {
-    opacity: 0;
-    transform: perspective(600px) rotateX(-20deg) translateY(-12px) scale(0.9);
-  }
-
-  100% {
-    opacity: 1;
-    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
-  }
-}
-
-@keyframes popover-slide-up {
-  0% {
-    opacity: 0;
-    transform: perspective(600px) rotateX(20deg) translateY(12px) scale(0.9);
-  }
-
-  100% {
-    opacity: 1;
-    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
-  }
-}
-
 /* --------------------------------------------------------------------------
-   THEME-SPECIFIC COMPONENT OVERRIDES (WIN95 & TERMINAL)
+   CUSTOM COMPONENT STYLES
    -------------------------------------------------------------------------- */
 
 #color-scheme {
@@ -791,7 +680,7 @@ canvas#snakeCanvas {
 }
 
 /* ==========================================================================
-   GAME BOARD THEME STYLES (SYNTHWAVE, WIN95, CRT TERMINAL)
+   GAME BOARD THEME STYLES (SYNTHWAVE)
    ========================================================================== */
 
 /* 1. Board Chassis */
