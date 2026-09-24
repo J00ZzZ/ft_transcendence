@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { postApi, translateErrorCode } from '../api';
 import { UserAvatar } from '../components/UserAvatar';
 import { RetroNavbar } from '../components/RetroNavbar';
-import { RankBadge } from '../components/RankBadge';
-import { getRankTier } from '../utils/ranks';
 import type { PlayerColor } from '../game/types';
 import { navigate } from '../router';
 import { useApp } from '../store';
@@ -92,7 +90,6 @@ export function Friends() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [blocked, setBlocked] = useState<BlockedUser[]>([]);
-  const [leaderboardMap, setLeaderboardMap] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<'friends' | 'blocked'>('friends');
   const [filterQuery, setFilterQuery] = useState('');
   const [searchUsername, setSearchUsername] = useState('');
@@ -102,11 +99,10 @@ export function Friends() {
 
   const fetchData = async () => {
     try {
-      const [fRes, rRes, bRes, lRes] = await Promise.all([
+      const [fRes, rRes, bRes] = await Promise.all([
         fetch('/api/friends', { credentials: 'include' }),
         fetch('/api/friends/requests', { credentials: 'include' }),
         fetch('/api/friends/blocked', { credentials: 'include' }),
-        fetch('/api/leaderboard?mode=global&limit=50', { credentials: 'include' }),
       ]);
       if (fRes.ok && rRes.ok) {
         const friendsData = await fRes.json();
@@ -126,16 +122,6 @@ export function Friends() {
       if (bRes.ok) {
         const blockedData = await bRes.json();
         setBlocked(blockedData ?? []);
-      }
-      if (lRes.ok) {
-        const lData = await lRes.json();
-        if (lData?.entries) {
-          const map: Record<string, number> = {};
-          lData.entries.forEach((e: { username: string; rank: number }) => {
-            map[e.username] = e.rank;
-          });
-          setLeaderboardMap(map);
-        }
       }
     } catch (e) {
       console.error(e);
@@ -599,8 +585,6 @@ export function Friends() {
                         </div>
                       ) : (
                         filteredFriends.map((f) => {
-                          const fRank = leaderboardMap[f.username];
-                          const fTier = getRankTier(f.rating, fRank);
                           const fStatus = STATUS_STYLE[f.status];
                           return (
                             <div
@@ -661,8 +645,8 @@ export function Friends() {
                                     style={{
                                       padding: 2,
                                       borderRadius: 6,
-                                      background: `linear-gradient(135deg, ${fTier.color}, var(--accent-cyan))`,
-                                      boxShadow: `0 0 10px ${fTier.glow}`,
+                                      background: 'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                                      boxShadow: '0 0 10px rgba(0, 240, 255, 0.3)',
                                     }}
                                   >
                                     <UserAvatar
@@ -741,8 +725,17 @@ export function Friends() {
                                 >
                                   {f.rating}
                                 </div>
-                                <div style={{ marginTop: 3 }}>
-                                  <RankBadge tier={fTier} fontSize="10px" padding="2px 7px" />
+                                <div
+                                  style={{
+                                    marginTop: 3,
+                                    fontSize: '9px',
+                                    fontWeight: 700,
+                                    color: 'rgba(0, 240, 255, 0.7)',
+                                    letterSpacing: '1px',
+                                    fontFamily: 'var(--font-display)',
+                                  }}
+                                >
+                                  ELO
                                 </div>
                               </div>
 

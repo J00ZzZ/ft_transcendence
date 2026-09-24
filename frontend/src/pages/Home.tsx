@@ -8,8 +8,6 @@ import { useNotifications } from '../hooks/useNotifications';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { retroAudio } from '../utils/audio';
-import { getRankTier } from '../utils/ranks';
-import { RankBadge } from '../components/RankBadge';
 import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
@@ -91,31 +89,14 @@ export function Home() {
     avgCapturesPerGame: number;
   };
   const [stats, setStats] = useState<PlayerStats | null>(null);
-  const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
-  const [leaderboardMap, setLeaderboardMap] = useState<Record<string, number>>({});
   const [isStatsLoading, setIsStatsLoading] = useState(false);
 
   useEffect(() => {
     setIsStatsLoading(true);
-    Promise.all([
-      getApi<PlayerStats>('/api/stats').catch(() => null),
-      getApi<{ myRank?: { rank: number }; entries?: Array<{ username: string; rank: number }> }>(
-        '/api/leaderboard?mode=global&limit=50',
-      ).catch(() => null),
-    ])
-      .then(([statsBody, lbBody]) => {
+    getApi<PlayerStats>('/api/stats')
+      .then((statsBody) => {
         if (statsBody && typeof statsBody.totalGames === 'number') {
           setStats(statsBody);
-        }
-        if (lbBody?.myRank?.rank) {
-          setLeaderboardRank(lbBody.myRank.rank);
-        }
-        if (lbBody?.entries) {
-          const map: Record<string, number> = {};
-          lbBody.entries.forEach((e) => {
-            map[e.username] = e.rank;
-          });
-          setLeaderboardMap(map);
         }
       })
       .catch((e) => {
@@ -614,8 +595,6 @@ export function Home() {
                     </div>
                   ) : (
                     friends.map((f) => {
-                      const fRank = leaderboardMap[f.username];
-                      const fTier = getRankTier(f.rating ?? 1200, fRank);
                       const fStatus = STATUS_STYLE[f.status ?? 'offline'];
 
                       return (
@@ -662,8 +641,8 @@ export function Home() {
                                 style={{
                                   padding: 2,
                                   borderRadius: 5,
-                                  background: `linear-gradient(135deg, ${fTier.color}, var(--accent-cyan))`,
-                                  boxShadow: `0 0 8px ${fTier.glow}`,
+                                  background: 'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                                  boxShadow: '0 0 8px rgba(0, 240, 255, 0.3)',
                                 }}
                               >
                                 <UserAvatar
@@ -722,7 +701,6 @@ export function Home() {
                                 >
                                   {f.displayName ?? f.username}
                                 </span>
-                                <RankBadge tier={fTier} fontSize="9.5px" padding="2px 7px" />
                               </div>
                               <div
                                 style={{
@@ -825,11 +803,6 @@ export function Home() {
                           >
                             {displayName.toUpperCase()}
                           </span>
-                          <RankBadge
-                            tier={getRankTier(stats?.rating ?? 1200, leaderboardRank)}
-                            fontSize="0.75rem"
-                            padding="3px 10px"
-                          />
                         </div>
                         <span
                           style={{
@@ -973,80 +946,73 @@ export function Home() {
                       </span>
                     </div>
 
-                    {/* Stat 4: Dynamic Tier ELO Rating (Clickable -> Leaderboard) */}
-                    {(() => {
-                      const currentRating = stats?.rating ?? 1200;
-                      const tier = getRankTier(currentRating, leaderboardRank);
-
-                      return (
-                        <div
-                          onClick={() => {
-                            retroAudio.playUiBeep(720, 0.05);
-                            navigate('/leaderboard');
-                          }}
-                          title="Click to view Global Leaderboard Ladder"
+                    {/* Stat 4: ELO Rating (Clickable -> Leaderboard) */}
+                    <div
+                      onClick={() => {
+                        retroAudio.playUiBeep(720, 0.05);
+                        navigate('/leaderboard');
+                      }}
+                      title="Click to view Global Leaderboard Ladder"
+                      style={{
+                        padding: '12px 14px',
+                        background: 'rgba(25, 10, 56, 0.5)',
+                        border: '1px solid rgba(0, 240, 255, 0.45)',
+                        borderRadius: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 240, 255, 0.14)';
+                        e.currentTarget.style.borderColor = 'var(--accent-cyan)';
+                        e.currentTarget.style.boxShadow = '0 0 14px rgba(0, 240, 255, 0.45)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(25, 10, 56, 0.5)';
+                        e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.45)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span
                           style={{
-                            padding: '12px 14px',
-                            background: 'rgba(25, 10, 56, 0.5)',
-                            border: `1px solid ${tier.border}`,
-                            borderRadius: 4,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 4,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = tier.bg;
-                            e.currentTarget.style.borderColor = tier.color;
-                            e.currentTarget.style.boxShadow = `0 0 14px ${tier.glow}`;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(25, 10, 56, 0.5)';
-                            e.currentTarget.style.borderColor = tier.border;
-                            e.currentTarget.style.boxShadow = 'none';
+                            fontSize: '0.68rem',
+                            color: 'var(--text-muted)',
+                            fontFamily: 'var(--font-mono)',
                           }}
                         >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: '0.68rem',
-                                color: 'var(--text-muted)',
-                                fontFamily: 'var(--font-mono)',
-                              }}
-                            >
-                              {t('homeExtended.eloRating')}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: '0.62rem',
-                                color: tier.color,
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              {tier.badge}
-                            </span>
-                          </div>
-                          <span
-                            style={{
-                              fontFamily: 'var(--font-heading)',
-                              fontSize: '1.2rem',
-                              color: tier.color,
-                              textShadow: `0 0 10px ${tier.glow}`,
-                            }}
-                          >
-                            {isStatsLoading ? '...' : currentRating}
-                          </span>
-                        </div>
-                      );
-                    })()}
+                          {t('homeExtended.eloRating')}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            color: 'var(--accent-cyan)',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          ELO
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-heading)',
+                          fontSize: '1.2rem',
+                          color: 'var(--accent-cyan)',
+                          textShadow: '0 0 10px rgba(0, 240, 255, 0.45)',
+                        }}
+                      >
+                        {isStatsLoading ? '...' : (stats?.rating ?? 1200)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </section>
