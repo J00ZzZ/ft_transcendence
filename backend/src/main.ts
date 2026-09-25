@@ -54,7 +54,9 @@ function validationExceptionFactory(errors: ValidationError[]): BadRequestExcept
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.set('trust proxy', 1);
+  // Trust internal hops (localhost/LAN/tunnel) by address, so req.ip is the
+  // real client IP for rate limiting and can't be spoofed via X-Forwarded-For.
+  app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
   // JwtStrategy reads the token from req.cookies; without this it's undefined.
   app.use(cookieParser());

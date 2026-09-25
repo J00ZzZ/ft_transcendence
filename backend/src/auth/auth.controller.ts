@@ -57,7 +57,7 @@ function originFromRequest(req: Request): string {
 @Controller('api/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-  @Throttle({ default: { limit: 3, ttl: HOUR_MS } })
+  @Throttle({ default: { limit: 5, ttl: HOUR_MS } })
   // POST /register
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() req: Request) {
