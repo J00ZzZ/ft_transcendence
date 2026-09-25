@@ -1,10 +1,9 @@
-// Upload validation for avatars: the multipart mimetype is only the client's
-// claim, so a mislabelled or truncated upload would otherwise be stored and then
-// fail to decode. See docs/avatar-system.md (Failure modes).
+// Avatar upload validation: the multipart mimetype is only the client's claim, so
+// a mislabelled or truncated upload is rejected before its bytes are stored.
 
-// The allowed MIME types and their magic-byte signatures. WebP needs two checks
-// (RIFF....WEBP). The MIME_SIGNATURES keys are the whitelist — an unknown MIME has no
-// entry and is rejected by `isImageSignatureValid`.
+// Signature per allowed MIME type, read at the given byte offset. WebP needs two
+// checks (the RIFF header and the WEBP tag at offset 8); a type missing from this
+// map is rejected by `isImageSignatureValid`.
 type SignatureCheck = [number, number[]];
 
 const MIME_SIGNATURES: Record<string, SignatureCheck[] | undefined> = {

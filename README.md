@@ -85,7 +85,7 @@ make dev
 - **`8443` (nginx)** is the only intentionally public-facing port (published on all host interfaces). It runs **TLS 1.2/1.3 only** with a self-signed cert and **no plain-HTTP listener**, sets HSTS + security headers + a CSP, disables `server_tokens`, denies hidden-file access, and applies per-IP rate limits (login `5r/m`, auth `60r/m`, refresh `30r/m`, leaderboard `30r/m`) in front of the API.
 - **`8080` (Vite)** is active only under the `dev` compose profile (`make dev`). It serves the SPA and proxies `/api` and `/socket.io` without TLS. Disabled in production.
 - **`3000` (backend)** is published loopback-only; clients reach it exclusively through nginx's `/api` proxy. Backend hardening: JWT auth in httpOnly cookies, bcrypt password hashes, class-validator on DTOs, and NestJS rate throttling. CORS is intentionally not enabled — every call the SPA makes is same-origin through nginx, so the backend emits no cross-origin headers.
-- **Avatar uploads** are checked twice before they are stored. First, the MIME type must be one of a fixed list (PNG, JPEG, GIF or WebP, with a 2 MB limit). Second, the first bytes of the file are compared against the signature of that format (for example `89 50 4E 47` for PNG, `FF D8 FF` for JPEG, `52 49 46 46…57 45 42 50` for WebP). The second check is needed because the MIME type is only what the client claims; a file with the wrong name, or a file that was cut off, is rejected before any data is written. The bytes are then stored in Postgres in a `Bytes` column through Prisma, and Prisma reads them back as raw bytes and sends them to the browser with the stored `Content-Type`. The database does not run or open the file; it only stores the bytes.
+- **Avatar uploads** are validated before they are stored. The 2 MB limit is enforced by the upload middleware, and the client refuses a file whose declared MIME type is not PNG, JPEG, GIF or WebP. The server then compares the leading bytes of the file against the signature of the declared type (`89 50 4E 47 0D 0A 1A 0A` for PNG, `FF D8 FF` for JPEG, `47 49 46 38` for GIF, `52 49 46 46…57 45 42 50` for WebP), because the MIME type is only what the client claims. A file whose declared type does not match its bytes is rejected before anything is written. The check reads the signature bytes only and does not decode the image, so a file cut off after its signature is stored, and the client falls back to the generated avatar when the browser cannot decode it. Accepted bytes are stored in Postgres in a `Bytes` column through Prisma, and Prisma reads them back as raw bytes and sends them to the browser with the stored `Content-Type`. The database does not run or open the file; it only stores the bytes.
 - **`5555` (Prisma Studio)** is a raw database browser with no application-level authentication — its protection is the loopback-only binding plus the Postgres credentials. Used on the host only.
 - **`/socket.io/`** is reachable only same-origin: over TLS via nginx (`wss://`) or through the Vite dev proxy — never on a raw `ws://` port. The engine validates the Socket.IO handshake JWT (game-scoped, with role/color) before the socket can join a room.
 - **Infrastructure ports not listed** — all published loopback-only; cross-container traffic rides the private `transcendence_network`:
@@ -157,8 +157,7 @@ by one process still reaches the clients served elsewhere.
 
 **Why a server-authoritative game loop.** The client never decides a dice value or validates
 a move. Every action is a request the server accepts or rejects against its own copy of the
-board, which is what makes the multiplayer and remote-player modules defensible rather than
-merely functional.
+board, so there is reduced chance of hacking or cheating.
 
 **Why Socket.IO over plain WebSockets.** It provides automatic reconnection, rooms, and
 broadcasting out of the box, which the live board, presence, and reconnect flows build on.
@@ -305,7 +304,7 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/frontend/frontend-settings-module.md](docs/frontend/frontend-settings-module.md)           | Settings (language, 2FA, game preferences)                 |
 | [docs/frontend/frontend-profile-module.md](docs/frontend/frontend-profile-module.md)             | Profile page — stats, history, friends                     |
 | [docs/frontend/frontend-components-system.md](docs/frontend/frontend-components-system.md)       | Shared UI components                                       |
-| [docs/frontend/frontend-styles-system.md](docs/frontend/frontend-styles-system.md)               | Stylesheets and the three-theme design system              |
+| [docs/frontend/frontend-styles-system.md](docs/frontend/frontend-styles-system.md)               | Stylesheets, theme tokens and the cityscape background     |
 | [docs/frontend/frontend-i18n-utilities-system.md](docs/frontend/frontend-i18n-utilities-system.md) | i18n/translations, audio, bot names, legal pages          |
 
 #### Ludo Engine (real-time game engine)

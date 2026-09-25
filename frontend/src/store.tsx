@@ -42,7 +42,7 @@ export type Seat =
 export type PlayerCount = 2 | 3 | 4;
 
 export type Lang = 'en' | 'fr' | 'ms';
-export type ThemeType = 'synthwave' | 'win95' | 'terminal';
+export type ThemeType = 'synthwave';
 
 /** Languages offered in the account menu. */
 export const LANGUAGES: Array<{ code: Lang; label: string; flag: string }> = [
@@ -62,8 +62,7 @@ function storedLang(): Lang {
 }
 
 function storedTheme(): ThemeType {
-  const raw = localStorage.getItem(THEME_KEY);
-  return raw === 'win95' || raw === 'terminal' || raw === 'synthwave' ? raw : 'synthwave';
+  return 'synthwave';
 }
 
 // Presence heartbeat cadence: how often this client tells the backend it is

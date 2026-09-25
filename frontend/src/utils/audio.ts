@@ -2,33 +2,8 @@
 
 export class RetroAudioEngine {
   ctx: AudioContext | null = null;
-  isPlaying = false;
-  currentTrackIndex = 0;
-  timerId: number | null = null;
-  noteStep = 0;
   volume = 0.2;
   muted = false;
-
-  tracks = [
-    {
-      name: "SYNTHWAVE NIGHTS '84",
-      tempo: 120,
-      scale: [220, 247.0, 261.6, 293.7, 329.6, 349.2, 392.0, 440], // A Minor
-      bass: [110, 110, 130.8, 146.8],
-    },
-    {
-      name: 'CYBERPUNK CHIPTUNE PARADISE',
-      tempo: 140,
-      scale: [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3, 659.3], // C Pentatonic
-      bass: [130.8, 130.8, 174.6, 196.0],
-    },
-    {
-      name: '8-BIT ARCADE ADVENTURE',
-      tempo: 150,
-      scale: [329.6, 392.0, 440.0, 493.9, 523.3, 587.3, 659.3, 784.0], // E Minor
-      bass: [164.8, 146.8, 130.8, 164.8],
-    },
-  ];
 
   initContext() {
     if (!this.ctx && typeof window !== 'undefined') {
@@ -277,43 +252,6 @@ export class RetroAudioEngine {
     }
   }
 
-  togglePlay(): boolean {
-    this.initContext();
-    if (this.isPlaying) {
-      this.stop();
-    } else {
-      this.isPlaying = true;
-      this.scheduleNextNote();
-    }
-    return this.isPlaying;
-  }
-
-  stop() {
-    this.isPlaying = false;
-    if (this.timerId) {
-      clearTimeout(this.timerId);
-      this.timerId = null;
-    }
-  }
-
-  nextTrack(): string {
-    this.currentTrackIndex = (this.currentTrackIndex + 1) % this.tracks.length;
-    this.noteStep = 0;
-    return this.tracks[this.currentTrackIndex].name;
-  }
-
-  prevTrack(): string {
-    this.currentTrackIndex = (this.currentTrackIndex - 1 + this.tracks.length) % this.tracks.length;
-    this.noteStep = 0;
-    return this.tracks[this.currentTrackIndex].name;
-  }
-
-  selectTrack(index: number): string {
-    this.currentTrackIndex = Math.max(0, Math.min(this.tracks.length - 1, index));
-    this.noteStep = 0;
-    return this.tracks[this.currentTrackIndex].name;
-  }
-
   setVolume(vol: number) {
     this.volume = Math.max(0, Math.min(1, vol));
   }
@@ -321,57 +259,6 @@ export class RetroAudioEngine {
   toggleMute(): boolean {
     this.muted = !this.muted;
     return this.muted;
-  }
-
-  scheduleNextNote() {
-    if (!this.isPlaying) return;
-
-    const track = this.tracks[this.currentTrackIndex];
-    const stepDuration = 60 / track.tempo / 2;
-
-    const melodyIndex = (this.noteStep * 3 + (this.noteStep % 5)) % track.scale.length;
-    const freq = track.scale[melodyIndex];
-
-    if (!this.muted) {
-      this.playNote(freq, stepDuration * 0.8, 'square', this.volume * 0.6);
-
-      if (this.noteStep % 4 === 0) {
-        const bassFreq = track.bass[(this.noteStep / 4) % track.bass.length];
-        this.playNote(bassFreq, stepDuration * 1.5, 'triangle', this.volume * 0.8);
-      }
-    }
-
-    if (
-      typeof window !== 'undefined' &&
-      (window as unknown as { updateSpectrumBars?: () => void }).updateSpectrumBars
-    ) {
-      (window as unknown as { updateSpectrumBars?: () => void }).updateSpectrumBars?.();
-    }
-
-    this.noteStep++;
-    this.timerId = window.setTimeout(() => this.scheduleNextNote(), stepDuration * 1000);
-  }
-
-  playNote(freq: number, duration: number, type: OscillatorType, vol: number) {
-    try {
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-
-      gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + duration);
-    } catch (e) {
-      console.debug('Audio error:', e);
-    }
   }
 }
 

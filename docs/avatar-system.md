@@ -18,8 +18,7 @@
 
 ## Overview
 
-Every account has one avatar. It is either a **photo the user uploaded** or a **generated DiceBear
-image**. The system is built around four requirements:
+Every account has one avatar. It is either a **photo the user uploaded** or a **generated DiceBear (image library) image**. The system is built around four requirements:
 
 1. A photo must appear, change or disappear on **every open client without a reload**.
 2. A user with **no photo** must never cause a failed request (no 404s in the console).
@@ -52,7 +51,7 @@ Three properties make that work:
 | --- | --- |
 | `backend/src/avatar/avatar-meta.service.ts` | The Redis record `avatar:<userId>` → `{ has, style, v }`. `set()` writes it and returns the change stamp; `get()` reads it; `syncFromUser()` repairs it from a row the caller already loaded; `remove()` cleans up. |
 | `backend/src/avatar/avatar-meta.module.ts` | Provides/exports `AvatarMetaService` (the same pattern as `NotificationService`). |
-| `backend/src/avatar/image-signature.util.ts` | Magic-byte check so a mislabelled or truncated upload cannot be stored. |
+| `backend/src/avatar/image-signature.util.ts` | Magic-byte check so the declared MIME type must match the file's leading bytes. |
 | `backend/src/user/user.controller.ts` | `POST /api/user/avatar`, `DELETE /api/user/avatar`, `GET /api/user/id/:userId/avatar`. Defines the cache headers and the upload validation. |
 | `backend/src/user/user.service.ts` | `getAvatarById()`; writes the Redis record **after** the Postgres commit in upload/delete; broadcasts `avatar_changed`; repairs the record on public-profile reads. |
 | `backend/src/auth/auth.service.ts` | Seeds the record on register and on the OAuth creation path; repairs it on `/me`; removes it on account deletion. |
@@ -127,7 +126,7 @@ reuse". `no-store`, which the `404` for a user with no photo uses, means "do not
 ---
 
 
-## Avatar system revamp policies
+## Avatar system policies
 
 1. **Postgres is written first; Redis is written second.** Writing Redis first could leave `has=1`
    with no bytes behind it — a guaranteed 404.
@@ -295,7 +294,7 @@ revalidated normally — the stamp is only needed once a change happens inside a
 | The Redis record is missing or evicted | the generated avatar | Consumers read a miss as `has: false`, so nothing is requested; the backend repairs the record the next time it loads that user. |
 | The SSE event is missed (stream reset) | the old image until the next mount or reload | The bare URL still revalidates on load, so the client self-corrects. Only the *instant* update is lost. |
 | A stale `has: true` with no bytes behind it | one failed load, then the generated avatar | `onError` marks the id broken for the session, so it is not retried. |
-| A corrupt or mislabelled upload | `400 Bad Request` | Magic-byte validation runs before anything is written, so an undecodable image is never stored. |
+| A corrupt or mislabelled upload | `400 Bad Request` | Magic-byte validation runs before anything is written, so a file whose bytes do not match its declared type is never stored. A file with a valid signature that the browser cannot decode is stored, and the client falls back to the generated avatar. |
 | An image the browser cannot decode | the generated avatar | Same `onError` path as a 404 — the marker covers both. |
 | Postgres is unavailable | the upload/delete fails with an error | Redis is only written after the Postgres write succeeds, so a `has: true` record with no stored photo cannot be created. |
 

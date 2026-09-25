@@ -12,9 +12,6 @@ import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   HERO_SUBTITLE,
@@ -91,7 +88,6 @@ export function LudoLobby() {
   };
 
   const [rooms, setRooms] = useState<Room[] | null>(null);
-  const [roomFilter, setRoomFilter] = useState<'all' | 'classic' | 'duel'>('all');
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
 
   const [hasActiveGame, setHasActiveGame] = useState(false);
@@ -224,16 +220,12 @@ export function LudoLobby() {
     };
   };
 
-  const filteredRooms = (rooms ?? []).filter((r) => roomFilter === 'all' || r.mode === roomFilter);
+  const filteredRooms = rooms ?? [];
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`} id="crtScreen">
@@ -780,70 +772,6 @@ export function LudoLobby() {
                   className={WINDOW_BODY}
                   style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}
                 >
-                  {/* Filter Sub-Bar */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '2px 4px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--accent-cyan)',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      {t('ludoLobbyPasses.filterSector')}
-                    </span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        className={RETRO_BTN}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.68rem',
-                          background: roomFilter === 'all' ? 'var(--accent-pink)' : undefined,
-                        }}
-                        onClick={() => {
-                          retroAudio.playUiBeep(520, 0.05);
-                          setRoomFilter('all');
-                        }}
-                      >
-                        {t('ludoLobbyPasses.filterAll')}
-                      </button>
-                      <button
-                        className={RETRO_BTN}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.68rem',
-                          background: roomFilter === 'classic' ? 'var(--accent-pink)' : undefined,
-                        }}
-                        onClick={() => {
-                          retroAudio.playUiBeep(520, 0.05);
-                          setRoomFilter('classic');
-                        }}
-                      >
-                        {t('ludoLobbyPasses.filterClassic4p')}
-                      </button>
-                      <button
-                        className={RETRO_BTN}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.68rem',
-                          background: roomFilter === 'duel' ? 'var(--accent-pink)' : undefined,
-                        }}
-                        onClick={() => {
-                          retroAudio.playUiBeep(520, 0.05);
-                          setRoomFilter('duel');
-                        }}
-                      >
-                        {t('ludoLobbyPasses.filterDuel2p')}
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Room Table */}
                   <div
                     style={{

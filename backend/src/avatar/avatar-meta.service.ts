@@ -5,7 +5,7 @@ import { secret } from '../secrets';
 
 // Avatar cache shared with the ludo-engine: `avatar:<userId>` = { has, style, v }.
 // Postgres stores the photo bytes, so this record is only a cache: write it AFTER
-// the Postgres write, and read a miss as has=false. See docs/avatar-system.md.
+// the Postgres write, and read a miss as has=false.
 export interface AvatarMeta {
   has: boolean;
   style?: string;

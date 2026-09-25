@@ -7,9 +7,6 @@ import { MarkdownViewer } from '../components/MarkdownViewer';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  GRID_HORIZON,
-  PERSPECTIVE_GRID,
   HERO_SECTION,
   HERO_TITLE,
   RETRO_WINDOW,
@@ -64,11 +61,7 @@ export function LegalPage({ initialDoc = 'privacy' }: LegalPageProps) {
 
   return (
     <>
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      <div className={GRID_BACKGROUND} />
 
       <div
         className={`${CRT_SCREEN} crt-screen flex min-h-screen w-full flex-col items-center justify-start`}

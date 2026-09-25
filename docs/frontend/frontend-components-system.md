@@ -7,8 +7,7 @@
 - [Key Types / Interfaces](#key-types--interfaces) — Component props and shared helpers
 - [Core Logic / Flow](#core-logic--flow) — Mermaid sequence diagrams for each component
 - [Logic Paths Summary](#logic-paths-summary) — Decision trees for rendering
-- [Rank Tiers (`utils/ranks.ts`)](#rank-tiers-utilsranksts) — Rating to tier mapping used by `RankBadge`
-- [Theme-aware Tailwind Utilities (`styles/tw.ts`)](#theme-aware-tailwind-utilities-stylestwts) — The shared utility-class constants
+- [Tailwind Utilities (`styles/tw.ts`)](#tailwind-utilities-stylestwts) — The shared utility-class constants
 - [Implementation Notes](#implementation-notes) — Portals, compact mode, avatar attributes, CJK (Chinese, Japanese and Korean) text sizing
 - [Dependencies](#dependencies) — Internal and external dependencies
 
@@ -25,7 +24,7 @@ The shared components are reusable UI (user interface) building blocks used on s
 2. **RetroNavbar** — top navigation bar used by every page (logo, nav links, language selector, user menu).
 4. **RetroAuthLayout** — centered layout for the authentication pages (login, signup, 2FA, forgot/reset password).
 5. **Board / Die** — the Ludo board and the animated die.
-6. **UserAvatar / RankBadge** — avatar rendering and rank tier badges.
+6. **UserAvatar** — avatar rendering.
 7. **OAuthButtons** — Google, GitHub and 42 provider buttons.
 8. **NotificationBell / NotificationToast** — the notification bell and toasts.
 9. **JoinByCode** — invite-code input for joining a game.
@@ -48,7 +47,6 @@ The shared components are reusable UI (user interface) building blocks used on s
 | `src/components/Die.tsx` | Dice component — face rendering with roll animation |
 | `src/components/UserAvatar.tsx` | Avatar image — keyed by the immutable `userId`; requests the photo only when the seat is not a bot and a photo is known to exist (payload flag or a live `avatar_changed` override), otherwise renders the DiceBear default. A failed load marks that id broken for the session so it is not retried; an optional `onPhotoError` callback runs when that happens, so a parent component can show a message (the Profile page uses it to show a warning in the user's language) |
 | `src/dicebear.ts` | DiceBear helper — generates an avatar data URI (Uniform Resource Identifier) (`avataaars`/`bottts`/`identicon`) |
-| `src/components/RankBadge.tsx` | Rank tier badge based on rating |
 | `src/components/OAuthButtons.tsx` | OAuth provider buttons (42, GitHub, Google) |
 | `src/components/NotificationBell.tsx` | Bell icon, unread badge and dropdown |
 | `src/components/NotificationToast.tsx` | Toast notifications |
@@ -239,33 +237,14 @@ sequenceDiagram
 ---
 
 
-## Rank Tiers (`utils/ranks.ts`)
-
-`getRankTier(rating, boardRank?)` maps a rating (plus an optional leaderboard position) to one of five tier objects that `RankBadge` renders. Home, Leaderboard, Friends and Profile use it.
-
-| Tier | Constant | Requirement |
-|------|----------|-------------|
-| MAMEE MONSTER | `RANK_MAMEE` | Top 3 on the leaderboard — a *position* rule that takes precedence over rating |
-| MILO DINOSAUR | `RANK_MILO` | rating >= 1350 |
-| PADDLE POP | `RANK_PADDLE` | rating 1200-1349 |
-| HONEY STARS | `RANK_HONEY` | rating 1000-1199 |
-| CHOKI CHOKI | `RANK_CHOKI` | rating < 1000 |
-
-The top tier depends on position, not on points: a player is MAMEE only while they hold a podium spot. The mamee and milo aura glows come from the `BADGE_*_AURA` constants in `styles/tw.ts`.
-
-
----
----
-
-
-## Theme-aware Tailwind Utilities (`styles/tw.ts`)
+## Tailwind Utilities (`styles/tw.ts`)
 
 `src/styles/tw.ts` holds Tailwind class strings that several components share, so the same long list of utility classes is not written out at every place it is used.
 
 Rules that apply to the whole file:
 
-- **Themes are handled in CSS, not in JavaScript.** The `[data-theme]` custom properties live in `retrowave.css`. Each theme change here is an arbitrary `&`-selector variant such as `[[data-theme=win95]_&]:...`. No JavaScript checks the theme.
-- **`!` (the important modifier) marks a real specificity conflict.** This happens when the code using the class sets its own inline `background`, `border` or `box-shadow`, or when two utilities of the same specificity depend on stylesheet order (Tailwind does not guarantee that its generated order matches the order inside the className). Every `!` marks a place where the utility without it does not take effect.
+- **No theme logic.** Every colour comes from the custom properties declared on `:root, [data-theme='synthwave']` in `retrowave.css`.
+- **`!` (the important modifier) marks a real specificity conflict.** Four constants need it: `GAME_WINDOW_HEADER_EXTRA`, `CYBER_BTN_PINK`, `CYBER_BTN_YELLOW` and `CYBER_BTN_DANGER`, where another utility of the same specificity would otherwise win.
 - **`@keyframes` and custom easing curves** (`--flicker`) cannot be written as utility classes, so they stay in `retrowave.css` and are referenced with `var()` or arbitrary `animation:` values.
 - **State controlled by JavaScript** (open/closed, glitching, an active LED) is written as a literal or conditional class, or as a `data-*` attribute read through a `group-data-` variant.
 
@@ -273,22 +252,16 @@ Per-constant notes:
 
 | Constant | Notes |
 |---|---|
-| `THEME_TRIGGER_BTN_BASE` | The code using this class sets inline background, border and shadow, so the theme variants need `!`. The variants are scoped to `.retro-floating-dock`, the dock that renders this button. `active` is a literal class set by JavaScript, so `&.active` matches it. |
-| `THEME_POPOVER_MENU_BASE` | The `--fs-*` custom properties cover the colours, but win95 and terminal also change the radius, shadow and blur, so those need their own variants with `!`. Open/closed/up/down is JavaScript state (`THEME_POPOVER_MENU_HIDDEN` / `_ACTIVE_DOWN` / `_ACTIVE_UP`); `@keyframes popover-slide-*` stay in CSS. |
-| `RETRO_FLOATING_DOCK` | RetroNavbar's `#mainNav`. This element has no inline background, border or shadow, so no `!` is needed — the arbitrary variants already have higher specificity. |
-| `CRT_SCREEN` | The "page shell" shared by Home, Profile, Leaderboard, Friends, Lobby, Game and LudoLobby. Every value comes from a custom property, so it follows the theme with no theme logic here. The win95/terminal `.retro-window`, `.window-header` and `.window-body` overrides live in the CSS. |
-| `GRID_BACKGROUND` | The animated 3D synthwave grid and sun, shared by RetroAuthLayout and the page shells. The theme `display:none` rules are `&` variants; `@keyframes grid-scroll` stays in CSS. |
-| `WINDOW_HEADER` | The theme reskin applies to every page. `!` is required to break the tie with `GAME_WINDOW_HEADER_EXTRA` on Game.tsx. |
-| `GAME_WINDOW_HEADER_EXTRA` | The Game.tsx-only header look, identical in every theme until a theme reskin replaces parts of it. `!bg-[#140a35]` beats `WINDOW_HEADER`'s plain default, while `WINDOW_HEADER`'s `!`-marked theme variants (higher specificity) win on win95 and terminal. |
-| `RETRO_TICKET_PASS` | LudoLobby's quick-deploy tickets. The win95/terminal overrides apply one property at a time; where two of them set the same property, the later one wins. |
+| `THEME_TRIGGER_BTN_BASE` | The account and notification trigger buttons. Callers set inline background, border and shadow; `active` is a literal class set by JavaScript, so `&.active` matches it. |
+| `THEME_POPOVER_MENU_BASE` | The account popover panel, coloured by the `--fs-*` custom properties. Open/closed/up/down is JavaScript state (`THEME_POPOVER_MENU_HIDDEN` / `_ACTIVE_DOWN` / `_ACTIVE_UP`); the `popover-slide-*` keyframes stay in CSS. |
+| `CRT_SCREEN` | The "page shell" shared by Home, Profile, Leaderboard, Friends, Lobby, Game and LudoLobby. Every value comes from a custom property. |
+| `GRID_BACKGROUND` | The fixed cityscape background layer used by RetroAuthLayout and the page shells, with a darkening gradient on its `after:` layer. |
+| `GAME_WINDOW_HEADER_EXTRA` | The Game.tsx-only header look. `!bg-[#140a35]` beats `WINDOW_HEADER`'s plain default. |
 | `ARCADE_START_TITLE` | `whitespace-nowrap` is required: at 1.5px letter-spacing the heading and its spaced arrows are wider than the overlay, so the arrows would wrap onto their own lines. |
-| `CYBER_CASSETTE_CHASSIS` | Home's "CYBERSOUND DECK" widget. The theme overrides are `&` variants; the `.lit-*` LED classes are utility strings chosen in JavaScript; `.cyber-deck-key-play.active` is a conditional class. |
-| `CYBER_MODAL_OVERLAY` | The most involved conversion. CyberModal's state has to reach many descendants, so the overlay includes `data-modal-state` and `data-glitching`, and the constants read them with `group-data-` variants. The overlay's group is **named** (`group/modal`) because `CyberButton`, which renders inside it, has its own unnamed `group`/`group-hover:` for a separate hover glitch, and an unnamed group matches *any* ancestor. While it was unnamed, hovering anywhere over the modal triggered the button's glitch and the label became garbled; this was confirmed by taking a screenshot, not assumed. `:root { --flicker }` and the three `@keyframes` stay in CSS. The `:not(:disabled)` guard on the hover rules was dropped because no call site passes `disabled`. |
-| `CYBER_BTN_PINK` / `_YELLOW` / `_DANGER` | Need `!` on their `--btn-accent`/`--btn-shadow` overrides: `CYBER_BTN_BASE` sets defaults of the same specificity, and those defaults otherwise win no matter what order the classes are joined in. |
-| `CYBER_BTN_BACKDROP_SHARED` | `before:!mask-clip-*` / `before:!mask-composite-*` need `!` because the `mask` shorthand utility resets its longhand properties, and Tailwind placed the shorthand after them. Without `!` the bevel cut turned back into a solid fill and the label became unreadable. |
-| `TICKET_CONTAINER` / `RESULTS_INVOICE` / `INVOICE_VALUE` | ResultsModal's "vending machine ticket". The values were read with `getComputedStyle()` on the live modal in all three themes: `top-6`, `z-5`, Share Tech Mono, VT323, and the win95/terminal title colour plus the terminal value's text-shadow and font-size. |
-| `PAY_TAG_BASE` | win95 and terminal override the border, background and colour regardless of rank, so the order relative to the rank modifiers does not matter (the theme selector has higher specificity than the rank modifier). |
-| `BADGE_*_AURA` | RankBadge's fire/plasma glow for the mamee and milo tiers: static `::before`/`::after` layers with their own always-running animation. Because the Tailwind JIT scanner can silently drop rules for a very long combined class string, this constant is checked against the compiled CSS. mamee's `before:` has no `pointer-events-none` and the other three do. |
+| `CYBER_MODAL_*` | CyberModal's overlay, box, body and glitch layers. The modal state travels through the `data-modal-state` and `data-glitching` attributes, read with `group-data-` variants. |
+| `CYBER_BTN_*` | The modal buttons. `_PINK`, `_YELLOW` and `_DANGER` use `!` on their `--btn-accent`/`--btn-shadow` overrides so they beat `CYBER_BTN_BASE`'s defaults. |
+| `RESULTS_INVOICE` / `TICKET_CONTAINER` / `INVOICE_VALUE` | ResultsModal's "vending machine ticket", printed by the `printVendingTicketJitter` keyframe; the invoice uses Share Tech Mono and VT323 with `top-6` and `z-5`. |
+| `PAY_TAG_BASE` / `PAY_TAG_*` | The payment tags: border, background and colour come from the rank modifier class. |
 
 
 ---

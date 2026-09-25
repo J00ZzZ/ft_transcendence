@@ -28,7 +28,6 @@ export class ResultSubmitter {
 
       // Hotseat is demo-and-forget: the result is NEVER submitted to the
       // backend : no game/participant rows, no counters, no leaderboard.
-      // (achievement-revamp.md §2)
       const matchData = await this.store.getMatchData(gameId);
       if (matchData?.gameType === 'HOTSEAT') {
         console.log(`Game ${gameId} is HOTSEAT : skipping backend submission (demo-and-forget)`);

@@ -483,6 +483,7 @@ GET /api/auth/{provider}/callback
   ├── Extract an email the provider has verified (Google, GitHub) or the 42 address
   ├── validateOAuthLogin():
   │   ├── Check existing Account → return linked user
+  │   ├── Add-method link: reject a provider email that already belongs to another account (409 AUTH_EMAIL_TAKEN)
   │   ├── Check email match → link provider to existing user
   │   └── Create new user + account
   ├── If the oauth-link token matched the session → redirect to /profile (no new session)

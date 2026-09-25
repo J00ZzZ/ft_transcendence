@@ -138,4 +138,4 @@ ResultsModal renders
 | `store.tsx` | `useApp` → lastResult, setLastResult |
 | `components/UserAvatar.tsx` | Player avatars on the podium |
 | `utils/audio.ts` | `retroAudio` end-of-game chimes |
-| `utils/ranks.ts` | `getRankTier` for rank display |
+

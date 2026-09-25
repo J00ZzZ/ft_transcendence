@@ -18,7 +18,7 @@
 Supporting modules shared by every screen:
 
 1. **i18n** — `i18next` + `react-i18next` with three languages: English (`en`), Malay (`ms`), French (`fr`). The choice persists in `localStorage` under the key `lr.lang`. If the saved value is unknown or missing, the default language `en` is used.
-2. **Audio** — `RetroAudioEngine`, a Web Audio chiptune synthesizer with three built-in tracks, used by the Game page for dice/move effects (`playUiBeep`) and background music. Muting is toggled via `toggleMute()`.
+2. **Audio** — `RetroAudioEngine`, a Web Audio synthesizer for UI beeps and game sounds (dice, moves, captures, ignition). The Game page calls it through `retroAudio`; muting is toggled with `toggleMute()`.
 3. **Bot names** — `localizedBotName()` maps the engine's `bot-<color>` user ids to a translated "bot-<color>" string using the `common.bot` label and the `lobby.color*` i18n keys.
 4. **Legal pages** — `LegalPage` renders the Privacy Policy and Terms of Service (public routes `/privacy` and `/terms`) from markdown files bundled with Vite's `?raw` imports, one variant per language.
 5. **Entry point** — `main.tsx` mounts `<App />` in `StrictMode` and imports the CSS plus `./i18n` so translations are ready before the first render.
@@ -37,7 +37,7 @@ Supporting modules shared by every screen:
 | `src/locales/en.ts` | English translation namespace |
 | `src/locales/fr.ts` | French translation namespace |
 | `src/locales/ms.ts` | Malay translation namespace |
-| `src/utils/audio.ts` | `RetroAudioEngine` — Web Audio chiptune tracks, UI beeps, mute toggle |
+| `src/utils/audio.ts` | `RetroAudioEngine` — Web Audio UI beeps and game sounds, volume + mute |
 | `src/utils/botName.ts` | `localizedBotName()` — `bot-<color>` → translated bot name |
 | `src/pages/LegalPage.tsx` | Privacy / Terms pages (`/privacy`, `/terms`) — markdown viewer per language |
 

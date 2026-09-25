@@ -9,15 +9,10 @@ import { useRoute, navigate } from '../router';
 import { useApp } from '../store';
 import { STATUS_STYLE, type PresenceStatus } from '../theme';
 import { retroAudio } from '../utils/audio';
-import { getRankTier } from '../utils/ranks';
-import { RankBadge } from '../components/RankBadge';
 import '../styles/retrowave.css';
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   RETRO_WINDOW,
@@ -90,9 +85,7 @@ const STATUS_KEYS: Record<PresenceStatus, string> = {
   offline: 'friends.offline',
 };
 
-/**
- * The 13 visible achievements; see docs/frontend/frontend-profile-module.md.
- */
+/** The 13 visible achievements. */
 const ACHIEVEMENTS_DEF = [
   {
     key: 'achFirstBlood',
@@ -197,8 +190,6 @@ export function Profile() {
   // a missing key must read as "no report yet" even though the map type is dense.
   const getAchievementReport = (key: string): AchievementReport | undefined => achievements[key];
   const [mainTab, setMainTab] = useState<'history' | 'achievements'>('history');
-  const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
-  const [leaderboardMap, setLeaderboardMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -329,31 +320,6 @@ export function Profile() {
         if (!cancelled) setFriendsData([]);
       });
 
-    fetch('/api/leaderboard?mode=global&limit=50', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.entries) {
-          const map: Record<string, number> = {};
-          data.entries.forEach((e: { username: string; rank: number }) => {
-            map[e.username] = e.rank;
-          });
-          setLeaderboardMap(map);
-
-          if (isOwnProfile && data?.myRank?.rank) {
-            setLeaderboardRank(data.myRank.rank);
-          } else {
-            const match = data.entries.find(
-              (e: { username: string; rank: number }) => e.username === username,
-            );
-            setLeaderboardRank(match ? match.rank : null);
-          }
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setLeaderboardRank(null);
-      });
-
     return () => {
       cancelled = true;
     };
@@ -362,12 +328,7 @@ export function Profile() {
   const totalGames = profile ? profile.wins + profile.losses : 0;
   const winRate = profile && totalGames > 0 ? Math.round((profile.wins / totalGames) * 100) : 0;
   const statusStyle = profile ? STATUS_STYLE[profile.status] : STATUS_STYLE.offline;
-  const rankTier = profile ? getRankTier(profile.rating, leaderboardRank) : getRankTier(1200);
   const peakRating = profile ? profile.highestRating || profile.rating : 1200;
-  const peakTier =
-    profile && leaderboardRank && leaderboardRank <= 3 && peakRating >= profile.rating
-      ? getRankTier(peakRating, leaderboardRank)
-      : getRankTier(peakRating);
 
   const unlockedCount = ACHIEVEMENTS_DEF.filter(
     (a) => getAchievementReport(a.key)?.unlocked === true,
@@ -377,12 +338,8 @@ export function Profile() {
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`} id="crtScreen">
@@ -522,7 +479,7 @@ export function Profile() {
                       flexShrink: 0,
                     }}
                   >
-                    {/* Ambient Rank Tier Glow */}
+                    {/* Ambient Glow */}
                     <div
                       style={{
                         position: 'absolute',
@@ -531,7 +488,8 @@ export function Profile() {
                         width: 260,
                         height: 260,
                         borderRadius: '50%',
-                        background: `radial-gradient(circle, ${rankTier.glow} 0%, rgba(0,0,0,0) 70%)`,
+                        background:
+                          'radial-gradient(circle, rgba(0, 240, 255, 0.4) 0%, rgba(0,0,0,0) 70%)',
                         opacity: 0.25,
                         pointerEvents: 'none',
                       }}
@@ -545,8 +503,9 @@ export function Profile() {
                           style={{
                             padding: 4,
                             borderRadius: 8,
-                            background: `linear-gradient(135deg, ${rankTier.color}, var(--accent-cyan))`,
-                            boxShadow: `0 0 20px ${rankTier.glow}`,
+                            background:
+                              'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                            boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)',
                           }}
                         >
                           <UserAvatar
@@ -806,9 +765,11 @@ export function Profile() {
                     <div
                       style={{
                         borderRadius: 10,
-                        background: `radial-gradient(circle at center, ${rankTier.glow} 0%, rgba(8, 2, 26, 0.95) 85%)`,
-                        border: `2px solid ${rankTier.color}`,
-                        boxShadow: `0 0 24px ${rankTier.glow}, inset 0 0 16px rgba(0, 0, 0, 0.7)`,
+                        background:
+                          'radial-gradient(circle at center, rgba(0, 240, 255, 0.15) 0%, rgba(8, 2, 26, 0.95) 85%)',
+                        border: '2px solid var(--accent-cyan)',
+                        boxShadow:
+                          '0 0 24px rgba(0, 240, 255, 0.35), inset 0 0 16px rgba(0, 0, 0, 0.7)',
                         padding: '14px 18px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -821,7 +782,7 @@ export function Profile() {
                       <div
                         style={{
                           fontSize: '0.72rem',
-                          color: rankTier.color,
+                          color: 'var(--accent-cyan)',
                           fontFamily: 'var(--font-display)',
                           fontWeight: 900,
                           letterSpacing: '1.2px',
@@ -836,7 +797,8 @@ export function Profile() {
                           color: '#ffffff',
                           fontFamily: 'var(--font-display)',
                           margin: '3px 0 6px',
-                          textShadow: `0 0 18px ${rankTier.glow}, 0 0 35px ${rankTier.glow}`,
+                          textShadow:
+                            '0 0 18px rgba(0, 240, 255, 0.6), 0 0 35px rgba(0, 240, 255, 0.3)',
                           lineHeight: 1,
                           letterSpacing: '0.03em',
                         }}
@@ -844,7 +806,21 @@ export function Profile() {
                         {profile.rating}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <RankBadge tier={rankTier} fontSize="12px" padding="3.5px 12px" />
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 900,
+                            color: 'var(--accent-cyan)',
+                            background: 'rgba(0, 240, 255, 0.12)',
+                            border: '1px solid rgba(0, 240, 255, 0.5)',
+                            borderRadius: 4,
+                            padding: '3px 12px',
+                            letterSpacing: '1px',
+                            fontFamily: 'var(--font-display)',
+                          }}
+                        >
+                          CURRENT ELO
+                        </div>
                       </div>
                     </div>
 
@@ -852,9 +828,11 @@ export function Profile() {
                     <div
                       style={{
                         borderRadius: 10,
-                        background: `radial-gradient(circle at center, ${peakTier.glow} 0%, rgba(8, 2, 26, 0.95) 85%)`,
-                        border: `2px solid ${peakTier.color}`,
-                        boxShadow: `0 0 24px ${peakTier.glow}, inset 0 0 16px rgba(0, 0, 0, 0.7)`,
+                        background:
+                          'radial-gradient(circle at center, rgba(255, 215, 0, 0.15) 0%, rgba(8, 2, 26, 0.95) 85%)',
+                        border: '2px solid #ffd700',
+                        boxShadow:
+                          '0 0 24px rgba(255, 215, 0, 0.35), inset 0 0 16px rgba(0, 0, 0, 0.7)',
                         padding: '14px 18px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -867,7 +845,7 @@ export function Profile() {
                       <div
                         style={{
                           fontSize: '0.72rem',
-                          color: peakTier.color,
+                          color: '#ffd700',
                           fontFamily: 'var(--font-display)',
                           fontWeight: 900,
                           letterSpacing: '1.2px',
@@ -879,10 +857,11 @@ export function Profile() {
                         style={{
                           fontSize: '2.2rem',
                           fontWeight: 900,
-                          color: peakTier.color,
+                          color: '#ffd700',
                           fontFamily: 'var(--font-display)',
                           margin: '3px 0 6px',
-                          textShadow: `0 0 18px ${peakTier.glow}, 0 0 35px ${peakTier.glow}`,
+                          textShadow:
+                            '0 0 18px rgba(255, 215, 0, 0.6), 0 0 35px rgba(255, 215, 0, 0.3)',
                           lineHeight: 1,
                           letterSpacing: '0.03em',
                         }}
@@ -890,7 +869,21 @@ export function Profile() {
                         {peakRating}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <RankBadge tier={peakTier} fontSize="12px" padding="3.5px 12px" />
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 900,
+                            color: '#ffd700',
+                            background: 'rgba(255, 215, 0, 0.12)',
+                            border: '1px solid rgba(255, 215, 0, 0.5)',
+                            borderRadius: 4,
+                            padding: '3px 12px',
+                            letterSpacing: '1px',
+                            fontFamily: 'var(--font-display)',
+                          }}
+                        >
+                          PEAK RECORD
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1617,8 +1610,6 @@ export function Profile() {
                             </div>
                           ) : (
                             friendsData.map((f) => {
-                              const fRank = leaderboardMap[f.username];
-                              const fTier = getRankTier(f.rating, fRank);
                               const fStatus = STATUS_STYLE[f.status];
                               return (
                                 <div
@@ -1664,8 +1655,9 @@ export function Profile() {
                                         style={{
                                           padding: 2,
                                           borderRadius: 5,
-                                          background: `linear-gradient(135deg, ${fTier.color}, var(--accent-cyan))`,
-                                          boxShadow: `0 0 8px ${fTier.glow}`,
+                                          background:
+                                            'linear-gradient(135deg, var(--accent-pink), var(--accent-cyan))',
+                                          boxShadow: '0 0 8px rgba(0, 240, 255, 0.3)',
                                         }}
                                       >
                                         <UserAvatar
@@ -1724,11 +1716,6 @@ export function Profile() {
                                         >
                                           {f.displayName ?? f.username}
                                         </span>
-                                        <RankBadge
-                                          tier={fTier}
-                                          fontSize="9.5px"
-                                          padding="2px 7px"
-                                        />
                                       </div>
                                       <div
                                         style={{

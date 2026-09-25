@@ -5,15 +5,10 @@ import { UserAvatar } from '../components/UserAvatar';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { retroAudio } from '../utils/audio';
-import { getRankTier } from '../utils/ranks';
-import { RankBadge } from '../components/RankBadge';
-import '../styles/retrowave.css';
+
 import {
   CRT_SCREEN,
   GRID_BACKGROUND,
-  SYNTHWAVE_SUN,
-  PERSPECTIVE_GRID,
-  GRID_HORIZON,
   HERO_SECTION,
   HERO_TITLE,
   RETRO_WINDOW,
@@ -102,12 +97,8 @@ export function Leaderboard() {
 
   return (
     <>
-      {/* Animated 3D Synthwave Grid & Sun Background */}
-      <div className={GRID_BACKGROUND}>
-        <div className={SYNTHWAVE_SUN} />
-        <div className={GRID_HORIZON} />
-        <div className={PERSPECTIVE_GRID} />
-      </div>
+      {/* Synthwave cityscape background */}
+      <div className={GRID_BACKGROUND} />
 
       {/* CRT Monitor Overlay FX Container */}
       <div className={`${CRT_SCREEN} crt-screen ${crtEnabled ? 'relative' : ''}`} id="crtScreen">
@@ -214,380 +205,357 @@ export function Leaderboard() {
                     }}
                   >
                     {/* Rank #2 Podium Card */}
-                    {top2 &&
-                      (() => {
-                        const tier2 = getRankTier(top2.rating, 2);
-                        return (
-                          <div
+                    {top2 && (
+                      <div
+                        style={{
+                          background: 'rgba(25, 10, 56, 0.85)',
+                          border: '1.5px solid rgba(0, 240, 255, 0.45)',
+                          borderRadius: 8,
+                          boxShadow: '0 0 18px rgba(0, 240, 255, 0.22)',
+                          padding: '20px 22px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                        }}
+                        onClick={() => {
+                          retroAudio.playUiBeep(600, 0.05);
+                          navigate(`/profile?u=${top2.username}`);
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-3px)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 16,
+                          }}
+                        >
+                          <span
                             style={{
-                              background: 'rgba(25, 10, 56, 0.85)',
-                              border: '1.5px solid rgba(0, 240, 255, 0.45)',
-                              borderRadius: 8,
-                              boxShadow: '0 0 18px rgba(0, 240, 255, 0.22)',
-                              padding: '20px 22px',
-                              cursor: 'pointer',
-                              transition: 'transform 0.2s, box-shadow 0.2s',
+                              fontSize: '1.35rem',
+                              fontFamily: 'var(--font-display)',
+                              fontWeight: 900,
+                              color: 'var(--accent-cyan)',
                             }}
-                            onClick={() => {
-                              retroAudio.playUiBeep(600, 0.05);
-                              navigate(`/profile?u=${top2.username}`);
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.transform = 'translateY(-3px)')
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.transform = 'translateY(0)')
-                            }
                           >
+                            #2
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          <UserAvatar
+                            username={top2.username}
+                            userId={top2.id}
+                            hasAvatarPhoto={top2.hasAvatarPhoto}
+                            size={52}
+                            fallbackStyle={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 8,
+                              background: 'rgba(10, 2, 28, 0.9)',
+                              color: 'var(--accent-cyan)',
+                              display: 'grid',
+                              placeItems: 'center',
+                              fontWeight: 'bold',
+                              fontSize: '1.05rem',
+                            }}
+                          />
+                          <div>
                             <div
                               style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: 16,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: '1.35rem',
-                                  fontFamily: 'var(--font-display)',
-                                  fontWeight: 900,
-                                  color: 'var(--accent-cyan)',
-                                }}
-                              >
-                                #2
-                              </span>
-                              <RankBadge tier={tier2} fontSize="12px" padding="4px 10px" />
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              <UserAvatar
-                                username={top2.username}
-                                userId={top2.id}
-                                hasAvatarPhoto={top2.hasAvatarPhoto}
-                                size={52}
-                                fallbackStyle={{
-                                  width: 52,
-                                  height: 52,
-                                  borderRadius: 8,
-                                  background: 'rgba(10, 2, 28, 0.9)',
-                                  color: 'var(--accent-cyan)',
-                                  display: 'grid',
-                                  placeItems: 'center',
-                                  fontWeight: 'bold',
-                                  fontSize: '1.05rem',
-                                }}
-                              />
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: '1.1rem',
-                                    fontWeight: 700,
-                                    color: '#ffffff',
-                                    fontFamily: 'var(--font-display)',
-                                    letterSpacing: '0.04em',
-                                  }}
-                                >
-                                  {top2.displayName ?? top2.username}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: '1.35rem',
-                                    fontWeight: 900,
-                                    color: '#ffffff',
-                                    fontFamily: 'var(--font-display)',
-                                    letterSpacing: '0.04em',
-                                    marginTop: 2,
-                                  }}
-                                >
-                                  ♛ {top2.rating}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                marginTop: 16,
-                                paddingTop: 12,
-                                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                                fontSize: '0.78rem',
-                                color: 'var(--text-muted)',
+                                fontSize: '1.1rem',
+                                fontWeight: 700,
+                                color: '#ffffff',
                                 fontFamily: 'var(--font-display)',
-                                letterSpacing: '0.03em',
+                                letterSpacing: '0.04em',
                               }}
                             >
-                              <span>
-                                {t('leaderboard.matchesLabel')}{' '}
-                                <strong style={{ color: '#ffffff' }}>{top2.gamesPlayed}</strong>
-                              </span>
-                              <span>
-                                {t('leaderboard.winRateLabel')}{' '}
-                                <strong style={{ color: '#ffffff' }}>{top2.winRate}%</strong>
-                              </span>
+                              {top2.displayName ?? top2.username}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '1.35rem',
+                                fontWeight: 900,
+                                color: '#ffffff',
+                                fontFamily: 'var(--font-display)',
+                                letterSpacing: '0.04em',
+                                marginTop: 2,
+                              }}
+                            >
+                              ♛ {top2.rating}
                             </div>
                           </div>
-                        );
-                      })()}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginTop: 16,
+                            paddingTop: 12,
+                            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                            fontSize: '0.78rem',
+                            color: 'var(--text-muted)',
+                            fontFamily: 'var(--font-display)',
+                            letterSpacing: '0.03em',
+                          }}
+                        >
+                          <span>
+                            {t('leaderboard.matchesLabel')}{' '}
+                            <strong style={{ color: '#ffffff' }}>{top2.gamesPlayed}</strong>
+                          </span>
+                          <span>
+                            {t('leaderboard.winRateLabel')}{' '}
+                            <strong style={{ color: '#ffffff' }}>{top2.winRate}%</strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Rank #1 Apex Champion Citadel Card */}
-                    {top1 &&
-                      (() => {
-                        const tier1 = getRankTier(top1.rating, 1);
-                        return (
+                    {top1 && (
+                      <div
+                        className={APEX_CHAMPION_CARD}
+                        style={{
+                          background:
+                            'linear-gradient(180deg, rgba(48, 12, 38, 0.95), rgba(20, 5, 28, 0.98))',
+                          border: '2px solid #ff1744',
+                          borderRadius: 8,
+                          padding: '24px 26px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                        }}
+                        onClick={() => {
+                          retroAudio.playUiBeep(750, 0.05);
+                          navigate(`/profile?u=${top1.username}`);
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 18,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span
+                              style={{
+                                fontSize: '1.5rem',
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 900,
+                                color: '#ffe600',
+                                textShadow: '0 0 10px rgba(255, 230, 0, 0.6)',
+                              }}
+                            >
+                              #1
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                color: '#ffe600',
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 900,
+                                letterSpacing: '0.5px',
+                              }}
+                            >
+                              {t('leaderboard.apexChampion')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                           <div
-                            className={APEX_CHAMPION_CARD}
                             style={{
-                              background:
-                                'linear-gradient(180deg, rgba(48, 12, 38, 0.95), rgba(20, 5, 28, 0.98))',
-                              border: '2px solid #ff1744',
+                              padding: 2.5,
                               borderRadius: 8,
-                              padding: '24px 26px',
-                              cursor: 'pointer',
-                              transition: 'transform 0.2s, box-shadow 0.2s',
-                            }}
-                            onClick={() => {
-                              retroAudio.playUiBeep(750, 0.05);
-                              navigate(`/profile?u=${top1.username}`);
+                              background: 'linear-gradient(135deg, #ff1744, #ffe600)',
+                              boxShadow: '0 0 16px rgba(255, 23, 68, 0.55)',
                             }}
                           >
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: 18,
+                            <UserAvatar
+                              username={top1.username}
+                              userId={top1.id}
+                              hasAvatarPhoto={top1.hasAvatarPhoto}
+                              size={62}
+                              fallbackStyle={{
+                                width: 62,
+                                height: 62,
+                                borderRadius: 6,
+                                background: 'rgba(10, 2, 28, 0.95)',
+                                color: '#ffe600',
+                                display: 'grid',
+                                placeItems: 'center',
+                                fontWeight: 'bold',
+                                fontSize: '1.4rem',
                               }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span
-                                  style={{
-                                    fontSize: '1.5rem',
-                                    fontFamily: 'var(--font-display)',
-                                    fontWeight: 900,
-                                    color: '#ffe600',
-                                    textShadow: '0 0 10px rgba(255, 230, 0, 0.6)',
-                                  }}
-                                >
-                                  #1
-                                </span>
-                                <span
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    color: '#ffe600',
-                                    fontFamily: 'var(--font-display)',
-                                    fontWeight: 900,
-                                    letterSpacing: '0.5px',
-                                  }}
-                                >
-                                  {t('leaderboard.apexChampion')}
-                                </span>
-                              </div>
-                              <RankBadge tier={tier1} fontSize="13px" padding="4px 12px" />
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              <div
-                                style={{
-                                  padding: 2.5,
-                                  borderRadius: 8,
-                                  background: 'linear-gradient(135deg, #ff1744, #ffe600)',
-                                  boxShadow: '0 0 16px rgba(255, 23, 68, 0.55)',
-                                }}
-                              >
-                                <UserAvatar
-                                  username={top1.username}
-                                  userId={top1.id}
-                                  hasAvatarPhoto={top1.hasAvatarPhoto}
-                                  size={62}
-                                  fallbackStyle={{
-                                    width: 62,
-                                    height: 62,
-                                    borderRadius: 6,
-                                    background: 'rgba(10, 2, 28, 0.95)',
-                                    color: '#ffe600',
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                    fontWeight: 'bold',
-                                    fontSize: '1.4rem',
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: '1.3rem',
-                                    fontWeight: 900,
-                                    color: '#ffffff',
-                                    fontFamily: 'var(--font-display)',
-                                    letterSpacing: '0.04em',
-                                  }}
-                                >
-                                  {top1.displayName ?? top1.username}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: '1.7rem',
-                                    fontWeight: 900,
-                                    color: '#ffffff',
-                                    fontFamily: 'var(--font-display)',
-                                    letterSpacing: '0.04em',
-                                    marginTop: 2,
-                                  }}
-                                >
-                                  ♛ {top1.rating}
-                                </div>
-                              </div>
-                            </div>
-
+                            />
+                          </div>
+                          <div>
                             <div
                               style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                marginTop: 18,
-                                paddingTop: 12,
-                                borderTop: '1px solid rgba(255, 23, 68, 0.3)',
-                                fontSize: '0.8rem',
-                                color: '#ffcad4',
+                                fontSize: '1.3rem',
+                                fontWeight: 900,
+                                color: '#ffffff',
                                 fontFamily: 'var(--font-display)',
-                                letterSpacing: '0.03em',
+                                letterSpacing: '0.04em',
                               }}
                             >
-                              <span>
-                                {t('leaderboard.matchesLabel')}{' '}
-                                <strong style={{ color: '#ffffff', fontSize: '0.88rem' }}>
-                                  {top1.gamesPlayed}
-                                </strong>
-                              </span>
-                              <span>
-                                {t('leaderboard.winRateLabel')}{' '}
-                                <strong style={{ color: '#00ff88', fontSize: '0.88rem' }}>
-                                  {top1.winRate}%
-                                </strong>
-                              </span>
+                              {top1.displayName ?? top1.username}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '1.7rem',
+                                fontWeight: 900,
+                                color: '#ffffff',
+                                fontFamily: 'var(--font-display)',
+                                letterSpacing: '0.04em',
+                                marginTop: 2,
+                              }}
+                            >
+                              ♛ {top1.rating}
                             </div>
                           </div>
-                        );
-                      })()}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginTop: 18,
+                            paddingTop: 12,
+                            borderTop: '1px solid rgba(255, 23, 68, 0.3)',
+                            fontSize: '0.8rem',
+                            color: '#ffcad4',
+                            fontFamily: 'var(--font-display)',
+                            letterSpacing: '0.03em',
+                          }}
+                        >
+                          <span>
+                            {t('leaderboard.matchesLabel')}{' '}
+                            <strong style={{ color: '#ffffff', fontSize: '0.88rem' }}>
+                              {top1.gamesPlayed}
+                            </strong>
+                          </span>
+                          <span>
+                            {t('leaderboard.winRateLabel')}{' '}
+                            <strong style={{ color: '#00ff88', fontSize: '0.88rem' }}>
+                              {top1.winRate}%
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Rank #3 Podium Card */}
-                    {top3 &&
-                      (() => {
-                        const tier3 = getRankTier(top3.rating, 3);
-                        return (
-                          <div
+                    {top3 && (
+                      <div
+                        style={{
+                          background: 'rgba(25, 10, 56, 0.85)',
+                          border: '1.5px solid rgba(255, 0, 127, 0.45)',
+                          borderRadius: 8,
+                          boxShadow: '0 0 18px rgba(255, 0, 127, 0.22)',
+                          padding: '20px 22px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                        }}
+                        onClick={() => {
+                          retroAudio.playUiBeep(600, 0.05);
+                          navigate(`/profile?u=${top3.username}`);
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-3px)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 16,
+                          }}
+                        >
+                          <span
                             style={{
-                              background: 'rgba(25, 10, 56, 0.85)',
-                              border: '1.5px solid rgba(255, 0, 127, 0.45)',
-                              borderRadius: 8,
-                              boxShadow: '0 0 18px rgba(255, 0, 127, 0.22)',
-                              padding: '20px 22px',
-                              cursor: 'pointer',
-                              transition: 'transform 0.2s, box-shadow 0.2s',
+                              fontSize: '1.35rem',
+                              fontFamily: 'var(--font-display)',
+                              fontWeight: 900,
+                              color: 'var(--accent-pink)',
                             }}
-                            onClick={() => {
-                              retroAudio.playUiBeep(600, 0.05);
-                              navigate(`/profile?u=${top3.username}`);
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.transform = 'translateY(-3px)')
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.transform = 'translateY(0)')
-                            }
                           >
+                            #3
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          <UserAvatar
+                            username={top3.username}
+                            userId={top3.id}
+                            hasAvatarPhoto={top3.hasAvatarPhoto}
+                            size={52}
+                            fallbackStyle={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 8,
+                              background: 'rgba(10, 2, 28, 0.9)',
+                              color: 'var(--accent-pink)',
+                              display: 'grid',
+                              placeItems: 'center',
+                              fontWeight: 'bold',
+                              fontSize: '1.05rem',
+                            }}
+                          />
+                          <div>
                             <div
                               style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: 16,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: '1.35rem',
-                                  fontFamily: 'var(--font-display)',
-                                  fontWeight: 900,
-                                  color: 'var(--accent-pink)',
-                                }}
-                              >
-                                #3
-                              </span>
-                              <RankBadge tier={tier3} fontSize="12px" padding="4px 10px" />
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              <UserAvatar
-                                username={top3.username}
-                                userId={top3.id}
-                                hasAvatarPhoto={top3.hasAvatarPhoto}
-                                size={52}
-                                fallbackStyle={{
-                                  width: 52,
-                                  height: 52,
-                                  borderRadius: 8,
-                                  background: 'rgba(10, 2, 28, 0.9)',
-                                  color: 'var(--accent-pink)',
-                                  display: 'grid',
-                                  placeItems: 'center',
-                                  fontWeight: 'bold',
-                                  fontSize: '1.05rem',
-                                }}
-                              />
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: '1.1rem',
-                                    fontWeight: 700,
-                                    color: '#ffffff',
-                                    fontFamily: 'var(--font-display)',
-                                    letterSpacing: '0.04em',
-                                  }}
-                                >
-                                  {top3.displayName ?? top3.username}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: '1.35rem',
-                                    fontWeight: 900,
-                                    color: '#ffffff',
-                                    fontFamily: 'var(--font-display)',
-                                    letterSpacing: '0.04em',
-                                    marginTop: 2,
-                                  }}
-                                >
-                                  ♛ {top3.rating}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                marginTop: 16,
-                                paddingTop: 12,
-                                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                                fontSize: '0.78rem',
-                                color: 'var(--text-muted)',
+                                fontSize: '1.1rem',
+                                fontWeight: 700,
+                                color: '#ffffff',
                                 fontFamily: 'var(--font-display)',
-                                letterSpacing: '0.03em',
+                                letterSpacing: '0.04em',
                               }}
                             >
-                              <span>
-                                {t('leaderboard.matchesLabel')}{' '}
-                                <strong style={{ color: '#ffffff' }}>{top3.gamesPlayed}</strong>
-                              </span>
-                              <span>
-                                {t('leaderboard.winRateLabel')}{' '}
-                                <strong style={{ color: '#ffffff' }}>{top3.winRate}%</strong>
-                              </span>
+                              {top3.displayName ?? top3.username}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '1.35rem',
+                                fontWeight: 900,
+                                color: '#ffffff',
+                                fontFamily: 'var(--font-display)',
+                                letterSpacing: '0.04em',
+                                marginTop: 2,
+                              }}
+                            >
+                              ♛ {top3.rating}
                             </div>
                           </div>
-                        );
-                      })()}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginTop: 16,
+                            paddingTop: 12,
+                            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                            fontSize: '0.78rem',
+                            color: 'var(--text-muted)',
+                            fontFamily: 'var(--font-display)',
+                            letterSpacing: '0.03em',
+                          }}
+                        >
+                          <span>
+                            {t('leaderboard.matchesLabel')}{' '}
+                            <strong style={{ color: '#ffffff' }}>{top3.gamesPlayed}</strong>
+                          </span>
+                          <span>
+                            {t('leaderboard.winRateLabel')}{' '}
+                            <strong style={{ color: '#ffffff' }}>{top3.winRate}%</strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -609,7 +577,7 @@ export function Leaderboard() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1.8fr 2.2fr 1.1fr 1.1fr 1fr',
+                      gridTemplateColumns: '0.8fr 2.5fr 1.2fr 1.2fr 1fr',
                       gap: 20,
                       padding: '14px 28px',
                       background: 'rgba(25, 10, 56, 0.98)',
@@ -624,7 +592,7 @@ export function Leaderboard() {
                       zIndex: 3,
                     }}
                   >
-                    <div>{t('leaderboard.colRankTier')}</div>
+                    <div>{t('leaderboard.colRank')}</div>
                     <div>{t('leaderboard.colPlayer')}</div>
                     <div>{t('leaderboard.colRating')}</div>
                     <div>{t('leaderboard.colMatches')}</div>
@@ -668,7 +636,6 @@ export function Leaderboard() {
                         const isYou = entry.username === user?.username;
                         const isRankOne = entry.rank === 1;
                         const isTopThree = entry.rank <= 3;
-                        const tier = getRankTier(entry.rating, entry.rank);
                         const rankMedal = `#${entry.rank}`;
 
                         return (
@@ -676,7 +643,7 @@ export function Leaderboard() {
                             key={entry.rank}
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: '1.8fr 2.2fr 1.1fr 1.1fr 1fr',
+                              gridTemplateColumns: '0.8fr 2.5fr 1.2fr 1.2fr 1fr',
                               gap: 20,
                               padding: isRankOne
                                 ? '20px 28px'
@@ -715,12 +682,11 @@ export function Leaderboard() {
                                 e.currentTarget.style.background = 'transparent';
                             }}
                           >
-                            {/* Rank Badge Column */}
+                            {/* Rank Column */}
                             <div
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: isRankOne ? 14 : 12,
                               }}
                             >
                               <span
@@ -731,20 +697,20 @@ export function Leaderboard() {
                                     : entry.rank <= 3
                                       ? '1.35rem'
                                       : '1rem',
-                                  color: '#ffffff',
+                                  color: isRankOne
+                                    ? '#ffe600'
+                                    : entry.rank === 2
+                                      ? 'var(--accent-cyan)'
+                                      : entry.rank === 3
+                                        ? 'var(--accent-pink)'
+                                        : '#ffffff',
                                   fontFamily: 'var(--font-display)',
                                   letterSpacing: '0.03em',
-                                  minWidth: isRankOne ? 44 : 36,
-                                  textAlign: 'center',
+                                  textAlign: 'left',
                                 }}
                               >
                                 {rankMedal}
                               </span>
-                              <RankBadge
-                                tier={tier}
-                                fontSize={isRankOne ? '13px' : '11.5px'}
-                                padding={isRankOne ? '5px 12px' : '4px 10px'}
-                              />
                             </div>
 
                             {/* Pilot Info */}

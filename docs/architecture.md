@@ -1,7 +1,7 @@
 # Architecture
 
 **Project:** ft_transcendence — RetroLudo '42
-**Updated:** 2026-09-10
+**Updated:** 2026-09-23
 
 An eight-service Docker Compose stack: a React 19 SPA built, published, and
 watched for source changes by a long-running `frontend` job, served over TLS by
@@ -380,7 +380,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   ├── nest-cli.json
 │   ├── prisma.config.ts
 │   │
-│   ├── src/                      # NestJS feature modules (9)
+│   ├── src/                      # NestJS API source (9 modules wired into app.module.ts)
 │   │   ├── app.module.ts         # Root module (9 feature modules + throttler)
 │   │   ├── main.ts               # Bootstrap, cookie-parser, trust proxy, /health
 │   │   ├── prisma.service.ts     # Prisma client singleton
@@ -388,6 +388,8 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   ├── common/               # Shared helpers
 │   │   │   ├── scoring.ts        # ratingDeltaFor() — piece-based scoring
 │   │   │   └── bot.ts            # isBotUserId() / BOT_PREFIX
+│   │   │
+│   │   ├── avatar/               # Avatar metadata + upload signature check (imported by auth and user)
 │   │   │
 │   │   ├── auth/                 # JWT + OAuth (Google, GitHub, 42) + 2FA + mail
 │   │   │   ├── auth.controller.ts    # register, login, logout, me, 2FA, OAuth
@@ -404,7 +406,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │   ├── fortytwo.strategy.ts  # 42 (intra) OAuth
 │   │   │   ├── ngrok_google_strategy.ts / ngrok_github_strategy.ts / ngrok_fortytwo_strategy.ts  # tunnel-mode OAuth
 │   │   │   ├── oauth.guards.ts       # OAuth route guards (per-Host strategy pick)
-│   │   │   └── dto/                  # login, register, 2FA, password, profile DTOs
+│   │   │   └── dto/                  # login, register, 2FA, password, profile and delete-account DTOs
 │   │   │
 │   │   ├── user/                 # User profiles & game history
 │   │   ├── friends/              # Friend system (requests, accept/decline, block)
@@ -482,10 +484,9 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       ├── api.ts                # Typed fetch wrapper (refresh + retry, ngrok)
 │       ├── socket.ts             # Socket.IO client types + connectSocket()
 │       ├── i18n.ts               # i18next init
-│       ├── theme.ts              # Theme constants + bot pool
+│       ├── theme.ts              # Shared style constants + bot pool
 │       ├── index.css             # Global styles
-│       ├── styles/retrowave.css  # Retro theme (styles/tw.ts: tailwind helpers)
-│       ├── data.ts               # Mock/helper game data
+│       ├── styles/retrowave.css  # Theme tokens + the CSS-only rules (styles/tw.ts: helpers)
 │       ├── avatarCache.ts        # avatar state store (userId-keyed overrides)
 │       ├── dicebear.ts           # @dicebear avatar style resolution
 │       ├── validatePassword.ts   # Client-side password policy mirror
@@ -495,14 +496,14 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       ├── components/           # RetroAuthLayout, RetroNavbar,
 │       │                         # NotificationBell/Toast, Board, Die,
 │       │                         # JoinByCode, OAuthButtons, ProfileEditModal,
-│       │                         # RankBadge, RulesModal, UserAvatar, CyberModal,
+│       │                         # RulesModal, UserAvatar, CyberModal,
 │       │                         # DeleteAccountModal, LegalModal, MarkdownViewer,
-│       │                         # ResultsModal
+│       │                         # ResultsModal, railButton.ts
 │       ├── game/                 # reducer.ts, types.ts
 │       ├── hooks/                # useNotifications.tsx
 │       ├── locales/              # en.ts, fr.ts, ms.ts
 │       ├── content/docs/         # Markdown docs rendered by LegalPage
-│       ├── utils/                # audio.ts, ranks.ts, botName.ts
+│       ├── utils/                # audio.ts, botName.ts
 │       └── assets/               # images/svg
 │
 ├── nginx/                        # TLS termination & reverse proxy

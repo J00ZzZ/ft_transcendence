@@ -137,7 +137,7 @@ type AppState = {
   settingOn: (key: string) => boolean  // Checks if a setting is on
   toggleSetting: (key: string) => void  // Flips a setting
   // Theme
-  theme: ThemeType  // Current theme (synthwave / win95 / terminal)
+  theme: ThemeType  // Current theme (synthwave, persisted as retro_theme)
   setTheme: (t: ThemeType) => void  // Changes the theme
   // Real-time match
   activeMatch: ActiveMatch  // The current match info

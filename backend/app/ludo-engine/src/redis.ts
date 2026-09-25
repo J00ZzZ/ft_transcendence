@@ -191,7 +191,6 @@ export class RedisGameStore {
 
   // FREE a non-host seat on abort: delete the slot from the match hash so the room
   // can hand it to someone else. The host seat is never cleared.
-  // See docs/ludo-engine/ludo-engine-lobby-module.md (Seat reserve and free).
   async clearMatchSeat(gameId: string, color: PlayerColor): Promise<void> {
     const data = await this.getMatchData(gameId);
     if (!data) return;
@@ -211,7 +210,7 @@ export class RedisGameStore {
 
   // RESERVE a non-host seat when a player leaves without aborting: keep the id and
   // colour so a rejoin returns to the same seat, and set `player<N>_left` so the
-  // seat is not counted as seated. See docs/ludo-engine/ludo-engine-lobby-module.md.
+  // seat is not counted as seated.
   async reserveMatchSeat(gameId: string, color: PlayerColor): Promise<void> {
     const data = await this.getMatchData(gameId);
     if (!data) return;

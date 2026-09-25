@@ -130,7 +130,7 @@ sequenceDiagram
 Sequence of steps when any module asks `secrets.ts` for a value — it is a single lookup against the process environment (the root `.env`, injected by `compose.yaml`'s `env_file` in containers and by `dotenv` for host-side scripts).
 ```mermaid
 sequenceDiagram
-    participant App as App.ts
+    participant App as main.ts
     participant Secrets as secrets.ts
     participant Env as process.env (.env)
 
@@ -149,7 +149,7 @@ sequenceDiagram
 Sequence of steps during PrismaService construction, database connection (`onModuleInit`), and disconnection (`onModuleDestroy`).
 ```mermaid
 sequenceDiagram
-    participant App as App.ts
+    participant App as main.ts
     participant DB as Database
 
     Note over App,DB: When the app starts

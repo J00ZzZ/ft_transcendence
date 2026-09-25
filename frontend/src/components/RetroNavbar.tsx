@@ -15,7 +15,6 @@ import {
   THEME_TRIGGER_BTN_BASE,
   THEME_POPOVER_MENU_BASE,
   THEME_POPOVER_MENU_ACTIVE_DOWN,
-  THEME_POPOVER_MENU_ACTIVE_UP,
   RETRO_FLOATING_DOCK,
 } from '../styles/tw';
 
@@ -23,8 +22,6 @@ const REJOIN_EDGE = {
   borderColor: 'var(--accent-pink)',
   boxShadow: '0 0 16px rgba(255, 0, 127, 0.55), inset 0 0 8px rgba(0, 240, 255, 0.25)',
 };
-
-type ThemeType = 'synthwave' | 'win95' | 'terminal';
 
 // How often the rejoin banner re-checks for an active game.
 // Original: 2500 ms. Recommended: 10000 ms — the badge only needs to appear
@@ -52,17 +49,7 @@ export function RetroNavbar({
 }: RetroNavbarProps) {
   const { t } = useTranslation();
   const route = useRoute();
-  const {
-    user,
-    logout,
-    lang,
-    setLang,
-    twoFactor,
-    toggleTwoFactor,
-    theme,
-    setTheme,
-    setActiveMatch,
-  } = useApp();
+  const { user, logout, lang, setLang, twoFactor, toggleTwoFactor, setActiveMatch } = useApp();
   const currentPath = activeRoute ?? route.path;
 
   // Below `xl` (1280px) the sidebar collapses to an icon rail; labels are
@@ -102,30 +89,19 @@ export function RetroNavbar({
   const activeMarkRead = onMarkRead ?? fallbackNotifs.markRead;
   const activeMarkAllRead = onMarkAllRead ?? fallbackNotifs.markAllRead;
 
-  const [isThemePopoverOpen, setIsThemePopoverOpen] = useState(false);
   const [isAccountPopoverOpen, setIsAccountPopoverOpen] = useState(false);
   const [soundMuted, setSoundMuted] = useState(retroAudio.muted);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const themePopoverContentRef = useRef<HTMLDivElement>(null);
-  const [themePopoverPos, setThemePopoverPos] = useState({ left: 0, bottom: 0, width: 0 });
   const accountPopoverRef = useRef<HTMLDivElement>(null);
   const accountPopoverContentRef = useRef<HTMLDivElement>(null);
   const [accountPopoverPos, setAccountPopoverPos] = useState({ top: 0, left: 0 });
 
-  // Global "all sounds" mute — same retroAudio.muted flag the in-game audio
-  // toggle uses (gates music AND every UI/FX beep), not just the chiptune
-  // background track (that's the separate togglePlay()/isPlayingAudio on Home).
+  // Global "all sounds" mute — gates every UI/FX beep via retroAudio.muted.
   const toggleSound = () => {
     retroAudio.muted = !retroAudio.muted;
     setSoundMuted(retroAudio.muted);
     if (!retroAudio.muted) {
       retroAudio.playUiBeep(520, 0.06);
     }
-  };
-
-  const applyTheme = (newTheme: ThemeType) => {
-    setTheme(newTheme);
-    retroAudio.playUiBeep(880, 0.05);
   };
 
   const fetchActiveGame = useCallback(() => {
@@ -190,11 +166,6 @@ export function RetroNavbar({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      const insideThemeTrigger = popoverRef.current?.contains(target);
-      const insideThemePortal = themePopoverContentRef.current?.contains(target);
-      if (!insideThemeTrigger && !insideThemePortal) {
-        setIsThemePopoverOpen(false);
-      }
       const insideTrigger = accountPopoverRef.current?.contains(target);
       const insidePortal = accountPopoverContentRef.current?.contains(target);
       if (!insideTrigger && !insidePortal) {
@@ -223,28 +194,6 @@ export function RetroNavbar({
       window.removeEventListener('resize', updatePosition);
     };
   }, [isAccountPopoverOpen]);
-
-  // Same reasoning as the account popover: portal to document.body so the
-  // theme menu can't be clipped/covered by an ancestor's stacking context.
-  useEffect(() => {
-    if (!isThemePopoverOpen) return;
-    const updatePosition = () => {
-      const rect = popoverRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setThemePopoverPos({
-        left: rect.left,
-        bottom: window.innerHeight - rect.top + 8,
-        width: isCompact ? 240 : rect.width,
-      });
-    };
-    updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
-    };
-  }, [isThemePopoverOpen, isCompact]);
 
   const username = user?.username ?? 'PILOT';
   const displayName = user?.displayName ?? username;
@@ -317,7 +266,6 @@ export function RetroNavbar({
             }}
             onClick={(e) => {
               e.stopPropagation();
-              setIsThemePopoverOpen(false);
               const next = !isAccountPopoverOpen;
               setIsAccountPopoverOpen(next);
               retroAudio.playUiBeep(next ? 880 : 440, 0.05);
@@ -859,7 +807,7 @@ export function RetroNavbar({
         </div>
       </div>
 
-      {/* Bottom Controls: Theme Selector + Notifications */}
+      {/* Bottom Controls: Notifications */}
       <div
         style={{
           width: '100%',
@@ -870,184 +818,6 @@ export function RetroNavbar({
           borderTop: '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
-        {/* Theme Selector Popover */}
-        <div
-          className="z-10000 inline-block"
-          ref={popoverRef}
-          style={{ width: '100%', position: 'relative' }}
-        >
-          <button
-            className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isThemePopoverOpen ? 'active' : ''}`}
-            id="themeModalBtn"
-            aria-label="Toggle Theme Menu"
-            style={{
-              ...railButtonStyle(isThemePopoverOpen),
-              width: '100%',
-              height: 44,
-              justifyContent: isCompact ? 'center' : 'space-between',
-              padding: isCompact ? 0 : '0 14px',
-              fontSize: '0.94rem',
-              borderRadius: 10,
-              color: 'var(--text-main)',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsAccountPopoverOpen(false);
-              const next = !isThemePopoverOpen;
-              setIsThemePopoverOpen(next);
-              retroAudio.playUiBeep(next ? 960 : 480, 0.05);
-            }}
-            {...railHoverHandlers(isThemePopoverOpen)}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span
-                style={{
-                  color: 'var(--accent-yellow)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '1.05rem',
-                  fontWeight: 'bold',
-                }}
-              >
-                &lt;/&gt;
-              </span>
-              {!isCompact && (
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    letterSpacing: '1px',
-                    fontWeight: 900,
-                    fontSize: '0.94rem',
-                  }}
-                >
-                  {t('navbar.themeBtn')}
-                </span>
-              )}
-            </div>
-            {!isCompact && (
-              <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>
-                {isThemePopoverOpen ? '▼' : '▲'}
-              </span>
-            )}
-          </button>
-
-          {/* Upward Opening Theme Popover Menu — portaled to document.body,
-              see accountPopoverMenu above for why. */}
-          {isThemePopoverOpen &&
-            createPortal(
-              <div
-                ref={themePopoverContentRef}
-                className={`${THEME_POPOVER_MENU_BASE} ${THEME_POPOVER_MENU_ACTIVE_UP}`}
-                id="themePopoverMenu"
-                style={{
-                  position: 'fixed',
-                  bottom: themePopoverPos.bottom,
-                  top: 'auto',
-                  left: themePopoverPos.left,
-                  right: 'auto',
-                  width: themePopoverPos.width,
-                  padding: '14px 16px',
-                  borderRadius: 14,
-                  boxSizing: 'border-box',
-                  zIndex: 10005,
-                }}
-              >
-                <fieldset
-                  id="color-scheme"
-                  style={{
-                    borderRadius: 10,
-                    padding: '12px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  <legend style={{ fontSize: '0.82rem', padding: '0 8px', fontWeight: 'bold' }}>
-                    {t('navbar.themeSelectorLegend')}
-                  </legend>
-                  <label
-                    htmlFor="theme-synthwave"
-                    style={{
-                      fontSize: '0.88rem',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      cursor: 'pointer',
-                      borderRadius: 6,
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      id="theme-synthwave"
-                      name="theme-radio"
-                      value="synthwave"
-                      checked={theme === 'synthwave'}
-                      onChange={() => {
-                        applyTheme('synthwave');
-                        setIsThemePopoverOpen(false);
-                      }}
-                      style={{ width: 17, height: 17, cursor: 'pointer' }}
-                    />
-                    <span style={{ fontWeight: 'bold' }}>{t('navbar.themeCyberpunk')}</span>
-                  </label>
-                  <label
-                    htmlFor="theme-win95"
-                    style={{
-                      fontSize: '0.88rem',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      cursor: 'pointer',
-                      borderRadius: 6,
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      id="theme-win95"
-                      name="theme-radio"
-                      value="win95"
-                      checked={theme === 'win95'}
-                      onChange={() => {
-                        applyTheme('win95');
-                        setIsThemePopoverOpen(false);
-                      }}
-                      style={{ width: 17, height: 17, cursor: 'pointer' }}
-                    />
-                    <span style={{ fontWeight: 'bold' }}>{t('navbar.themeWin95')}</span>
-                  </label>
-                  <label
-                    htmlFor="theme-terminal"
-                    style={{
-                      fontSize: '0.88rem',
-                      padding: '8px 10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      cursor: 'pointer',
-                      borderRadius: 6,
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      id="theme-terminal"
-                      name="theme-radio"
-                      value="terminal"
-                      checked={theme === 'terminal'}
-                      onChange={() => {
-                        applyTheme('terminal');
-                        setIsThemePopoverOpen(false);
-                      }}
-                      style={{ width: 17, height: 17, cursor: 'pointer' }}
-                    />
-                    <span style={{ fontWeight: 'bold' }}>{t('navbar.themeTerminal')}</span>
-                  </label>
-                </fieldset>
-              </div>,
-              document.body,
-            )}
-        </div>
-
         {/* Notifications Bell -> Accessible across ALL pages */}
         <div
           style={{

@@ -18,12 +18,11 @@
 
 The Home page is the main landing page after login (`/home`, full-screen). It also acts as the player dashboard, and shows:
 
-1. **Player stats widget** — read from the backend API (Application Programming Interface) at `GET /api/stats` (rating, games, wins, losses, captures).
-2. **Leaderboard rank widget** — read from `GET /api/leaderboard?mode=global&limit=50`, using `myRank` plus a username-to-rank map.
+1. **Hero header** — the page title, a greeting with the player's display name, and a live online-player count from `GET /api/presence/online-count` (polled every 15 seconds).
+2. **Arcade panel** — a 720×400 canvas that draws the sun, the star field, the horizon grid, four army nodes and the marquee, with a "press start" overlay. Clicking it, or pressing Space or Enter, opens `/gamelobby`.
 3. **Friends widget** — read from `GET /api/friends` + `GET /api/friends/requests`, refreshed every 12 seconds; shows live presence status.
 4. **Notifications** — bell icon and toasts from `useNotifications()`, which uses an SSE (Server-Sent Events) stream.
-5. **Quick actions** — start a game (navigates to `/gamelobby`), leaderboard, friends.
-6. **Global hotkeys** — keyboard shortcuts registered when the page mounts (for example, quick navigation).
+5. **Footer** — the copyright line and the Privacy Policy and Terms of Service modals.
 
 > The Home page reads all of its data from the API; there is no mock data. It uses the retro/cyber styling (`RetroNavbar`, `retrowave.css`).
 
@@ -36,10 +35,9 @@ The Home page is the main landing page after login (`/home`, full-screen). It al
 
 | File | Role |
 |------|------|
-| `src/pages/Home.tsx` | Home page — stats, leaderboard rank, friends, notifications, quick actions |
+| `src/pages/Home.tsx` | Home page — hero header, arcade panel, friends list, footer |
 | `src/hooks/useNotifications.tsx` | Notification bell + toasts (SSE) |
 | `src/components/UserAvatar.tsx` | Avatar rendering |
-| `src/components/RankBadge.tsx` | Rank tier badge |
 | `src/components/RetroNavbar.tsx` | Top navigation bar |
 | `src/components/NotificationToast.tsx` | Toast notifications |
 
@@ -93,17 +91,20 @@ sequenceDiagram
 
     App->>Home: <Home /> (full-screen route)
     Home->>Notif: useNotifications() → bell + toasts
-    Home->>API: getApi('/api/stats')
-    Home->>API: getApi('/api/leaderboard?mode=global&limit=50')
     Home->>API: getApi('/api/friends') + '/api/friends/requests'
+    Home->>API: getApi('/api/presence/online-count')
     alt data loaded
-        API-->>Home: stats + rank + friends
-        Home->>Home: Render widgets
+        API-->>Home: friends + online count
+        Home->>Home: Render the arcade panel and the friends list
     else error
         Home->>Home: Render empty/loading states
     end
-    Note over Home: Friends widget refreshes every 12 seconds
+    Note over Home: The friends list refreshes every 12 seconds; the online count every 15
 ```
+
+### Arcade attract-mode canvas
+
+The arcade panel renders its scene on one 720×400 canvas: the background gradient, the sun, the star field, the horizon grid, the four army nodes and the marquee. The sun's disc and its scanlines are drawn under a single clip path, so a scanline stroke cannot extend past the disc even though each stroke is wider than the disc near its top.
 
 
 ---
@@ -116,12 +117,11 @@ sequenceDiagram
 ```
 <Home />
   ├── useNotifications() → notifications, unreadCount, markRead, markAllRead
-  ├── Fetch /api/stats + /api/leaderboard + /api/friends + /api/friends/requests
-  │   ├── Stats present → render stat tiles
-  │   ├── Leaderboard myRank → render rank badge
-  │   └── Friends → render friends list with presence
-  ├── Render quick actions: Start game → navigate('/gamelobby')
-  └── Register global hotkeys
+  ├── Fetch /api/friends + /api/friends/requests + /api/presence/online-count
+  │   ├── Friends → render the friends list with presence
+  │   └── Online count → render the hero badge
+  ├── Draw the arcade canvas (gradient, sun, stars, grid, army nodes, marquee)
+  └── Space/Enter or a click on the arcade panel → navigate('/gamelobby')
 ```
 
 
@@ -142,9 +142,9 @@ The hero section shows a live site-wide badge with the number of **online player
 
 | Dependency | Purpose |
 |-----------|---------|
-| `api.ts` | `getApi` for `/api/stats`, `/api/leaderboard`, `/api/friends` |
+| `api.ts` | `getApi` for `/api/friends`, `/api/friends/requests`, `/api/presence/online-count` |
 | `store.tsx` | `useApp` for user, settings, presence |
 | `hooks/useNotifications.tsx` | Real-time notification bell + toasts |
-| `router.tsx` | `navigate` for quick actions |
-| `utils/ranks.ts` | `getRankTier` rank badges |
+| `router.tsx` | `navigate` to `/gamelobby` and `/profile` |
 | `utils/audio.ts` | `retroAudio` sound effects |
+| `styles/tw.ts` | The hero, window and arcade class constants |

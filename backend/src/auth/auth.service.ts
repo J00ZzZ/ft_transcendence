@@ -680,6 +680,20 @@ export class AuthService implements OnModuleDestroy {
     if (linkUserId) {
       const linked = await this.prisma.db.user.findUnique({ where: { id: linkUserId } });
       if (linked) {
+        // The provider's email must not already belong to a different account
+        const linkEmail = input.email ? normalizeEmail(input.email) : undefined;
+        if (linkEmail) {
+          const linkEmailOwner = await this.prisma.db.user.findUnique({
+            where: { email: linkEmail },
+          });
+          if (linkEmailOwner && linkEmailOwner.id !== linkUserId) {
+            throw new ConflictException({
+              code: 'AUTH_EMAIL_TAKEN',
+              message: 'That provider account uses an email already registered to another account',
+            });
+          }
+        }
+
         await this.prisma.db.account.create({
           data: {
             id: crypto.randomUUID(),
@@ -696,9 +710,9 @@ export class AuthService implements OnModuleDestroy {
 
         return linked;
       }
-      // The "add method" user no longer exists (e.g. session outlived a DB
-      // wipe). Don't link to a ghost userId (FK violation) : fall through to
-      // a normal first-time login.
+      // The "add method" user can be missing (e.g. session outlived a DB wipe),
+      // so fall through to a normal first-time login instead of linking a
+      // non-existent userId (FK violation).
     }
 
     //  First time with this provider and the email already belongs to an

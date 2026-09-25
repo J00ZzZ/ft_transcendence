@@ -2,7 +2,7 @@ import i18n from './i18n';
 
 // Auth API helpers: on a 401, refresh once (shared across all callers) and
 // retry. An expired refresh token means signed out; a blocked one returns its own
-// status. See docs/frontend/frontend-store-system.md.
+// status.
 
 // ngrok needs this header to skip its first-request interstitial; other hosts
 // ignore it. Headers go through the Headers constructor because spreading a

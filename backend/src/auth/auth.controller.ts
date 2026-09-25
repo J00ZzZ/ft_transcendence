@@ -50,6 +50,7 @@ function originFromRequest(req: Request): string {
   const forwarded = req.headers['x-forwarded-proto'];
   const forwardedProto = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : '';
   const proto = forwardedProto || req.protocol || 'https';
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- intentional fallback for missing Host header
   return `${proto}://${req.get('host') || 'localhost:8443'}`;
 }
 
