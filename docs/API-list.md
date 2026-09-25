@@ -2392,4 +2392,5 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
 - **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
 - **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
-- **Rate limiting:** Auth endpoints (`register`, `login`) have throttler guard enabled.
+- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `login` (5/minute), `2fa/verify` (5/minute), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
+- **Client IP:** `main.ts` trusts internal hops only (`trust proxy`), so the address behind those limits is the client's own and a client-sent `X-Forwarded-For` cannot spoof it.

@@ -179,7 +179,9 @@ npm run start:dev (or node main.js)
     │   │       AchievementsModule, StatsModule, MatchModule, PresenceModule,
     │   │       NotificationModule, ThrottlerModule (global rate limit)
   │   └── Register PrismaService as provider + export
-  ├── app.set('trust proxy', 1)
+  ├── app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal'])
+  │       # internal hops only, so req.ip is the real client IP for rate
+  │       # limiting and a client-sent X-Forwarded-For cannot spoof it
   ├── app.use(cookieParser())
   ├── app.useGlobalPipes(ValidationPipe { whitelist, transform, exceptionFactory })
   │       # exceptionFactory adds a VALIDATION_* code to the DTO errors listed in main.ts

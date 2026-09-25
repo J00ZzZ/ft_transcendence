@@ -161,6 +161,23 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `GET` | `/api/auth/42` | None | Redirect to 42 OAuth |
 | `GET` | `/api/auth/42/callback` | None | 42 OAuth callback |
 
+### Rate limits
+
+The controller sets a per-IP limit on the routes below; every other route falls back to the global
+throttler default (300 requests per 60 s, installed in `app.module.ts`).
+
+| Route | Limit |
+|-------|-------|
+| `POST /api/auth/register` | 5 per hour |
+| `POST /api/auth/login` | 5 per minute |
+| `POST /api/auth/2fa/verify` | 5 per minute |
+| `POST /api/auth/refresh` | 30 per minute |
+| `POST /api/auth/forgot-password` | 3 per hour |
+| `POST /api/auth/reset-password` | 5 per 15 minutes |
+
+The counted address is the client's own: `main.ts` trusts internal hops only, so a client-sent
+`X-Forwarded-For` cannot move a request into a different bucket.
+
 ### Cookie Configuration
 
 Two httpOnly cookies are used:
