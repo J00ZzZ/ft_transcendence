@@ -50,7 +50,7 @@ export class MailService {
     return this.send(
       to,
       'Verify your RetroLudo 42 account',
-      `Welcome to Ludo Royale!\n\nConfirm this email address by opening:\n\n${link}\n\nThe link expires in 24 hours. If you did not sign up, ignore this mail.`,
+      `Welcome to RetroLudo 42!\n\nConfirm this email address by opening:\n\n${link}\n\nThe link expires in 24 hours. If you did not sign up, ignore this mail.`,
     );
   }
 
