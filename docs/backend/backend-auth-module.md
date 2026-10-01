@@ -170,6 +170,12 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `GET` | `/api/auth/42` | None | Redirect to 42 OAuth |
 | `GET` | `/api/auth/42/callback` | None | 42 OAuth callback |
 
+**Display-name rules** (`PATCH /api/auth/profile`): the name must satisfy
+`VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`, be unique
+(`409 AUTH_DISPLAY_NAME_TAKEN`), and may not impersonate a bot — a name starting with
+`bot-`, `bot ` or `bot_` is rejected with `400 AUTH_DISPLAY_NAME_RESERVED`
+(`isReservedBotName()` in `common/botname-enforce.ts`).
+
 ### Rate limits
 
 The controller sets a per-IP limit on the routes below; every other route falls back to the global
@@ -684,7 +690,7 @@ Callers differ:
 | `nodemailer` | SMTP email delivery (verification, 2FA, password reset, email change — copy localized per recipient) |
 | `ioredis` | Redis client (SessionService, TwoFactorService, MailService's expiry subscription) |
 | `PrismaService` | Database access (User, Account models) |
-| `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
+| `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, ENGINE_JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
 
 
 ---
@@ -698,6 +704,7 @@ All configuration is read from environment variables — the root `.env` (compos
 | Variable | Used By |
 |--------|---------|
 | `JWT_SECRET` | JwtModule, JwtStrategy |
+| `ENGINE_JWT_SECRET` | `MatchModule` (signs the ludo-engine match tokens — deliberately a separate key, not read by AuthModule) |
 | `GOOGLE_CLIENT_ID` | GoogleStrategy |
 | `GOOGLE_CLIENT_SECRET` | GoogleStrategy |
 | `GOOGLE_CALLBACK_URL` | GoogleStrategy |

@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma.service';
 import { requireSecret, secret } from '../secrets';
 import Redis from 'ioredis';
 import { BOT_PREFIX, isBotUserId } from '../common/botname-enforce';
+import { signEngineToken } from './engine-token.util';
+import { isEngineGameStarted, isSeatFinalized } from './seat-finalization';
 
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 const FRONTEND_URL = requireSecret('FRONTEND_URL');
@@ -116,7 +118,7 @@ export class MatchCreatorService {
         }
       }
       // Someone else is mid-create for this user. They finish in ms, and
-      // the SCAN will then find their room and we return that instead.
+      // findReusableRoom will then find their new room and we return that instead.
       await new Promise((r) => setTimeout(r, 50));
     }
     // The lock was still held after the retries, so proceed without it rather than
@@ -132,29 +134,15 @@ export class MatchCreatorService {
     botColors?: string[],
     seatColors?: string[],
   ) {
-    // SCAN guard: idempotent room creation : reuse existing WAITING/ACTIVE match if user already seated
-    let cursor = '0';
-    let foundExisting = false;
-    let existingGameId = '';
-    do {
-      const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'match:*', 'COUNT', 100);
-      cursor = nextCursor;
-      for (const key of keys) {
-        const data = await this.redis.hgetall(key);
-        if (
-          (data.player1_id === userId ||
-            data.player2_id === userId ||
-            data.player3_id === userId ||
-            data.player4_id === userId) &&
-          (data.status === 'WAITING' || data.status === 'ACTIVE')
-        ) {
-          foundExisting = true;
-          existingGameId = data.id;
-          break;
-        }
-      }
-    } while (!foundExisting && cursor !== '0');
-    const gameId = foundExisting ? existingGameId : crypto.randomUUID();
+    // Idempotent create: a PvP create by a player who already has a seat in one
+    // of their own PvP lobby rooms returns that seat instead of opening a second
+    // room. Rooms whose game has already started are never reused.
+    if (mode === 'pvp') {
+      const reusable = await this.findReusableRoom(userId);
+      if (reusable) return this.handoffExistingRoom(reusable, userId);
+    }
+
+    const gameId = crypto.randomUUID();
     const totalBots = botCount;
     const isPvP = mode === 'pvp';
     const player1Color = SLOT_COLORS[0];
@@ -225,18 +213,15 @@ export class MatchCreatorService {
 
     const username = await this.resolveUsername(userId);
     const displayName = await this.resolveDisplayName(userId);
-    const token = this.jwt.sign(
-      {
-        gameId,
-        playerId: userId,
-        username: username ?? undefined,
-        displayName,
-        role: 'player1',
-        mode,
-        color: player1Color,
-      },
-      { expiresIn: '24h' },
-    );
+    const token = signEngineToken(this.jwt, {
+      gameId,
+      playerId: userId,
+      username: username ?? undefined,
+      displayName,
+      role: 'player1',
+      mode,
+      color: player1Color,
+    });
 
     // mode + playerCount are required: the frontend persists activeMatch for
     // refresh/reconnect and branches on mode. Without them a refresh makes
@@ -253,6 +238,71 @@ export class MatchCreatorService {
       result.inviteCode = updates.inviteCode;
     }
     return result;
+  }
+
+  // The caller's own PvP lobby room, if they still have one: seated, hash still
+  // WAITING, engine game not started, and the caller's seat not finalized. Left
+  // untouched (the caller is handed their existing seat instead).
+  private async findReusableRoom(userId: string): Promise<Record<string, string> | null> {
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'match:*', 'COUNT', 100);
+      cursor = nextCursor;
+      for (const key of keys) {
+        const data = await this.redis.hgetall(key);
+        if (data.status !== 'WAITING' || data.gameType !== 'PVP') continue;
+        const seatIds = [data.player1_id, data.player2_id, data.player3_id, data.player4_id];
+        const slotIndex = seatIds.indexOf(userId);
+        if (slotIndex === -1) continue;
+        // A game the engine has already started is not a lobby any more.
+        if (await isEngineGameStarted(this.redis, data.id)) continue;
+        // Nor is a seat the engine finalized: the player is out of that game.
+        const color = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
+        if (await isSeatFinalized(this.redis, data.id, color)) continue;
+        return data;
+      }
+    } while (cursor !== '0');
+    return null;
+  }
+
+  // Returns the caller's existing seat in a reused room. Writes nothing to the
+  // room hash, because updating status/createdAt/inviteCode here is what used to
+  // demote a live ACTIVE room back to WAITING.
+  private async handoffExistingRoom(
+    data: Record<string, string>,
+    userId: string,
+  ): Promise<MatchRoomHandoff> {
+    const gameId = data.id;
+    const slotIndex = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].indexOf(
+      userId,
+    );
+    const color = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
+    // Reclaiming the seat clears the reservation flag a "returned to lobby" leave
+    // set, so the room counts this player again.
+    await this.redis.hdel(`match:${gameId}`, `player${slotIndex + 1}_left`);
+
+    const mode = (data.gameType || 'PVP').toLowerCase();
+    const username = await this.resolveUsername(userId);
+    const displayName = await this.resolveDisplayName(userId);
+    const token = signEngineToken(this.jwt, {
+      gameId,
+      playerId: userId,
+      username: username ?? undefined,
+      displayName,
+      role: slotIndex === 0 ? 'player1' : 'player',
+      color,
+      mode,
+    });
+
+    return {
+      gameId,
+      token,
+      engineUrl: ENGINE_WS_URL,
+      color,
+      mode,
+      playerCount: parseInt(data.playerCount || '4', 10),
+      inviteCode: data.inviteCode || undefined,
+    };
   }
 
   // Create a PvP room and return its invite code (alias for createMatch).

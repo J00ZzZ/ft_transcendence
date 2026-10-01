@@ -28,8 +28,8 @@ achievement system, and the whole interface is available in multiple languages.
 - **Docker** and **Docker Compose** (the only runtime requirement).
 - **make** (to use the provided build commands).
 - A `.env` file at the repo root (see [Configuration (.env)](#configuration-env) below). The stack refuses to start if required values are missing.
-- OAuth client IDs and secrets for Google, GitHub, and 42 — **optional**. Local sign-up and login work without them.
-- At least one free port: `8443` (HTTPS) was chosen for our project.
+- OAuth client IDs and secrets for Google, GitHub, and 42, plus the six ngrok tunnel values. The providers themselves are not needed to sign up or log in locally, but every one of these keys is validated by `make env` and read at backend boot, so the stack does not start without them. See [Configuration (.env)](#configuration-env).
+- Free host ports: `8443` (HTTPS, published on every interface) and `8444` (loopback-only, where the ngrok agent reaches nginx in tunnel mode). `make dev` additionally uses `8080`.
 
 ### Running
 
@@ -91,11 +91,23 @@ make dev
 - **Infrastructure ports not listed** — all published loopback-only; cross-container traffic rides the private `transcendence_network`:
   - **Postgres** (`127.0.0.1:5432`) — requires credentials.
   - **Redis** (`127.0.0.1:6479`) — requires a password.
-  - **Engine** (`127.0.0.1:3001`) — additionally gated by JWT token verification: the Socket.IO handshake JWT (game-scoped, with role/color, signed with `JWT_SECRET` and verified in constant time) must be valid before a socket can join a room, so a loopback connection alone is not enough to interact with any game.
+  - **Engine** (`127.0.0.1:3001`) is additionally gated by JWT token verification: the Socket.IO handshake JWT (game-scoped, with role/color, signed with the engine-dedicated `ENGINE_JWT_SECRET` and carrying an `aud: ludo-engine` claim, verified in constant time) must be valid before a socket can join a room, so a loopback connection alone is not enough to interact with any game.
+- **`4040` (ngrok agent)** is ngrok's own local API and inspector, bound to loopback and open only while `make tunnel` runs. `make tunnel-url` reads the public tunnel URL from it, and it is the only place the agent is reachable on this host.
 
 ### Configuration (.env)
 
 All config lives in the root `.env` (`KEY=VALUE` per line), loaded into containers via compose's `env_file:`. It is gitignored and shared between the team only (via Discord) — `.env.example` is a template we used. `make` validates it and **fails early** if `.env` is missing or any required field is empty. OAuth credentials are added manually from the provider consoles (Google, GitHub, 42).
+
+`make env` runs before every `make build` / `make all` and requires every key in `.env.example` to be non-empty, with one exception: `LAN_IP` (written automatically with this machine's current address). `SMTP_CREDENTIALS` is required too — the backend only logs verification emails when it is absent, but an empty value means the `.env` was copied incompletely. The ngrok tunnel keys are part of that check, and the backend also reads `NGROK_FRONTEND_URL` plus the three `NGROK_*_CALLBACK_URL` values at boot, so they cannot be left empty even if no tunnel is ever started.
+
+Two keys name host ports the stack publishes:
+
+| Key | Default | Port it opens |
+| --- | --- | --- |
+| `HTTPS_PORT` | `8443` | nginx's direct TLS listener, published on every interface (`8443 → 443` in `compose.yaml`) and printed by `make all` / `make lan` |
+| `NGROK_PORT` | `8444` | nginx's tunnel listener, published loopback-only (`127.0.0.1:8444 → 444` in `compose.yaml`), which `make tunnel` points the ngrok agent at |
+
+Both publishes are hardcoded in `compose.yaml` and belong to no compose profile, so `8444` is bound in every mode, tunnel running or not, and the stack will not start if either port is already taken. Changing the two keys in `.env` moves the address host scripts use (`make tunnel`, the printed LAN URL), not the publish itself. While a tunnel runs, the ngrok agent also binds `127.0.0.1:4040` for its own local API, which is where `make tunnel-url` reads the public URL from.
 
 ## Team Information
 
@@ -255,11 +267,11 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 
 #### Overview
 
-| Document                                       | Responsibility                                                                              |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [docs/architecture.md](docs/architecture.md)   | System topology, services, request paths, data layer, secrets, make targets, file structure |
-| [docs/API-list.md](docs/API-list.md)           | Complete HTTP + WebSocket API reference                                                     |
-| [docs/avatar-system.md](docs/avatar-system.md) | Avatar storage, Redis metadata, caching and freshness, seat rendering                       |
+| Document                                       | Responsibility                                                                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)   | System topology, services, request paths, data layer, security & threat model, secrets, make targets, file structure |
+| [docs/API-list.md](docs/API-list.md)           | Complete HTTP + WebSocket API reference                                                                              |
+| [docs/avatar-system.md](docs/avatar-system.md) | Avatar storage, Redis metadata, caching and freshness, seat rendering                                                |
 
 #### Deployment
 

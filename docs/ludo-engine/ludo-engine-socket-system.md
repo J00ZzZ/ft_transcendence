@@ -42,7 +42,7 @@ input/output. Each event is documented in full below; see
 
 | Event | Triggered by | Payload (client → server) | Server action | Resulting broadcasts |
 |---|---|---|---|---|
-| `join_game` | Entering a room — PvP join/rejoin, PvE/hotseat seat-in (hotseat sends one call per local seat) | `(gameId: string, playerColor?, userId?, displayName?)` | Bind the socket to the room/seat (reconnect or fresh join), create the game if missing, auto-start PvE/hotseat. A non-reconnecting join to an **ACTIVE** game is rejected with an `error` ("Game already in progress") — hotseat is exempt (one socket controls all its seats) | `game_joined` to the sender |
+| `join_game` | Entering a room — PvP join/rejoin, PvE/hotseat seat-in (hotseat sends one call per local seat) | `(gameId: string, playerColor?, userId?, displayName?)` | Bind the socket to the room/seat (reconnect or fresh join), create the game if missing, auto-start PvE/hotseat. A non-reconnecting join to an **ACTIVE** game is only rejected when the token's own seat can no longer be resumed (exited/inactive/never seated); the refused socket is detached from the room and unbound from the seat (so it can neither observe the game nor disturb a seated player on disconnect) and told `seat_expired`/`error`. A live seat is always the token holder's own, so it is accepted as a (re)join — this keeps a reconnect working when the previous socket has not been reaped yet, and any other socket still bound to that seat is unbound (takeover) so a stale one cannot later force the seat down. Hotseat is exempt (one socket controls all its seats) | `game_joined` to the sender |
 | `roll_dice` | Current player, phase `WAITING_FOR_ROLL` | `()` | Roll the die and compute the legal moves (a 3rd six auto-forfeits the turn) | `dice_rolled` |
 | `move_piece` | Current player, phase `WAITING_FOR_MOVE` | `(pieceId: string)` | Validate and apply the move | `piece_moved` |
 | `player_ready` | Seated player in the waiting lobby | `()` | Mark ready; when every active player is ready the game starts | `game_started` |
@@ -89,6 +89,7 @@ input/output. Each event is documented in full below; see
 | `index.ts` | Entry point — `SocketServer.start(3001)` |
 | `socket/server.ts` | `SocketServer` class — event routing, JWT middleware, engine lifecycle |
 | `socket/auth.ts` | `GameSocket` type, JWT extraction middleware |
+| `socket/auth.spec.ts` | Vitest cover for `verifyToken` — accepts a valid engine token, rejects a wrong secret, a missing/ wrong `aud`, `alg:none`, a tampered signature and an expired token |
 | `socket/socket-handlers.ts` | All client→server event handlers (join, roll, move, etc.) |
 | `socket/join-manager.ts` | `JoinManager` — seat resolution, game creation, reconnect vs fresh join, PvE/hotseat auto-start |
 | `socket/bot-scheduler.ts` | One timer per game that drives bot turns |
@@ -131,11 +132,14 @@ The JWT payload (issued by `MatchService`) contains:
   "displayName": "Display Name",
   "role": "player1" | "player",
   "color": "red" | "green" | "yellow" | "blue",
-  "mode": "pvp" | "pve" | "hotseat"
+  "mode": "pvp" | "pve" | "hotseat",
+  "aud": "ludo-engine"
 }
 ```
 
 `playerId` is the account id, which the engine reads as `userId`. `color` always identifies the seat and becomes the socket's seat colour. `mode` is present only on tokens minted when the match is created; tokens from `joinMatch` and `rejoin` omit it, and the engine derives the mode from the match record instead.
+
+Every one of these tokens is signed with the engine-dedicated `ENGINE_JWT_SECRET` — **not** the session `JWT_SECRET` — and carries `aud: "ludo-engine"`.
 
 
 ---
@@ -144,9 +148,13 @@ The JWT payload (issued by `MatchService`) contains:
 
 ### JWT Validation
 
-The handshake middleware in `socket/server.ts` reads the token from `socket.handshake.auth.token` and passes it to `verifyToken` in `socket/auth.ts`. That function validates the token itself: it accepts only `HS256`, recomputes the HMAC-SHA256 signature and compares it in constant time, and rejects an expired token (`exp`). No external JWT library is used.
+The handshake middleware in `socket/server.ts` reads the token from `socket.handshake.auth.token` and passes it to `verifyToken` in `socket/auth.ts`. That function validates the token itself: it accepts only `HS256`, recomputes the HMAC-SHA256 signature against the engine-dedicated `ENGINE_JWT_SECRET` and compares it in constant time (a plain byte comparison would leak how much of the signature matched through response timing), requires `aud: "ludo-engine"`, and rejects an expired token (`exp`). Match tokens are minted with a 24 h lifetime (`ENGINE_TOKEN_TTL` in `engine-token.util.ts`). No external JWT library is used.
 
-`verifyToken` reads the account id from `playerId`, `sub`, or `userId`, and also returns `gameId`, `username`, `displayName`, `role` (default `player`), `color`, and `mode`. The middleware stores these on `socket.data`, where `color` becomes `tokenColor` — the seat colour issued by the backend. `handleJoinGame` prefers `tokenColor` over the colour the client sends, so a client cannot claim another seat. A missing token or a failed check rejects the connection.
+Match tokens are deliberately signed with a key distinct from the session `JWT_SECRET` and carry the engine audience, so a session access token — signed with the other key and with no `aud` — cannot be replayed against the engine to take over a seat or join an in-progress game. Two independent checks stand in the way: the signature (wrong key) and the audience (wrong token family). `src/socket/auth.spec.ts` (vitest) asserts both, plus rejection of `alg:none`, a tampered signature and an expired token.
+
+`verifyToken` reads the account id from `playerId`, `sub`, or `userId`, and also returns `gameId`, `username`, `displayName`, `role` (default `player`), `color`, and `mode`. The middleware stores these on `socket.data`, where `color` becomes `tokenColor` — the seat colour issued by the backend — and `gameId` is also kept as `tokenGameId` (a copy that `detachSocket` never clears). `handleJoinGame` pins the game to `tokenGameId` and prefers `tokenColor` over the colour the client sends, so neither the `gameId` nor the `playerColor` argument can redirect a socket to a seat or a match that is not its own — including after a refusal has cleared the working `gameId`. A missing token or a failed check rejects the connection.
+
+> The threat model behind these rules, and the holes they closed, is in [`../architecture.md`](../architecture.md) → Security & Threat Model.
 
 
 ---
@@ -336,7 +344,7 @@ Automatically handled by Socket.IO on connection drop.
 
 **Response:** `player_disconnected` is broadcast immediately; `player_reconnected` fires if the player returns inside the grace window; `player_exited` (and possible room teardown) only if the grace window expires without a reconnect.
 
-The window is only opened for a **live** seat (`status === 'active'` and not finished). Expiry is final: `finalizeDeparture(..., 'timeout')` parks every one of that colour's pieces at `step = -1` and marks the seat `exited`, and `handlePlayerDisconnect` refuses to open a new window for a seat in that state. A later `join_game` for such a seat is therefore rejected instead of being treated as a reconnect — otherwise the seat would come back `active` with all four pieces at `-1`, which `MoveValidator` skips, leaving a player who can never produce a legal move and whose turn auto-passes forever. The rejected client gets `seat_expired` (that socket only).
+The window is only opened for a **live** seat (`status === 'active'` and not finished). Expiry is final: `finalizeDeparture(..., 'timeout')` parks every one of that colour's pieces at `step = -1` and marks the seat `exited`, and `handlePlayerDisconnect` refuses to open a new window for a seat in that state. A later `join_game` for such a seat is therefore rejected instead of being treated as a reconnect — otherwise the seat would come back `active` with all four pieces at `-1`, which `MoveValidator` skips, leaving a player who can never produce a legal move and whose turn auto-passes forever. The rejected client gets `seat_expired` (that socket only), and the socket is detached (removed from the room and unbound from the seat) so it can neither observe room events nor, on its own disconnect, reopen the grace/prune path for a live player.
 
 A rename is carried through the reconnect: the `join_game` payload's `displayName` is persisted and republished on `player_reconnected`, because the rest of the room only sees that event — a live game never re-broadcasts the whole lobby roster.
 
@@ -505,6 +513,7 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
 | `REDIS_PASSWORD` | (from secrets) | Redis authentication |
 | `BACKEND_URL` | `http://backend:3000` | Engine callback URL |
 | `ENGINE_API_KEY` | (from secrets) | Validates engine→backend callbacks |
+| `ENGINE_JWT_SECRET` | (from secrets) | Verifies the Socket.IO handshake match tokens (`socket/auth.ts`); required, and independent of the backend's session `JWT_SECRET` |
 
 
 ---

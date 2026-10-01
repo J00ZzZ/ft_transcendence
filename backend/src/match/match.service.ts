@@ -70,8 +70,8 @@ export class MatchService {
   }
 
   // Queries
-  async listOpenRooms() {
-    return this.query.listOpenRooms();
+  async listOpenRooms(viewerId?: string) {
+    return this.query.listOpenRooms(viewerId);
   }
   async listMyRooms(userId: string) {
     return this.query.listMyRooms(userId);

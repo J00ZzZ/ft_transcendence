@@ -51,7 +51,9 @@ export class JoinManager {
     userId?: string,
     displayName?: string,
   ): void {
-    const effectiveGameId = socket.data.gameId || gameId;
+    // The token's match id decides which game is joined; the client-supplied
+    // argument is only a fallback and cannot send the socket to another game.
+    const effectiveGameId = socket.data.tokenGameId || socket.data.gameId || gameId;
     const effectiveUserId = socket.data.userId || userId;
     const effectiveUsername = displayName || socket.data.username;
     const isHotseat = socket.data.mode === 'hotseat';
@@ -87,23 +89,33 @@ export class JoinManager {
         if (state) {
           const discIndex = state.disconnectedPlayers.findIndex((d) => d.color === effectiveColor);
           const isReconnectingPlayer = discIndex !== -1;
+          const seat = state.players.find((p) => p.color === effectiveColor);
+          // Seat colours come from the token, so a live seat is always this
+          // socket's own seat. Its owner may resume it, so the join is accepted
+          // even when the previous socket has not been closed yet.
+          const seatResumable =
+            !!seat && (seat.status === 'active' || seat.status === 'disconnected');
 
-          // Socket locking: reject non-reconnecting joins to games already in
-          // progress : only a player reconnecting to their own seat may re-enter.
-          // Hotseat is exempt — only 1 socket used in this game mode.
-          if (state.status !== 'waiting' && !isReconnectingPlayer && !isHotseat) {
-            // A seat left as exited belongs to a player removed from this live
-            // match. Tell its owner the seat is gone so the client leaves instead
-            // of being stranded on a board it cannot use.
-            const seat = state.players.find((p) => p.color === effectiveColor);
+          // A game in progress accepts no new players: only the owner of a live
+          // seat may re-enter. Hotseat is exempt because one socket controls all
+          // of its seats.
+          if (state.status !== 'waiting' && !isReconnectingPlayer && !isHotseat && !seatResumable) {
+            // Detach the refused socket: it must not observe room events, and its
+            // later disconnect must not mark a seated player as disconnected.
+            this.detachSocket(socket, effectiveGameId);
+            // An exited seat belongs to a player removed from the match, so tell
+            // the client the seat is gone instead of leaving it on a dead board.
             if (seat?.status === 'exited') {
-              void socket.leave(effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
-              return;
+            } else {
+              socket.emit('error', 'Game already in progress');
             }
-            socket.emit('error', 'Game already in progress');
             return;
           }
+
+          // Unbind any other socket still holding this seat, so an older tab or a
+          // socket the server has not closed yet cannot disturb this fresh one.
+          this.evictSeatSiblings(socket, effectiveGameId, effectiveColor);
 
           if (isReconnectingPlayer) {
             const revived = await this.engine.handlePlayerReconnect(
@@ -114,23 +126,21 @@ export class JoinManager {
             state = await this.store.loadGameState(effectiveGameId);
             if (!revived) {
               // The grace window outlived the seat: nothing is left to resume,
-              // so leave the room and tell the client its seat is gone.
-              void socket.leave(effectiveGameId);
+              // so detach the socket and tell the client its seat is gone.
+              this.detachSocket(socket, effectiveGameId);
               socket.emit('seat_expired', { gameId: effectiveGameId, color: effectiveColor });
               return;
             }
-            // The player is back on their old seat, so tell the room: every client
-            // switches that seat from "Reconnecting…" back to active. The name
-            // rides along because they may have renamed while they were away.
+            // The player is back on their old seat: tell the room so every client
+            // switches that seat from "Reconnecting…" back to active.
             this.engine.emitEvent({
               type: 'player_reconnected',
               gameId: effectiveGameId,
               color: effectiveColor,
               displayName: displayName || socket.data.displayName,
             });
-            // If the game was paused waiting for this seat, the revive cleared
-            // the pause — push the fresh state so every client drops the pause
-            // banner and resumes rendering live play.
+            // If the revive cleared a pause, push the new state so every client
+            // stops showing the pause banner.
             if (state.status === 'active' && !state.paused) {
               this.engine.emitEvent({ type: 'state_update', gameId: effectiveGameId, state });
             }
@@ -208,6 +218,27 @@ export class JoinManager {
       }
     });
   }
+  // Removes a socket's room and seat binding without closing the connection.
+  // Used when a join is refused. tokenGameId is kept, so the socket stays pinned
+  // to its own game.
+  private detachSocket(socket: GameSocket, gameId: string): void {
+    void socket.leave(gameId);
+    delete socket.data.gameId;
+    delete socket.data.playerColor;
+  }
+
+  // Unbinds any other socket still holding this seat, so an older tab or a socket
+  // the server has not closed yet cannot mark the seat as disconnected when it
+  // later drops.
+  private evictSeatSiblings(socket: GameSocket, gameId: string, color: PlayerColor): void {
+    for (const other of socket.nsp.sockets.values()) {
+      if (other.id === socket.id) continue;
+      if (other.data.gameId === gameId && other.data.playerColor === color) {
+        this.detachSocket(other, gameId);
+      }
+    }
+  }
+
   // Auto-start PvE/hotseat matches : neither has a second remote player for
   // a ready-check quorum. PvE registers its bot seats here; hotseat waits
   // for every local seat to join before flipping the game active.

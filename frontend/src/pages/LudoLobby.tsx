@@ -46,6 +46,8 @@ type Room = {
   seats: number;
   maxSeats: number;
   mode: 'classic' | 'duel';
+  /** True when the viewer holds a seat in this room, so the row is a REJOIN row. */
+  mySeat?: boolean;
 };
 
 type MatchResult = {
@@ -158,7 +160,7 @@ export function LudoLobby() {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
     const ownRoom = (rooms ?? []).find(
-      (r) => r.hostUsername === user?.username && r.roomCode === trimmed,
+      (r) => r.roomCode === trimmed && (r.mySeat ?? r.hostUsername === user?.username),
     );
     if (ownRoom) {
       await rejoinRoom(ownRoom);
@@ -836,7 +838,7 @@ export function LudoLobby() {
                         </div>
                       ) : (
                         filteredRooms.map((room) => {
-                          const isOwn = room.hostUsername === user?.username;
+                          const isMySeat = room.mySeat ?? room.hostUsername === user?.username;
                           const full = room.seats >= room.maxSeats;
                           const hue = hueForHost(room.host);
                           return (
@@ -849,7 +851,7 @@ export function LudoLobby() {
                                 padding: '12px 14px',
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
                                 alignItems: 'center',
-                                background: isOwn ? 'rgba(255, 0, 127, 0.12)' : 'transparent',
+                                background: isMySeat ? 'rgba(255, 0, 127, 0.12)' : 'transparent',
                               }}
                             >
                               <div
@@ -919,20 +921,20 @@ export function LudoLobby() {
                                 <button
                                   className={RETRO_BTN}
                                   onClick={() => {
-                                    if (isOwn) void rejoinRoom(room);
+                                    if (isMySeat) void rejoinRoom(room);
                                     else void joinRoom(room);
                                   }}
-                                  disabled={(!isOwn && full) || joiningRoomId === room.id}
+                                  disabled={(!isMySeat && full) || joiningRoomId === room.id}
                                   style={{
                                     padding: '5px 12px',
                                     fontSize: '0.7rem',
-                                    background: isOwn ? 'var(--accent-pink)' : undefined,
+                                    background: isMySeat ? 'var(--accent-pink)' : undefined,
                                     opacity:
-                                      (!isOwn && full) || joiningRoomId === room.id ? 0.4 : 1,
-                                    cursor: !isOwn && full ? 'not-allowed' : 'pointer',
+                                      (!isMySeat && full) || joiningRoomId === room.id ? 0.4 : 1,
+                                    cursor: !isMySeat && full ? 'not-allowed' : 'pointer',
                                   }}
                                 >
-                                  {isOwn
+                                  {isMySeat
                                     ? joiningRoomId === room.id
                                       ? '...'
                                       : t('lobbyBrowser.rejoinBtn')

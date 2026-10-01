@@ -21,7 +21,7 @@ The lobby is at `/gamelobby` (`LudoLobby.tsx`), with a separate table/room scree
 1. **Seat setup** — player count (2-4, read from the `?mode=` query param) and seat assignment (`you`, `player`, `bot`, or empty).
 2. **Bot setup** — add or remove bots.
 3. **Mode selection** — PvP (player versus player), PvE (player versus environment) or hotseat.
-4. **Match creation** — `LudoLobby.tsx` lists open rooms (`GET /api/games/rooms`) and rejoinable games (`GET /api/games/mine`), and joins them (`POST /api/match/join/:code`, `POST /api/game/:id/rejoin`) or creates a PvP (player versus player) invite (`POST /api/match/pvp/invite`); for local PvE/hotseat play it hands off to the table screen (`/gamelobby/table?mode=…`). The table screen (`Lobby.tsx`) is the one that calls `POST /api/match/create` with the exact `seatColors`, stores the returned `activeMatch` (gameId and engine token) in the store, then navigates to `/game`, where the Socket.IO connection starts.
+4. **Match creation** — `LudoLobby.tsx` lists the rooms the caller may enter (`GET /api/games/rooms`; each row carries `mySeat`, where `true` means "you hold a seat here, so this is a REJOIN row" — including a room whose game already started, as long as your seat is still inside its 45 s grace window) and the games they are seated in (`GET /api/games/mine`), and joins them (`POST /api/match/join/:code`, `POST /api/game/:id/rejoin`) or creates a PvP (player versus player) invite (`POST /api/match/pvp/invite`); for local PvE/hotseat play it hands off to the table screen (`/gamelobby/table?mode=…`). The table screen (`Lobby.tsx`) is the one that calls `POST /api/match/create` with the exact `seatColors`, stores the returned `activeMatch` (gameId and engine token) in the store, then navigates to `/game`, where the Socket.IO connection starts.
 
 > **Note:** The lobby communicates with the real backend. Creating a match returns engine credentials (`gameId`, `token`, `engineUrl`), which the Game page uses to connect through Socket.IO.
 
@@ -138,8 +138,13 @@ sequenceDiagram
 ```
 LudoLobby.tsx (/gamelobby)
   ├── Local setup → navigate('/gamelobby/table?mode=…&bots=…&local=…')
-  └── Join → POST /api/match/join/:code | POST /api/game/:id/rejoin | POST /api/match/pvp/invite
-       └── Success → setActiveMatch(result) → navigate('/game?gameId=…')
+  ├── Create room → POST /api/match/pvp/invite
+  │   └── Refused while GET /api/games/mine is non-empty (you are already seated somewhere)
+  ├── Room row → room.mySeat → POST /api/game/:id/rejoin (REJOIN row, own seat)
+  │              otherwise → POST /api/match/join/:code (JOIN row)
+  ├── Invite-code box → a code matching one of your own row → rejoin
+  │                     any other code → POST /api/match/join/:code
+  └── Success → setActiveMatch(result) → navigate('/game?gameId=…')
 
 Lobby.tsx (table, /gamelobby/table)
   ├── POST /api/match/create { mode, playerCount, botCount, seatColors }

@@ -143,7 +143,7 @@ export function RetroNavbar({
     measure();
     window.addEventListener('resize', measure);
     // Re-measure with the real Orbitron metrics once the web font loads.
-    void document.fonts?.ready.then(measure).catch(() => {});
+    void document.fonts.ready.then(measure).catch(() => {});
     return () => {
       window.removeEventListener('resize', measure);
       probe.remove();

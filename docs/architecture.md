@@ -324,6 +324,46 @@ metadata cache. The engine is a separate process, so its `RedisGameStore` and
 ---
 
 
+## Security & Threat Model
+
+The ludo-engine socket is the one channel where a client acts on live game state directly, so it is treated as a boundary rather than as a trusted caller. The boundary rests on two properties:
+
+- **The engine is only reachable same-origin.** `ludo-engine` publishes `127.0.0.1:3001` only, and the browser connects to `/socket.io/` on its own origin, which nginx proxies: a loopback connection on its own is never enough to reach a game.
+- **Every socket is authenticated by a match token, and the token, not the client, names the room and the seat.** The backend mints that token only for a seat the caller still owns, in a game the engine has neither started nor finalized.
+
+The table below lists the holes found in the first version of this boundary, why each one mattered, and the rule that now closes it. The engine-side rules are described in [`ludo-engine/ludo-engine-socket-system.md`](ludo-engine/ludo-engine-socket-system.md) (handshake, `join_game`, `disconnect`), the minting and seat gates in [`backend/backend-match-module.md`](backend/backend-match-module.md), and the rejoin row the UI derives from `mySeat` in [`frontend/frontend-lobby-module.md`](frontend/frontend-lobby-module.md).
+
+| # | Hole (before) | Why it mattered | Fix (now) | Code |
+|---|---|---|---|---|
+| 1 | The engine verified handshake tokens against the session `JWT_SECRET`, with no audience or token-type check | Any session access token, or a token minted by any service sharing that key, was also a valid game token, so one leaked key forged both session and seat credentials | The engine has its own `ENGINE_JWT_SECRET`: a token must carry `aud: 'ludo-engine'`, be `HS256`, have a signature that compares in constant time and a live `exp`, and the boot preflight refuses to start without the key | `backend/src/match/engine-token.util.ts`, `backend/app/ludo-engine/src/socket/auth.ts`, `backend/docker-entrypoint.sh`, `Makefile` |
+| 2 | `join_game` took the room from the client whenever the socket had no `gameId` of its own, and nothing ever cleared that binding | The room a socket acted in was not necessarily the room named by its token, and a refused socket stayed bound to the room it already had | The token's match id is kept as `tokenGameId`, is the authoritative id for `join_game`, and `detachSocket()` never clears it, so a refusal cannot re-point a socket at another game | `backend/app/ludo-engine/src/socket/server.ts`, `socket/join-manager.ts` |
+| 3 | A refused join returned without leaving the room or clearing `socket.data.gameId` / `playerColor` | The refused socket received every broadcast of a game it was not in, and its close ran `handleDisconnect`, which marked that seat disconnected and opened the 45 s grace window for a player who was online | `detachSocket()` leaves the room and clears both fields before the refusal is emitted, so the refused socket's later close is a no-op | `backend/app/ludo-engine/src/socket/join-manager.ts`, `socket/socket-handlers.ts` |
+| 4 | The in-progress guard refused every non-reconnecting join | A seat the engine still held as `active` or `disconnected` (for example right after an abrupt close, before the grace bookkeeping ran) could not be resumed by its own owner | The guard also accepts a join whose token seat is resumable (`active` / `disconnected`); only a seat the engine finalized (`exited`) or never seated is refused, and that one gets `seat_expired` | `backend/app/ludo-engine/src/socket/join-manager.ts` |
+| 5 | Nothing unbound an older socket holding the same room + colour | A duplicate tab could keep its binding, and its close marked the seat disconnected while the newer socket was live | An accepted join calls `evictSeatSiblings()`, which detaches any other socket bound to that room + colour, without opening a grace window | `backend/app/ludo-engine/src/socket/join-manager.ts` |
+
+| 6 | `POST /api/match/create` reused any `WAITING`/`ACTIVE` room the caller was seated in and then wrote that hash again (`status`, `createdAt`, `inviteCode`) | A started game could be rewritten to `WAITING` and re-advertised as a lobby, and a seat the engine had already taken away could be handed back | `findReusableRoom()` reuses a room only when it is `WAITING` PvP, its engine game has not started and the caller's seat is not finalized; `handoffExistingRoom()` writes nothing to the hash; every other create gets a fresh `gameId` | `backend/src/match/match.creator.service.ts` |
+| 7 | `isSeatFinalized()` was consulted only when the hash said `ACTIVE` | A seat the engine had already pruned (`exited`) under any other hash status could still pass `POST /api/game/:id/rejoin` from a cached tab or a crafted request, which also bypassed the `GET /api/games/mine` filter | The check runs on the caller's seat whatever the hash status says | `backend/src/match/match.player.service.ts`, `backend/src/match/seat-finalization.ts` |
+| 8 | Joins checked only the `match:*` hash | The hash can lag behind the engine, so a room whose game had started could still read `WAITING` and take a new seat | `isEngineGameStarted()` reads the engine's own state and is checked in `joinMatch()` and in the room list | `backend/src/match/seat-finalization.ts`, `backend/src/match/match.player.service.ts` |
+| 9 | `GET /api/games/rooms` returned one list to all callers and included only `WAITING` rooms | A seated player whose game had started had no rejoin row, and a row only its own holder could reclaim was indistinguishable from a joinable one | The list is computed per caller: rows carry `mySeat`, and an `ACTIVE` room is returned only to a viewer who still holds a reclaimable seat in it | `backend/src/match/match.query.service.ts`, `backend/src/match/match.controller.ts`, `frontend/src/pages/LudoLobby.tsx` |
+| 10 | Three `jwt.sign` calls across the match services minted engine tokens with the session `JWT_SECRET` borrowed from `AuthModule`, each overriding only `expiresIn` | With no single mint site, the secret, audience and lifetime rules could drift apart: none of the three carried an audience, so each call had to state every other rule itself | `signEngineToken()` is the single mint site, applying the engine secret, the audience and the 24 h lifetime | `backend/src/match/engine-token.util.ts` |
+
+### Invariants to check
+
+- A match token is signed with `ENGINE_JWT_SECRET`, carries `aud: 'ludo-engine'`, uses `HS256` and has a 24 h `exp`; the engine rejects anything else, including a session access token, which has neither the audience nor the signature.
+- `join_game` binds the socket to the room and colour named by the token (`tokenGameId`, `tokenColor`); the client's arguments are fallbacks only.
+- A socket holds a room and seat binding only while its join is accepted: a refusal or a takeover clears `socket.data.gameId` and `playerColor` (`detachSocket()`), so its later `disconnect` cannot disturb a live seat.
+- The backend mints a token only when the caller's seat is not `exited` in the engine state and the engine has not started the game; the `match:*` hash is never trusted on its own.
+- `POST /api/match/create` never rewrites an existing room hash: a reusable lobby is handed back unchanged.
+- `GET /api/games/rooms` is caller-scoped: a started room is visible only to the holder of a reclaimable seat in it (`mySeat`).
+- The engine's state readers fail open (a missing or unreadable `game:<gameId>` returns `false`), so a bad read hides no legitimate seat and locks no legitimate room.
+
+> The engine-side rules and the token lifecycle are detailed in [`ludo-engine/ludo-engine-socket-system.md`](ludo-engine/ludo-engine-socket-system.md); the seat gates that decide whether a match token is issued at all are in [`backend/backend-match-module.md`](backend/backend-match-module.md).
+
+
+---
+---
+
+
 ## Configuration (.env)
 
 See the [README](../README.md) **Configuration (.env)** section for the `.env` layout,
@@ -334,6 +374,15 @@ it via compose's `env_file:`; host-side scripts load it through dotenv. `backend
 is a single lookup point over `process.env`: `secret(name)` returns `undefined` when unset,
 `requireSecret(name)` throws at boot on a missing value. The remaining `${...}` in
 `compose.yaml` are non-secret topology values and all carry defaults.
+
+Two host ports are hardcoded in `compose.yaml` rather than read from `.env`:
+`8443 → 443` for nginx's direct TLS listener (published on every interface) and
+`127.0.0.1:8444 → 444` for the ngrok tunnel listener (published loopback-only).
+`HTTPS_PORT` and `NGROK_PORT` in `.env` mirror those two values for host-side
+scripts and printed URLs (`make all`, `make lan`, `make tunnel`), so editing them
+in `.env` does not move either publish. Neither publish is conditional on a
+compose profile, so `8444` is open in every mode, with or without a tunnel, and
+the stack fails to start if either port is already in use on the host.
 
 
 ---

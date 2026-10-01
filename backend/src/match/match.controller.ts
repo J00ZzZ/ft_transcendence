@@ -82,11 +82,12 @@ export class MatchController {
     return this.match.readyGame(gameId, req.user.id);
   }
 
-  // Browse Open Rooms (WAITING PvP games : joinable)
+  // Browse Open Rooms (WAITING PvP games : joinable, plus the caller's own
+  // reclaimable seats in games that have already started)
   @UseGuards(JwtAuthGuard)
   @Get('api/games/rooms')
-  listRooms() {
-    return this.match.listOpenRooms();
+  listRooms(@Request() req: { user: { id: string } }) {
+    return this.match.listOpenRooms(req.user.id);
   }
 
   // My Rooms (WAITING/ACTIVE games I'm seated in : rejoin after refresh)

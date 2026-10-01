@@ -384,3 +384,4 @@ Module-level constants in the engine's support files — edit at the top of each
 | `REDIS_PASSWORD` | (from secrets) | RedisGameStore |
 | `BACKEND_URL` | `http://backend:3000` | ResultSubmitter |
 | `ENGINE_API_KEY` | (from secrets) | ResultSubmitter |
+| `ENGINE_JWT_SECRET` | (from secrets) | `socket/auth.ts` — verifies the handshake match tokens |

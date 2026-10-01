@@ -49,6 +49,7 @@ An error response has one of two shapes:
 | `AUTH_NOT_AUTHENTICATED` | 401 | No valid session |
 | `AUTH_SESSION_EXPIRED` | 401 | Session expired — log in again |
 | `AUTH_DISPLAY_NAME_TAKEN` | 409 | Display name already taken |
+| `AUTH_DISPLAY_NAME_RESERVED` | 400 | Display name cannot start with `bot-` (reserved for bots) |
 | `AUTH_CURRENT_PASSWORD_INCORRECT` | 401 | Current password wrong |
 | `AUTH_EMAIL_CHANGE_SET_PASSWORD` | 400 | Set a password before changing email (OAuth-only account) |
 | `AUTH_EMAIL_CHANGE_RATE_LIMITED` | 429 | Too many email-change requests (max 3/hour per user) |
@@ -656,7 +657,7 @@ Update the logged-in user's profile (display name, email, 2FA toggle, OAuth link
 }
 ```
 
-`user.email` stays the **current** address while a change is pending. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`.
+`user.email` stays the **current** address while a change is pending. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`; a name that impersonates a bot (starts with `bot-`) returns `400 AUTH_DISPLAY_NAME_RESERVED`.
 
 
 ---
@@ -1120,6 +1121,7 @@ Create a PvP invite game with a shareable code.
 **Notes:**
 - Share `inviteCode` via chat/friend list.
 - Recipient joins via `POST /api/match/join/:code`.
+- Follows the same create-or-reuse path as `POST /api/match/create`: if you already sit in one of your own `WAITING` PvP rooms, that room (and its existing invite code) is handed back instead of a second room being created.
 
 
 ---
@@ -1151,7 +1153,9 @@ Join a PvP game by invite code.
 
 ```
 
-**Errors:** 404 `MATCH_INVITE_INVALID` when no WAITING room carries that code (not found, expired, or already started); 403 `MATCH_ROOM_FULL` if the last seat was taken between the lookup and the assignment; 400 `MATCH_OWN_INVITE` when you are the host.
+**Errors:** 404 `MATCH_INVITE_INVALID` when no WAITING room carries that code (not found or expired); 403 `MATCH_ROOM_FULL` if the last seat was taken between the lookup and the assignment; 400 `MATCH_OWN_INVITE` when you are the host; 403 `MATCH_ALREADY_STARTED` when the room's game already started (the stored hash is `ACTIVE`, or the engine's ready-check already flipped the game state out of `waiting`) or when your own seat in that room has been finalized (`MATCH_SEAT_EXPIRED`).
+
+If the caller already holds a seat in that room, the rejoin rules apply and their **existing** seat and colour are returned instead of a new slot being allocated.
 
 
 ---
@@ -1237,6 +1241,8 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
 - `mode` is **required** and must be `pvp`, `pve`, or `hotseat` (no silent fallback).
 - `playerCount` accepts 2-4; `botCount` must be 0 to `playerCount-1`. Bots are only allowed in PvE games.
 - `botColors` / `seatColors` (optional string arrays) can override the default slot colors. Seat `color` is otherwise assigned by the server.
+- **Reuse:** creating a `pvp` room while you already sit in one of your own still-`WAITING` PvP rooms hands that room back — the response carries its `gameId`, `inviteCode` and your existing seat colour, and nothing in the stored room is modified. A room whose game has already started (engine state is anything but `waiting`, or your seat in it is finalized) is never reused: a fresh room is created instead, so a player who left a live game can start or join another one while their old seat stays ghosted.
+- `pve`/`hotseat` always create a fresh room (they start `ACTIVE` and are never reused).
 
 
 ---
@@ -1378,10 +1384,22 @@ no seat is left for the friend.
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
 
-List open (WAITING PvP) rooms that can be joined.
+List the PvP rooms the caller may enter. The list is computed **per caller**:
+
+- **Join rows** (`mySeat: false`) — PvP rooms stored as `WAITING` whose engine game has not started and
+  which are not full.
+- **Rejoin rows** (`mySeat: true`) — rooms the caller holds a seat in, **including games that have
+  already started**: their seat is kept for the 45 s grace window after they leave the table
+  ("RETURN TO LOBBY"), so they can come back to it. Such a row is returned even when the room is full,
+  and stops being returned once the engine finalizes that seat.
+
+A started room is therefore hidden from everybody except the players who still hold a reclaimable seat
+in it, and `ABORTED`/`ENDED` rooms are never returned. The engine state, not just the stored hash,
+decides whether a game has started (see `isEngineGameStarted` in `backend-match-module.md`).
 
 **Headers:** 🔒 (requires `token` cookie)  
-**Response:** Array of joinable room summaries.
+**Response:** Array of room summaries — `id`, `roomCode`, `hostId`, `host`, `hostUsername`,
+`hasAvatarPhoto`, `seats`, `maxSeats`, `mode`, and `mySeat`.
 
 
 ---
@@ -1392,10 +1410,11 @@ List open (WAITING PvP) rooms that can be joined.
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
 
-List rooms (WAITING/ACTIVE) the current user is seated in — used to rejoin after a refresh. An
-ACTIVE room whose seat the engine has **finalized** (grace expired / End Game — `PlayerMeta.status`
-is `exited`) is filtered out via `isSeatFinalized()`, so a departed player is not offered a REJOIN
-MATCH button they can no longer use.
+List rooms (WAITING/ACTIVE) the current user is seated in — used to rejoin after a refresh. A room
+whose seat the engine has **finalized** (grace expired / End Game — `PlayerMeta.status` is `exited`)
+is filtered out via `isSeatFinalized()`, so a departed player is not offered a REJOIN MATCH button they
+can no longer use. The seat is checked whatever the stored hash status says: a room whose hash still
+reads `WAITING` can have live engine state behind it.
 
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** Array of the user's room summaries.
@@ -1433,7 +1452,9 @@ only when the room has one.
 
 **Errors:** 404 if game not found, 403 `MATCH_NOT_PLAYER` if the caller holds no seat, and 403
 `MATCH_SEAT_EXPIRED` when the seat has been finalized (the engine parked every piece at `step = -1`),
-so no fresh token is minted for a seat that can never move again.
+so no fresh token is minted for a seat that can never move again. The seat is checked regardless of the
+stored hash status (`isSeatFinalized` in `backend-match-module.md`), so a hash that was rewritten back
+to `WAITING` cannot resurrect a dead seat.
 
 
 ---
@@ -2217,12 +2238,15 @@ JWT payload structure:
   "displayName": "string",
   "role": "player1" | "player",
   "color": "red",
-  "mode": "pvp" | "pve" | "hotseat"
+  "mode": "pvp" | "pve" | "hotseat",
+  "aud": "ludo-engine"
 }
 
 ```
 
 `mode` is signed only on tokens minted by the creation endpoints (`/api/match/create`, `/api/match/pvp/invite`, `/api/match/pve`); the join-by-code and rejoin tokens omit it, and the engine treats a missing `mode` as a PvP seat. The engine reads the account id from `playerId` (it also accepts `sub` or `userId` if present). `username` is omitted for bot seats.
+
+Every token is signed with the engine-dedicated `ENGINE_JWT_SECRET` (not the session `JWT_SECRET`) and carries `aud: "ludo-engine"`; the engine rejects a token signed with any other key or missing the audience, so a session access token cannot be replayed as a match token.
 
 **Health endpoint on the engine:** `GET http://localhost:3001/health` returns `{ "status": "ok", "uptime": 12345.67 }`.
 

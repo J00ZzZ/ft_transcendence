@@ -34,7 +34,7 @@ All three are full-screen routes (no side rail) and are public, so no session is
 | `src/pages/ForgotPassword.tsx` | Password reset step 1 — email input |
 | `src/pages/ResetPassword.tsx` | Password reset step 2 — new password form |
 | `src/components/RetroAuthLayout.tsx` | Layout container for all auth pages |
-| `src/store.tsx` | `verify2fa`, `forgotPassword`, `resetPassword` actions |
+| `src/store.tsx` | `verify2fa`, `resend2fa`, `forgotPassword`, `resetPassword` actions |
 | `src/validatePassword.ts` | Client-side password validation (same rules as the backend policy) |
 
 
@@ -57,6 +57,7 @@ Reached with `?token=<pendingToken>` after password login or OAuth when the acco
 - Calls `POST /api/auth/2fa/verify` with `pendingToken` and `code`.
 - On success, navigates to `/home`.
 - On failure, shows an error message.
+- A **"Regenerate code"** button re-issues a fresh code for the same challenge via `POST /api/auth/2fa/resend` (the previous code is invalidated); the per-user cap is 3/hour, over which the route returns `429 AUTH_CODE_RESEND_LOCKED`.
 
 **Route params:** the `token` query parameter holds the `pendingToken` from the login response.
 
@@ -174,7 +175,7 @@ export function passwordError(pw: string): string | null {
 
 | Dependency | Purpose |
 |-----------|---------|
-| `store.tsx` | `verify2fa`, `forgotPassword`, `resetPassword` actions |
+| `store.tsx` | `verify2fa`, `resend2fa`, `forgotPassword`, `resetPassword` actions |
 | `router.tsx` | `navigate`, `useRoute` for token query params |
 | `validatePassword.ts` | Client-side password validation |
 | `RetroAuthLayout.tsx` | Centered card layout wrapper |

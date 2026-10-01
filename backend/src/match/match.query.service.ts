@@ -3,7 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
-import { isSeatFinalized } from './seat-finalization';
+import { isEngineGameStarted, isSeatFinalized } from './seat-finalization';
+
+const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 
 @Injectable()
 // Read-only match queries over Redis match:* hashes, enriched with host
@@ -22,8 +24,10 @@ export class MatchQueryService {
     });
   }
 
-  // List all WAITING PvP rooms that are open for joining.
-  async listOpenRooms() {
+  // Lists the PvP rooms the viewer may enter: public lobby rooms, plus the
+  // viewer's own seat in a room whose game has already started, as long as that
+  // seat can still be reclaimed.
+  async listOpenRooms(viewerId?: string) {
     let cursor = '0';
     const rooms: Array<{
       id: string;
@@ -31,27 +35,42 @@ export class MatchQueryService {
       hostId: string;
       seats: number;
       maxSeats: number;
+      mySeat: boolean;
     }> = [];
     do {
       const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'match:*', 'COUNT', 100);
       cursor = nextCursor;
       for (const key of keys) {
         const data = await this.redis.hgetall(key);
-        if (data.status === 'WAITING' && data.gameType === 'PVP' && data.player1_id) {
-          const seats = [data.player1_id, data.player2_id, data.player3_id, data.player4_id].filter(
-            Boolean,
-          ).length;
-          const maxSeats = parseInt(data.playerCount || '4', 10);
-          // Full rooms are hidden from the list of joinable PvP rooms
+        if (data.status !== 'WAITING' && data.status !== 'ACTIVE') continue;
+        if (data.gameType !== 'PVP' || !data.player1_id) continue;
+
+        const seatIds = [data.player1_id, data.player2_id, data.player3_id, data.player4_id];
+        const seats = seatIds.filter(Boolean).length;
+        const maxSeats = parseInt(data.playerCount || '4', 10);
+        const slotIndex = viewerId ? seatIds.indexOf(viewerId) : -1;
+
+        if (slotIndex !== -1) {
+          // The viewer holds a seat here, so the full-room rule does not apply.
+          const color = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
+          if (await isSeatFinalized(this.redis, data.id, color)) continue;
+        } else {
+          // A game that has already started takes no new players. The match hash
+          // can still say WAITING, so the engine state is checked as well (see
+          // isEngineGameStarted).
+          if (data.status === 'ACTIVE') continue;
+          if (await isEngineGameStarted(this.redis, data.id)) continue;
           if (seats >= maxSeats) continue;
-          rooms.push({
-            id: data.id,
-            roomCode: data.inviteCode,
-            hostId: data.player1_id,
-            seats,
-            maxSeats,
-          });
         }
+
+        rooms.push({
+          id: data.id,
+          roomCode: data.inviteCode,
+          hostId: data.player1_id,
+          seats,
+          maxSeats,
+          mySeat: slotIndex !== -1,
+        });
       }
     } while (cursor !== '0');
 
@@ -76,6 +95,9 @@ export class MatchQueryService {
         seats: r.seats,
         maxSeats: r.maxSeats,
         mode: r.maxSeats === 2 ? 'duel' : 'classic',
+        // True when the viewer holds a seat in this room: the UI turns the row
+        // into a REJOIN row instead of a join row.
+        mySeat: r.mySeat,
       };
     });
   }
@@ -100,12 +122,11 @@ export class MatchQueryService {
         if (!seatIds.includes(userId)) continue;
         if (data.status !== 'WAITING' && data.status !== 'ACTIVE') continue;
 
-        // A seat the engine finalized cannot be rejoined: stop advertising this
-        // match to that player. ACTIVE only; a WAITING room has no game state.
-        if (data.status === 'ACTIVE') {
-          const color = data[`player${seatIds.indexOf(userId) + 1}_color`];
-          if (color && (await isSeatFinalized(this.redis, data.id, color))) continue;
-        }
+        // A finalized seat can never be rejoined, so this match is not advertised
+        // at all. Checked on every hash status, because the engine keeps its state
+        // for waiting rooms too.
+        const color = data[`player${seatIds.indexOf(userId) + 1}_color`];
+        if (color && (await isSeatFinalized(this.redis, data.id, color))) continue;
         rooms.push({
           id: data.id,
           roomCode: data.inviteCode || null,

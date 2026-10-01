@@ -35,6 +35,14 @@ which is the whole reason the tunnel has its own port. Both listeners `include`
 the same server body (`nginx/conf/app.inc`), so routing, security headers and
 rate limits never drift between the local and tunnel modes.
 
+The `127.0.0.1:8444:444` publish carries no compose profile, so nginx binds
+`8444` as soon as the stack starts: the port is open in every mode, tunnel
+running or not, and `compose up` fails if the host already uses it. Only
+loopback can reach it, and the ngrok agent is the only process that connects.
+While a tunnel runs, the agent also binds `127.0.0.1:4040` for its own local API
+(`make tunnel-url` reads the public URL from there), so that port has to be free
+too.
+
 If `NGROK_DOMAIN` is set in `.env`, `make tunnel` passes
 `--url=https://$(NGROK_DOMAIN)` so you get a stable, reusable ngrok domain
 instead of a random one each run.
@@ -76,16 +84,18 @@ check to decide which `FRONTEND_URL` to redirect back to after login
 | Variable | Required | Notes |
 |---|---|---|
 | `NGROK_AUTHTOKEN` | yes | Required by `make ngrok-auth`, which `tunnel` depends on |
-| `NGROK_DOMAIN` | no | Reserved ngrok domain, for a stable URL across restarts |
-| `NGROK_PORT` | no | Default `8444` — the loopback port ngrok tunnels. It must match the `:444` tunnel listener's published port (`127.0.0.1:8444:444` in `compose.yaml`); the default lives in the `Makefile` and can be overridden in `.env` |
-| `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests |
+| `NGROK_DOMAIN` | yes | Reserved ngrok domain, for a stable URL across restarts. `make env` requires it to be non-empty; `make tunnel` passes it as `--url` whenever it is set |
+| `NGROK_PORT` | yes | Default `8444`: the loopback port ngrok tunnels, which is the host port compose publishes nginx's tunnel listener on (`127.0.0.1:8444:444`). Required by `make env`, defaulted in the `Makefile`. It must match the publish in `compose.yaml`, because that publish does not read this key |
+| `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests, read at backend boot by `requireSecret`, so an empty value stops the backend container from starting |
 | `GOOGLE_/GITHUB_/FORTYTWO_CLIENT_ID` + `_SECRET` + `_CALLBACK_URL` | yes | OAuth app credentials — shared by the local and tunnel strategies |
 | `NGROK_GOOGLE_/GITHUB_/FORTYTWO_CALLBACK_URL` | yes | Tunnel callback URLs registered as extra redirect URIs on the same OAuth apps |
 
 `make env` (a prerequisite of `make build`, so it runs on every path) reads
 `.env`, validates that every required value (core secrets/DB URLs, OAuth apps,
-tunnel credentials) is present and non-empty — failing hard with the missing
-list otherwise.
+tunnel credentials) is present and non-empty, and fails hard with the missing
+list otherwise. Every key in the table above is on that list, the ngrok group
+included, so the tunnel values are needed for every build and not only when a
+tunnel is actually run.
 Nothing is auto-generated (the one exception: `LAN_IP`, which `make env`
 overwrites with the machine's current address so LAN mode cannot print a
 stale URL): copy a real `.env` from a teammate.

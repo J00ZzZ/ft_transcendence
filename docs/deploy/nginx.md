@@ -67,6 +67,12 @@ publish `127.0.0.1:<port>:<port>` for host-side `psql`, Prisma Studio and
 that's what makes [tunnel mode](./tunnel.md) need zero extra routing config of
 its own.
 
+Neither mapping sits behind a compose profile, so both are created every time
+the stack starts: `8444` is bound even with no ngrok agent running, and
+`compose up` fails if the host already has either port in use. The agent itself
+also binds `127.0.0.1:4040` while a tunnel runs, for its local API, which
+`make tunnel-url` reads.
+
 
 ---
 ---

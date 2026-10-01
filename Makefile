@@ -14,12 +14,14 @@ OAUTH_VARS     = GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL \
 # are what `make tunnel` needs. Required by the preflight below.
 TUNNEL_VARS    = NGROK_AUTHTOKEN NGROK_DOMAIN NGROK_FRONTEND_URL \
                  NGROK_GOOGLE_CALLBACK_URL NGROK_GITHUB_CALLBACK_URL NGROK_FORTYTWO_CALLBACK_URL
-# Everything the stack hard-requires: core secrets/DB/URLs + OAuth apps. These
+# Everything the preflight requires: core secrets/DB/URLs + OAuth apps. These
 # are validated (and never auto-generated — a real .env is copied from a
-# teammate). LAN_IP and SMTP_CREDENTIALS are deliberately not in the list.
-CORE_VARS      = JWT_SECRET POSTGRES_PASSWORD REDIS_PASSWORD ENGINE_API_KEY \
+# teammate). SMTP_CREDENTIALS counts too: without it mail only gets logged, but
+# an empty value still means the .env was copied incompletely. LAN_IP is the
+# only key left out of the list (`make env` writes it itself).
+CORE_VARS      = JWT_SECRET ENGINE_JWT_SECRET POSTGRES_PASSWORD REDIS_PASSWORD ENGINE_API_KEY \
                  POSTGRES_USER POSTGRES_DB DATABASE_URL CONTAINER_DATABASE_URL \
-                 FRONTEND_URL NGROK_PORT HTTPS_PORT
+                 FRONTEND_URL NGROK_PORT HTTPS_PORT SMTP_CREDENTIALS
 
 all: build start
 	@ echo "Frontend: https://localhost:$(HTTPS_PORT)"
