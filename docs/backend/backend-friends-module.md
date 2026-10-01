@@ -37,7 +37,7 @@ Friendships have a status field: `pending`, `accepted`, or `blocked`.
 
 | File | Role |
 |------|------|
-| `friends.controller.ts` | HTTP routes: send, accept, decline, list, requests, remove, block |
+| `friends.controller.ts` | HTTP routes: send, accept, decline, remove, list, requests, block/unblock, blocked list, and game invites (invite, pending, dismiss) |
 | `friends.service.ts` | Business logic: Prisma queries for friendship CRUD |
 | `friends.module.ts` | NestJS module — registers controller, service, and PrismaService |
 

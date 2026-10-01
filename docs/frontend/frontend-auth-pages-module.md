@@ -19,7 +19,7 @@
 These pages are the entry point to the app. They are:
 
 1. **Login** — identifier (username or email), password, OAuth (Open Authorization) buttons, and two-factor authentication (2FA) support. It also shows one-shot notices carried in the query string (`verified`, `reset`, `error`) that arrive from email links and OAuth callbacks.
-2. **Signup** — username, email and password fields, a confirm-password field that must match, and a terms tick that must be checked before the form submits. Its link opens the legal popup. On success the form is replaced by a "check your inbox" confirmation screen.
+2. **Signup** — username, email and password fields, a confirm-password field that must match, and a terms tick that must be checked before the form submits. Its link opens the legal popup. On success the form is replaced by a "check your inbox" confirmation screen, which also shows the username assigned to the new account.
 
 Both pages use the `RetroAuthLayout` container and share the same styling: the retro/cyber theme and the provider buttons.
 
@@ -37,8 +37,10 @@ Both pages use the `RetroAuthLayout` container and share the same styling: the r
 | `src/pages/TwoFactor.tsx` | 2FA code entry |
 | `src/pages/ForgotPassword.tsx` | Password reset — step 1 (request link) |
 | `src/pages/ResetPassword.tsx` | Password reset — step 2 (set new password) |
-| `src/components/RetroAuthLayout.tsx` | Layout wrapper — logo, tagline, centered card |
+| `src/components/RetroAuthLayout.tsx` | Layout wrapper — logo, tagline, centered card (imports `GRID_BACKGROUND` from `styles/tw.ts`); also exports `NeonCheck`, the terms-tick glyph |
 | `src/components/OAuthButtons.tsx` | 42, GitHub, Google provider buttons |
+| `src/validatePassword.ts` | Client-side password-policy check (`passwordError`) |
+| `src/validateEmail.ts` | Loose client-side email-format check (`isValidEmail`) |
 
 
 ---
@@ -54,6 +56,9 @@ const [identifier, setIdentifier] = useState('')
 const [password, setPassword] = useState('')
 const [error, setError] = useState<string | null>(null)
 const [submitting, setSubmitting] = useState(false)
+const [notVerified, setNotVerified] = useState(false)     // shows the resend-verification link
+const [resendNotice, setResendNotice] = useState<string | null>(null)
+const [resending, setResending] = useState(false)
 ```
 
 ### Signup Form State
@@ -73,9 +78,9 @@ const [legalOpen, setLegalOpen] = useState(false)
 
 | Field | Rule |
 |-------|------|
-| Username | Required, 3-20 chars, alphanumeric + underscore only |
-| Email | Required, valid email format (used for verification and 2FA) |
-| Password | Required, 12-72 chars, must contain uppercase, lowercase, number, and special character |
+| Username | Required. The backend enforces 3-20 chars, alphanumeric + underscore only; the signup form does not validate it client-side. |
+| Email | Required, valid email format (`isValidEmail`, a loose mirror of the backend `@IsEmail()`; used for verification and 2FA) |
+| Password | Required, 12-72 chars, must contain uppercase, lowercase, number, and special character (`passwordError`) |
 | Confirm | Must match password |
 | Agree | Must be ticked before the form submits; its link opens the legal popup |
 
@@ -175,10 +180,14 @@ onSubmit(e)
   ├── If submitting → return
   ├── login(identifier, password)
   │   ├── POST /api/auth/login
-  │   │   ├── 200 + twoFactorRequired=false → setUser(user), navigate('/home')
-  │   │   ├── 200 + twoFactorRequired=true → navigate('/2fa?token=' + pendingToken)
-  │   │   ├── 200 + code=AUTH_EMAIL_NOT_VERIFIED → setError(the translated notice)
-  │   │   └── error → setError(message)
+  │   │   ├── 200 + twoFactorRequired=false → setUser(user), return {}
+  │   │   ├── 200 + twoFactorRequired=true → return { pendingToken }
+  │   │   ├── 200 + code=AUTH_EMAIL_NOT_VERIFIED → return { error, notVerified: true }
+  │   │   └── error → return { error }
+  ├── setNotVerified(!!result.notVerified)   (unlocks the "resend verification" link)
+  ├── If result.error → setError(message)
+  ├── Else if result.pendingToken → navigate('/2fa?token=' + result.pendingToken)
+  ├── Else → navigate('/home')  (2FA off: the session already exists)
   └── setSubmitting(false)
 ```
 
@@ -187,12 +196,13 @@ onSubmit(e)
 onSubmit(e)
   ├── e.preventDefault()
   ├── If submitting → return
-  ├── If passwordError(password) → setError(the password rule message)
-  ├── If password !== confirm → setError('Passwords do not match')
+  ├── If !isValidEmail(email) → setError(the email-format message); return
+  ├── If passwordError(password) → setError(the password rule message); return
+  ├── If password !== confirm → setError('Passwords do not match'); return
   ├── If !agreed → setError(the terms message); return
   ├── register(username, password, email)
   │   ├── POST /api/auth/register
-  │   │   ├── 200 → setSent(true) (the form is replaced by the "check your inbox" screen; no session is created)
+  │   │   ├── 200 → setAssigned(result.username); setSent(true) (the form is replaced by the "check your inbox" screen, which also shows the assigned username; no session is created)
   │   │   └── error → setError(message)
   └── setSubmitting(false)
 ```
@@ -213,9 +223,10 @@ onClick provider button
 
 | Dependency | Purpose |
 |-----------|---------|
-| `store.tsx` | `useApp()` for login/register actions, returns `{ error, pendingToken }` |
+| `store.tsx` | `useApp()` for login/register/resendVerification actions; `login` returns `{ error?, pendingToken?, notVerified? }` |
 | `router.tsx` | `navigate` for post-auth redirect |
-| `theme.ts` | `btnGold`, `goldText`, `input`, `label` styles |
+| `styles/tw.ts` | `RETRO_AUTH_*` class constants (title, input, label, button, error, link) |
+| `validatePassword.ts` / `validateEmail.ts` | Client-side mirrors of the backend password policy and `@IsEmail()` rule |
 | `RetroAuthLayout.tsx` | Retro-styled centered card container (`tag` + `children`), and `NeonCheck` — the glyph that shows the terms tick |
 | `LegalModal.tsx` | The legal popup the terms link opens: Terms of Service and Privacy Policy, with tabs and language buttons |
 | `OAuthButtons.tsx` | Provider button row |

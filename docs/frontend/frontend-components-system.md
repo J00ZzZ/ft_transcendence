@@ -20,16 +20,15 @@
 
 The shared components are reusable UI (user interface) building blocks used on several pages. They are:
 
-1. **RetroNavbar** — top navigation bar used by the full-screen pages.
-2. **RetroNavbar** — top navigation bar used by every page (logo, nav links, language selector, user menu).
-4. **RetroAuthLayout** — centered layout for the authentication pages (login, signup, 2FA, forgot/reset password).
-5. **Board / Die** — the Ludo board and the animated die.
-6. **UserAvatar** — avatar rendering.
-7. **OAuthButtons** — Google, GitHub and 42 provider buttons.
-8. **NotificationBell / NotificationToast** — the notification bell and toasts.
-9. **JoinByCode** — invite-code input for joining a game.
-10. **ProfileEditModal / RulesModal** — edit-profile dialog and rules popup.
-11. **CyberModal / ResultsModal** — cyber-styled modal base and the post-game results overlay.
+1. **RetroNavbar** — top navigation bar used by every page (logo, nav links, language selector, user menu).
+2. **RetroAuthLayout** — centered layout for the authentication pages (login, signup, 2FA, forgot/reset password).
+3. **Board / Die** — the Ludo board and the animated die.
+4. **UserAvatar** — avatar rendering.
+5. **OAuthButtons** — Google, GitHub and 42 provider buttons.
+6. **NotificationBell / NotificationToast** — the notification bell and toasts.
+7. **JoinByCode** — invite-code input for joining a game.
+8. **ProfileEditModal / RulesModal** — edit-profile dialog and rules popup.
+9. **CyberModal / ResultsModal** — cyber-styled modal base and the post-game results overlay.
 
 
 ---
@@ -88,7 +87,18 @@ type NeonCheckProps = {
 
 ### Board Component
 
-No props of its own; it reads the game state from `useApp()`.
+Presentational: it takes all game state as props and never reads the store itself.
+
+```typescript
+type BoardProps = {
+  pieces?: Array<{ id: string; color: string; step: number; isInGoal: boolean; isInBase: boolean }>
+  players?: Array<{ color: string; status: string }>
+  legalMoves?: Array<{ pieceId: string; from: number; to: number; isCapture: boolean; isHomeEntry: boolean }>
+  onPieceClick?: (pieceId: string) => void
+  animating?: { pieceId: string; step: number } | null  // renders that piece at `step` during the move animation
+  fx?: { color: string; to: number } | null             // transient capture-burst overlay
+}
+```
 
 ### Die Component
 
@@ -286,9 +296,8 @@ Per-constant notes:
 
 | Component | Depends On | Purpose |
 |-----------|-----------|---------|
-| `RetroAuthLayout` | `theme.ts` | `goldText`, inline styles |
-| `Board` | `store.tsx` | `useApp` for game state |
+| `RetroAuthLayout` | `styles/tw.ts` | `GRID_BACKGROUND` class constant, inline styles |
 | `Board` | `theme.ts` | `COL`, inline styles |
-| `Die` | `theme.ts` | Keyframe CSS for the shake animation, gradient backgrounds |
+| `Die` | `react` | Inline `shake` animation and pip-grid faces (no theme import) |
 | `OAuthButtons` | `theme.ts` | `btnOutline` style |
 | `RetroNavbar` | `store.tsx` | `useApp` for `user`, `lang`, `setLang`, `logout` |

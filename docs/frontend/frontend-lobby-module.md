@@ -21,7 +21,7 @@ The lobby is at `/gamelobby` (`LudoLobby.tsx`), with a separate table/room scree
 1. **Seat setup** — player count (2-4, read from the `?mode=` query param) and seat assignment (`you`, `player`, `bot`, or empty).
 2. **Bot setup** — add or remove bots.
 3. **Mode selection** — PvP (player versus player), PvE (player versus environment) or hotseat.
-4. **Match creation** — calls the backend matchmaking API (Application Programming Interface) at `POST /api/match/create` (or the PvP/PvE shortcuts), stores the returned `activeMatch` (gameId and engine token) in the store, then navigates to `/game`, where the Socket.IO connection starts.
+4. **Match creation** — `LudoLobby.tsx` lists open rooms (`GET /api/games/rooms`) and rejoinable games (`GET /api/games/mine`), and joins them (`POST /api/match/join/:code`, `POST /api/game/:id/rejoin`) or creates a PvP (player versus player) invite (`POST /api/match/pvp/invite`); for local PvE/hotseat play it hands off to the table screen (`/gamelobby/table?mode=…`). The table screen (`Lobby.tsx`) is the one that calls `POST /api/match/create` with the exact `seatColors`, stores the returned `activeMatch` (gameId and engine token) in the store, then navigates to `/game`, where the Socket.IO connection starts.
 
 > **Note:** The lobby communicates with the real backend. Creating a match returns engine credentials (`gameId`, `token`, `engineUrl`), which the Game page uses to connect through Socket.IO.
 
@@ -92,24 +92,26 @@ sequenceDiagram
 
 ### 2. Start Game Flow
 
-Sequence of steps when the user clicks "Start Game".
+The lobby (`/gamelobby`) sets up the seats and then hands off to the table screen
+(`/gamelobby/table`); the table screen creates the match.
+
 ```mermaid
 sequenceDiagram
     participant User
     participant Lobby as LudoLobby.tsx
-    participant API as POST /api/match/create
+    participant Table as Lobby.tsx (table)
+    participant API as Backend
     participant Store as AppProvider
     participant Router as navigate
 
-    User->>Lobby: Click "Start game" (mode = pve/pvp/hotseat)
-    Lobby->>API: POST /api/match/create { mode, playerCount, botCount }
-    API-->>Lobby: { gameId, token, engineUrl, color, inviteCode? }
-    Lobby->>Store: setActiveMatch({ gameId, token, color, mode, playerCount, inviteCode })
-    alt mode = pvp
-        Lobby->>Router: navigate('/gamelobby/table') (wait for opponent)
-    else pve / hotseat
-        Lobby->>Router: navigate('/game')
-    end
+    User->>Lobby: Choose a mode / seats, click start
+    Lobby->>Router: navigate('/gamelobby/table?mode=…&bots=…&local=…')
+    Note over Lobby: Or join directly — POST /api/match/join/:code, POST /api/game/:id/rejoin, POST /api/match/pvp/invite
+    Table->>API: POST /api/match/create { mode, playerCount, botCount, seatColors }
+    API-->>Table: { gameId, token, engineUrl, color, inviteCode? }
+    Table->>Store: setActiveMatch({ gameId, token, color, mode, playerCount, inviteCode })
+    Table->>Router: navigate('/game?gameId=…') → Game connects via Socket.IO
+```
 ```
 
 
@@ -134,12 +136,16 @@ sequenceDiagram
 
 ### Match Creation Path
 ```
-Start game (pvp / pve / hotseat)
-  ├── POST /api/match/create { mode, playerCount, botCount, botColors?, seatColors? }
+LudoLobby.tsx (/gamelobby)
+  ├── Local setup → navigate('/gamelobby/table?mode=…&bots=…&local=…')
+  └── Join → POST /api/match/join/:code | POST /api/game/:id/rejoin | POST /api/match/pvp/invite
+       └── Success → setActiveMatch(result) → navigate('/game?gameId=…')
+
+Lobby.tsx (table, /gamelobby/table)
+  ├── POST /api/match/create { mode, playerCount, botCount, seatColors }
   │   ├── Error (bad mode / bots in non-pve) → show message
   │   └── Success → setActiveMatch(result)
-  ├── pvp → navigate('/gamelobby/table')
-  └── pve / hotseat → navigate('/game') → Game connects via Socket.IO
+  └── navigate('/game?gameId=…') → Game connects via Socket.IO
 ```
 
 ### Seat Management Path

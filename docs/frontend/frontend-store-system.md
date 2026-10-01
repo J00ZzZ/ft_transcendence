@@ -21,7 +21,7 @@ The store is one React Context provider (`AppProvider`) that holds all global UI
 1. **Authentication session** — the `user` object, the `authReady` flag, and the `login`, `register` and `logout` actions.
 2. **Game setup state** — `playerCount` (2-4), the `seats` array (you/bot/player/empty), `dice`, `rolling` and `turn`.
 3. **Settings** — on/off switches (sound, music, auto-roll and others), each with a string key and a default value.
-4. **Real-time match** — `activeMatch` (the engine credentials from `POST /api/match/create`) and `lastResult` (the finished-match data for the Results view).
+4. **Real-time match** — `activeMatch` (the engine credentials from `POST /api/match/create`) and `lastResult` (the finished-match data for the `ResultsModal` overlay).
 5. **Helpers** — `addBot`, `removeBot`, `addPlayer`, `removePlayer`, `startGame`, `roll`, `endTurn`, `settingOn`, `toggleSetting`.
 6. **Session keep-alive** — a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is still waiting for a response. This is the **client → server** direction only, and it shows that the browser session is still active; keeping the notification SSE stream alive runs the other way and is handled server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
@@ -108,11 +108,13 @@ type AppState = {
   user: AuthUser | null  // The logged-in user
   authReady: boolean  // Whether the sign-in state has loaded
   // Auth actions
-  login: (identifier: string, password: string) => Promise<{ error?: string; pendingToken?: string }>  // Logs the user in
-  register: (username: string, password: string, email: string) => Promise<string | null>  // Creates a new account
+  login: (identifier: string, password: string) => Promise<{ error?: string; pendingToken?: string; notVerified?: boolean }>  // Logs the user in
+  register: (username: string, password: string, email: string) => Promise<{ error?: string; username?: string }>  // Creates a new account; success returns the assigned username
   verify2fa: (pendingToken: string, code: string) => Promise<string | null>  // Checks the 2FA code
+  resend2fa: (pendingToken: string) => Promise<string | null>  // Re-issues the login code for a live 2FA challenge
   forgotPassword: (email: string) => Promise<string | null>  // Requests a password reset
   resetPassword: (token: string, password: string) => Promise<string | null>  // Sets a new password
+  resendVerification: (email: string) => Promise<string | null>  // Resends a signup verification link
   logout: () => Promise<void>  // Logs the user out
   // 2FA preference
   twoFactor: boolean  // Whether 2FA is on
@@ -263,8 +265,8 @@ login(identifier, password)
 
 register(username, password, email)
   └── POST /api/auth/register
-       ├── 200 → return null (no session; the account activates via the emailed link)
-       └── error → return the message
+       ├── 200 → return { username } (the assigned username; no session; the account activates via the emailed link)
+       └── error → return { error }
 
 logout()
   └── POST /api/auth/logout → setUser(null)

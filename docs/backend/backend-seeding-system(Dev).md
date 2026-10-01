@@ -21,8 +21,8 @@ The seed pipeline populates the database with a full test roster for development
 1. **28 seed players** (a "Cyber Roster") — themed usernames spanning the rating ladder (Viper_X 1650 down to NeonSprout 650), each with rating/win/loss counters on `User`, an `avatarStyle`, and achievement flags on the nested `Achievement` row consistent with the current thresholds.
 2. **1 blank test account** — `bossku` / `password`, deliberately empty (no flags, no history) for testing brand-new accounts.
 3. **Redis leaderboards** — the whole roster synced into Redis sorted sets (`leaderboard:global|ranked|casual`).
-4. **Friendships and friend requests** — a rich social graph seeded by `seed_friends.ts`.
-5. **User profiles** — avatar-style/profile tweaks from `seed_user_profile.ts`.
+4. **Friendships and friend requests** — `seed.ts` itself builds a social graph (pending requests, accepted friends and one blocked pair); `seed_friends.ts` can add a denser accepted-friendship graph on top.
+5. **Demo account profiles** — stats, achievements, match history and friendships for the two demo accounts (`harleyhxng` / `harleynghxedu`) from `seed_user_profile.ts`.
 
 Seeding is a **manual** step — run `npm run db:seed` (or `npm run db:reset` for a clean reseed) after the stack is up. `make all` only builds and starts the containers: the backend container's entrypoint runs `prisma db push` to sync the schema automatically, but nothing seeds the database by itself.
 
@@ -36,8 +36,8 @@ Seeding is a **manual** step — run `npm run db:seed` (or `npm run db:reset` fo
 | File | Role |
 |------|------|
 | `prisma/seed.ts` | Main seed — 28-player roster, blank `bossku` account, Redis leaderboard sync, game history |
-| `prisma/seed_friends.ts` | Friendship graph + incoming friend requests |
-| `prisma/seed_user_profile.ts` | Per-user profile extras (avatar styles, display names) |
+| `prisma/seed_friends.ts` | Dense accepted-friendship graph (up to 8 links per user; 10+ for the two target accounts) |
+| `prisma/seed_user_profile.ts` | Stats, achievements, match history and friendships for the two demo accounts (`harleyhxng` / `harleynghxedu`) |
 | `prisma/sync_leaderboard.ts` | Standalone Redis leaderboard sync script |
 | `prisma/drop-all.sql` | SQL script to drop all tables (clean reset) |
 | `prisma/truncate-all.sql` | SQL script to truncate all tables (clean reseed) |
@@ -128,8 +128,8 @@ sequenceDiagram
 
 ### Secondary Seed Scripts
 
-- `seed_friends.ts` — deletes existing friendships for seed users, then creates the friend graph + requests.
-- `seed_user_profile.ts` — applies per-user profile extras.
+- `seed_friends.ts` — deletes all friendships, then creates accepted friendships (up to 8 per user; 10+ each for the two target accounts). It does not create pending requests.
+- `seed_user_profile.ts` — applies stats / achievements / match history / friendships for the two demo accounts (`harleyhxng`, `harleynghxedu`); it does not touch avatars.
 - `sync_leaderboard.ts` — standalone re-sync of the Redis leaderboards (idempotent).
 
 

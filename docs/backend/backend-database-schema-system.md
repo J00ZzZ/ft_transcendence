@@ -115,6 +115,7 @@ data, and disconnect/reconnect counters.
 | `password_hash` | String? | | bcrypt hash (null for OAuth-only users) |
 | `emailVerified` | DateTime? | | When email was verified |
 | `twoFactorEnabled` | Boolean | Default: false | Whether email-code 2FA is required at login |
+| `language` | String | Default: `"en"` | UI/transactional-email language (`en` \| `fr` \| `ms`) |
 | `rating` | Int | Default: 0 | Elo-like rating |
 | `highestRating` | Int | Default: 0 | Peak rating achieved |
 | `wins` | Int | Default: 0 | Total games won |
@@ -225,9 +226,11 @@ state and in the engine JWT, and it never reaches Postgres. The engine reports
 only the human seats that finished, and `match.postgame` skips a bot id before it
 writes anything.
 
-`backend/src/common/bot.ts` defines `BOT_PREFIX` and `isBotUserId()`. The engine
-process keeps its own copy of both in `socket/auth.ts`, so bot identity must be
-changed in both places at once.
+`backend/src/common/botname-enforce.ts` defines `BOT_PREFIX`, `isBotUserId()` and
+`isReservedBotName()` (which stops a human display name from masquerading as a
+bot). The engine process keeps its own copy of the bot prefix/check in
+`backend/app/ludo-engine/src/socket/auth.ts`, so bot identity must be changed in
+both places at once.
 
 Modules that must tell humans from bots:
 
@@ -299,6 +302,7 @@ erDiagram
         string password_hash "Scrambled password"
         datetime emailVerified "When email was verified"
         boolean twoFactorEnabled "Is 2FA on?"
+        string language "Email/UI language"
         int rating "Skill score"
         int highestRating "Best rating ever"
         int wins "Games won"

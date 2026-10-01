@@ -6,7 +6,7 @@ knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
 [`tunnel.md`](./tunnel.md).
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
-`compose.yaml`). See [Static-asset delivery](#static-asset-delivery-gzip--caching)
+`nginx/conf/app.inc`, `compose.yaml`). See [Static-asset delivery](#static-asset-delivery-gzip--caching)
 at the bottom for how the SPA is compressed and cached.
 
 
@@ -178,8 +178,10 @@ it goes out and how long it may be cached are configured there:
   every `add_header` inherited from the `server` block, which would silently drop
   the CSP/HSTS headers from these responses.
 
-The `nginx/conf/app.inc` "shared server body" that used to sit in this repo — and
-that `nginx.conf` never actually `include`d — was removed along with these
-settings. Including it would have failed with a duplicate-`location` error, since
-its routing duplicated the inline `server {}` block (which additionally carries the
-rate-limiting zones `app.inc` lacked). `nginx.conf` is the single source of truth.
+The `nginx/conf/app.inc` "shared server body" is retained in the repo as a
+reference, but nothing wires it into the running nginx: `nginx.conf` never
+`include`s it, `nginx/Dockerfile` does not `COPY` it, and `compose.yaml`
+bind-mounts only `conf/nginx.conf`. Its routing duplicates the inline `server {}`
+block in `nginx.conf` (which additionally carries the rate-limiting zones
+`app.inc` lacks), so `include`-ing it would fail with a duplicate-`location`
+error. `nginx.conf` is the single source of truth.

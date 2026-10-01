@@ -36,11 +36,12 @@ The module uses Redis for short-lived match data (queues, active games) and lets
 | File | Role |
 |------|------|
 | `match.controller.ts` | HTTP routes: matchmaking, game actions, room browsing, engine callbacks |
-| `match.service.ts` | Facade — composes the four split services (`MatchCreatorService`, `MatchPlayerService`, `MatchQueryService`, `MatchPostgameService`) and re-exports `ENGINE_WS_URL` |
+| `match.service.ts` | Facade — composes the four split services (`MatchCreatorService`, `MatchPlayerService`, `MatchQueryService`, `MatchPostgameService`) and re-exports the `GameEndPayload` type from `match.postgame.service.ts` (`ENGINE_WS_URL` is defined/exported by `match.creator.service.ts`) |
 | `match.creator.service.ts` | Match creation: PvP/PvE/hotseat, invite codes, room joining, bot seeding |
 | `match.player.service.ts` | In-game actions: join, rejoin, invite friend, ready, exit, cancel |
 | `match.query.service.ts` | Browse queries: open rooms, my rooms |
 | `match.postgame.service.ts` | `POST /api/game/end` processing (scoring, ratings, achievements) |
+| `seat-finalization.ts` | `isSeatFinalized()` helper — whether a live seat can still be rejoined (used by `GET /api/games/mine` and `POST /api/game/:id/rejoin`) |
 | `match.module.ts` | NestJS module — registers all services, PrismaService |
 
 
@@ -275,11 +276,15 @@ GET /api/games/mine
 
 | Dependency | Purpose |
 |-----------|---------|
-| `PresenceService` | Updates player presence when entering/leaving games |
 | `Redis` (ioredis) | Match state, invite codes; match.postgame posts finished-game ratings into `leaderboard:global` (zadd) |
 | `PrismaService` | Game history, rating updates, achievement evaluation |
+| `NotificationService` | `game_invite` / `match_cancelled` / `match_finished` pushes to the seated players |
+| `AchievementsService` | Achievement evaluation after a game ends (`match.postgame`) |
 | `JwtService` | Issue JWTs for Socket.IO engine handshake |
 | `secrets.ts` | `ENGINE_API_KEY` for validating engine callbacks |
+
+> Presence is **not** a match dependency: no `match.*` service imports `PresenceService`.
+> Presence is driven entirely by the client's `POST /api/presence/heartbeat` (see `backend-presence-module.md`).
 
 
 ---

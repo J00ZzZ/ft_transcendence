@@ -1,7 +1,7 @@
 # Architecture
 
 **Project:** ft_transcendence — RetroLudo '42
-**Updated:** 2026-09-23
+**Updated:** 2026-10-01
 
 An eight-service Docker Compose stack: a React 19 SPA built, published, and
 watched for source changes by a long-running `frontend` job, served over TLS by
@@ -254,8 +254,8 @@ Prisma-managed, schema at `backend/prisma/schema.prisma`.
 Schema is applied with `npx prisma db push --accept-data-loss` from
 `backend/docker-entrypoint.sh` on every boot — the runtime deliberately uses **db
 push, not `migrate deploy`**, so schema state is driven by `schema.prisma` (the
-single source of truth — never hand-edit the database). A `migrations/` directory
-exists for reference/history snapshots, but nothing on the boot path replays it.
+single source of truth — never hand-edit the database). No `migrations/` history is
+kept — the schema is pushed straight from `schema.prisma` on every boot.
 
 `DATABASE_URL` comes from the root `.env` via compose's `env_file:`; on the
 backend container compose's `environment:` override swaps in `CONTAINER_DATABASE_URL`
@@ -370,63 +370,119 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 ```
 .
 ├── compose.yaml                  # Docker Compose — all 8 services
-├── Makefile                      # Build / run / dev / tunnel targets
-├── .env.example                   # Config template (`make env` validates) — real .env is gitignored
+├── Makefile                      # Build / run / dev / tunnel / LAN targets
+├── .env.example                  # Config template (`make env` validates) — real .env is gitignored
+├── .gitignore                    # Ignored paths (node_modules, dist, generated, .env, lockfiles, planning docs)
+├── LICENSE                       # GPL-3.0
+├── README.md                     # Project overview, setup, module list, docs index
 │
 ├── backend/                      # NestJS REST API (port 3000)
 │   ├── Dockerfile
+│   ├── .dockerignore
 │   ├── docker-entrypoint.sh      # Prisma push + app start
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── nest-cli.json
 │   ├── prisma.config.ts
 │   │
-│   ├── src/                      # NestJS API source (9 modules wired into app.module.ts)
+│   ├── src/                      # NestJS API source (9 feature modules wired into app.module.ts)
 │   │   ├── app.module.ts         # Root module (9 feature modules + throttler)
-│   │   ├── main.ts               # Bootstrap, cookie-parser, trust proxy, /health
+│   │   ├── main.ts               # Bootstrap, cookie-parser, trust proxy, /health, validation codes
 │   │   ├── prisma.service.ts     # Prisma client singleton
 │   │   ├── secrets.ts            # env-var secret lookup over process.env
-│   │   ├── common/               # Shared helpers
-│   │   │   ├── scoring.ts        # ratingDeltaFor() — piece-based scoring
-│   │   │   └── bot.ts            # isBotUserId() / BOT_PREFIX
+│   │   │
+│   │   ├── common/               # Shared backend helpers (no Nest module)
+│   │   │   ├── scoring.ts         # ratingDeltaFor() — piece-based rating change
+│   │   │   └── botname-enforce.ts # isBotUserId() / BOT_PREFIX / isReservedBotName()
+│   │   │
+│   │   ├── i18n/                 # Backend email localization (consumed by auth/mail.service.ts)
+│   │   │   └── email-messages.ts  # EmailLang/EmailStrings, en/fr/ms sets, emailStrings() + fill()
 │   │   │
 │   │   ├── avatar/               # Avatar metadata + upload signature check (imported by auth and user)
+│   │   │   ├── avatar-meta.module.ts    # Provides/exports AvatarMetaService
+│   │   │   ├── avatar-meta.service.ts   # Redis cache `avatar:<userId>` = { has, style, v }
+│   │   │   └── image-signature.util.ts  # Magic-byte validation of uploaded images
 │   │   │
 │   │   ├── auth/                 # JWT + OAuth (Google, GitHub, 42) + 2FA + mail
-│   │   │   ├── auth.controller.ts    # register, login, logout, me, 2FA, OAuth
-│   │   │   ├── auth.service.ts       # Token signing, password hashing
+│   │   │   ├── auth.controller.ts    # register, login, logout, me, profile/password, 2FA, OAuth
+│   │   │   ├── auth.service.ts       # Token signing, password hashing, account flows
 │   │   │   ├── auth.module.ts        # JWT config (15-min access) + local & ngrok OAuth strategies
+│   │   │   ├── auth.constants.ts     # Auth tunables (token TTLs, resend limits)
 │   │   │   ├── twofactor.service.ts  # Email one-time-code 2FA (idempotent)
-│   │   │   ├── session.service.ts    # Session/refresh concerns
-│   │   │   ├── mail.service.ts       # SMTP mailer (nodemailer)
+│   │   │   ├── session.service.ts    # Refresh-token sessions in Redis (mint/rotate/revoke)
+│   │   │   ├── mail.service.ts       # SMTP mailer (nodemailer), localized copy
 │   │   │   ├── jwt.strategy.ts       # Reads token from httpOnly cookie
 │   │   │   ├── jwt-auth.guard.ts     # Route guard
-│   │   │   ├── jwt-payload.ts        # Type definitions
+│   │   │   ├── jwt-payload.ts        # JWT payload type definitions
 │   │   │   ├── google.strategy.ts    # Google OAuth
 │   │   │   ├── github.strategy.ts    # GitHub OAuth
 │   │   │   ├── fortytwo.strategy.ts  # 42 (intra) OAuth
 │   │   │   ├── ngrok_google_strategy.ts / ngrok_github_strategy.ts / ngrok_fortytwo_strategy.ts  # tunnel-mode OAuth
 │   │   │   ├── oauth.guards.ts       # OAuth route guards (per-Host strategy pick)
-│   │   │   └── dto/                  # login, register, 2FA, password, profile and delete-account DTOs
+│   │   │   └── dto/                  # Request DTOs + shared password policy
+│   │   │       ├── login.dto.ts               # username-or-email + password
+│   │   │       ├── register.dto.ts            # signup fields (incl. language)
+│   │   │       ├── twofactor.dto.ts           # 2FA verify payload
+│   │   │       ├── two-factor-setting.dto.ts  # enable/disable 2FA
+│   │   │       ├── password.rules.ts          # shared password policy
+│   │   │       ├── change-password.dto.ts     # logged-in password change
+│   │   │       ├── forgot-password.dto.ts     # reset-link request
+│   │   │       ├── reset-password.dto.ts      # reset token + new password
+│   │   │       ├── resend-verification.dto.ts # resend the signup link
+│   │   │       ├── update-profile.dto.ts      # optional profile fields (incl. language)
+│   │   │       └── delete-account.dto.ts      # account-deletion confirmation
 │   │   │
 │   │   ├── user/                 # User profiles & game history
-│   │   ├── friends/              # Friend system (requests, accept/decline, block)
+│   │   │   ├── user.controller.ts    # public profile/history + avatar upload/get/delete
+│   │   │   ├── user.service.ts       # profile + avatar logic, game history
+│   │   │   └── user.module.ts
+│   │   ├── friends/              # Friend system (requests, accept/decline, block, invites)
+│   │   │   ├── friends.controller.ts # friend + game-invite routes
+│   │   │   ├── friends.service.ts    # friendship rules + online enrichment
+│   │   │   └── friends.module.ts
 │   │   ├── match/                # Matchmaking & game lifecycle (split services)
+│   │   │   ├── match.controller.ts        # match/game HTTP routes
+│   │   │   ├── match.service.ts           # facade over the four match sub-services
+│   │   │   ├── match.creator.service.ts   # create/join/rejoin payloads
+│   │   │   ├── match.player.service.ts    # join/rejoin/invite/ready/exit actions
+│   │   │   ├── match.query.service.ts     # read-only open-rooms / my-rooms queries
+│   │   │   ├── match.postgame.service.ts  # POST /api/game/end handling
+│   │   │   ├── seat-finalization.ts       # terminal-seat lookup from engine state
+│   │   │   └── match.module.ts
 │   │   ├── leaderboard/          # Rankings (Redis sorted sets, Postgres backfill when empty)
+│   │   │   ├── leaderboard.controller.ts     # GET /api/leaderboard
+│   │   │   ├── leaderboard.service.ts        # ranking logic + response envelope
+│   │   │   ├── leaderboard-redis.service.ts  # Redis sorted-set storage (one set per mode)
+│   │   │   └── leaderboard.module.ts
 │   │   ├── achievements/         # 13 Ludo achievements
+│   │   │   ├── achievements.controller.ts  # progress report + check route
+│   │   │   ├── achievements.service.ts     # evaluation logic
+│   │   │   ├── achievements.registry.ts    # authoritative list of the 13 achievements
+│   │   │   └── achievements.module.ts
 │   │   ├── player-stats/         # Per-player aggregates
+│   │   │   ├── stats.controller.ts  # GET /api/stats
+│   │   │   ├── stats.service.ts     # aggregate stats card
+│   │   │   └── stats.module.ts
 │   │   ├── presence/             # Online/offline/playing tracking
+│   │   │   ├── presence.controller.ts    # heartbeat + online-count routes
+│   │   │   ├── presence.service.ts       # per-user presence keys with TTL
+│   │   │   ├── presence.module.ts
+│   │   │   └── dto/heartbeat.dto.ts      # in-match flag on the heartbeat
 │   │   └── notification/         # Notifications (SSE + Redis pub/sub)
+│   │       ├── notification.controller.ts  # SSE stream + list/read/read-all
+│   │       ├── notification.service.ts     # persist + publish notifications
+│   │       └── notification.module.ts
 │   │
 │   ├── app/
 │   │   ├── ludo-engine/          # Standalone game engine (port 3001)
 │   │   │   ├── Dockerfile
+│   │   │   ├── .dockerignore
 │   │   │   ├── package.json
 │   │   │   ├── tsconfig.json
 │   │   │   └── src/
 │   │   │       ├── index.ts              # Entry point → SocketServer.start(3001)
 │   │   │       ├── engine.ts             # Game state machine (roll, move, win)
-│   │   │       ├── move-validator.ts     # Legal move computation
+│   │   │       ├── move-validator.ts     # Legal move computation, captures, win check
 │   │   │       ├── turn.ts               # Move outcome: mirrors, win check, turn advance
 │   │   │       ├── board-mapper.ts       # Board geometry (safe zones, tracks)
 │   │   │       ├── bot.ts                # Heuristic bot AI
@@ -452,47 +508,44 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │       ├── Dockerfile
 │   │       └── redis-init.sh
 │   │
-│   ├── prisma/
-│   │   ├── schema.prisma         # DB schema (single source of truth)
-│   │   ├── seed.ts               # Development seed data (dev)
-│   │   ├── seed_friends.ts       # Friendship seed (dev)
-│   │   ├── seed_user_profile.ts  # User profile seed (dev)
-│   │   ├── sync_leaderboard.ts   # Leaderboard sync script (dev)
-│   │   ├── drop-all.sql          # Drop-all script (dev)
-│   │   ├── truncate-all.sql      # Truncate-all script (dev)
-│   │   ├── migrations/           # Prisma migrations (migration_lock.toml)
-│   │   └── ... (generated client output is in backend/generated, gitignored)
-│   │
-│   └── scripts/
-│       └── migrate-snapshot.sh
+│   └── prisma/
+│       ├── schema.prisma         # DB schema (single source of truth)
+│       ├── seed.ts               # Development seed data (dev)
+│       ├── seed_friends.ts       # Friendship seed (dev)
+│       ├── seed_user_profile.ts  # User profile seed (dev)
+│       ├── sync_leaderboard.ts   # Leaderboard sync script (dev)
+│       ├── drop-all.sql          # Drop-all script (dev)
+│       └── truncate-all.sql      # Truncate-all script (dev)
 │
 ├── frontend/                     # React 19 SPA (Vite)
 │   ├── Dockerfile                # Build + publish via publish.sh → spa_dist
 │   ├── Dockerfile.dev            # Vite HMR (dev profile)
+│   ├── .dockerignore
 │   ├── package.json
 │   ├── vite.config.ts            # Dev proxies for /api and /socket.io
 │   ├── tsconfig.json / tsconfig.app.json / tsconfig.node.json
 │   ├── index.html
 │   ├── .npmrc / .oxlintrc.json    # npm registry config / oxlint rules
 │   ├── publish.sh                # Build, publish, watch src/ (long-running)
-│   ├── public/                   # OAuth button images + logo
+│   ├── public/                   # Static assets copied as-is (logo, OAuth icons, cityscape, DB-schema image)
 │   │
 │   └── src/
 │       ├── main.tsx              # React entry point
 │       ├── App.tsx               # Root component (routes + auth guard)
 │       ├── router.tsx            # Custom window.location router
-│       ├── store.tsx             # React context + API + game/settings state
-│       ├── api.ts                # Typed fetch wrapper (refresh + retry, ngrok)
+│       ├── store.tsx             # React context + API + game/settings state + presence heartbeat
+│       ├── api.ts                # Typed fetch wrapper (refresh + retry, ngrok, error-code translation)
 │       ├── socket.ts             # Socket.IO client types + connectSocket()
 │       ├── i18n.ts               # i18next init
 │       ├── theme.ts              # Shared style constants + bot pool
 │       ├── index.css             # Global styles
-│       ├── styles/retrowave.css  # Theme tokens + the CSS-only rules (styles/tw.ts: helpers)
 │       ├── avatarCache.ts        # avatar state store (userId-keyed overrides)
 │       ├── dicebear.ts           # @dicebear avatar style resolution
+│       ├── validateEmail.ts      # Client-side email-format check (mirror of @IsEmail)
 │       ├── validatePassword.ts   # Client-side password policy mirror
-│       ├── pages/                # Home, Login, Signup, TwoFactor, Forgot/ResetPassword,
-│       │                         # LudoLobby, Lobby, Game, Friends,
+│       ├── styles/               # retrowave.css (theme tokens/CSS) + tw.ts (helpers)
+│       ├── pages/                # Home, Login, Signup, TwoFactor, ForgotPassword,
+│       │                         # ResetPassword, LudoLobby, Lobby, Game, Friends,
 │       │                         # Leaderboard, Profile, LegalPage
 │       ├── components/           # RetroAuthLayout, RetroNavbar,
 │       │                         # NotificationBell/Toast, Board, Die,
@@ -504,8 +557,9 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       ├── hooks/                # useNotifications.tsx
 │       ├── locales/              # en.ts, fr.ts, ms.ts
 │       ├── content/docs/         # Markdown docs rendered by LegalPage
+│       │                         # (Terms-of-Service + Privacy-Policy in en/fr/my)
 │       ├── utils/                # audio.ts, botName.ts
-│       └── assets/               # images/svg
+│       └── assets/               # hero.png, react.svg, vite.svg
 │
 ├── nginx/                        # TLS termination & reverse proxy
 │   ├── Dockerfile
@@ -518,8 +572,44 @@ See the [README](../README.md) **Commands** section for the full list of make ta
     ├── API-list.md               # Complete HTTP + WebSocket API reference
     ├── avatar-system.md          # Avatar pipeline: storage, caching, freshness, seats
     ├── Ludo_Rules.md             # Classic Ludo rules
-    ├── backend/                  # Backend module deep-dives (backend-*-module/system)
-    ├── frontend/                 # Frontend deep-dives (frontend-*-module/system)
-    ├── ludo-engine/              # Engine internals (core, bot, lobby, socket, redis)
-    └── deploy/                   # nginx.md, lan.md, tunnel.md (ngrok mode)
+    ├── backend/                  # Backend module deep-dives
+    │   ├── backend-app-bootstrap-system.md   # Bootstrap, module wiring, secrets, health check
+    │   ├── backend-auth-module.md            # Registration, login, OAuth, 2FA, sessions, reset
+    │   ├── backend-user-module.md            # Public profiles, game history, avatars
+    │   ├── backend-friends-module.md         # Friend requests, block/unblock, game invites
+    │   ├── backend-match-module.md           # Matchmaking (PvP/PvE/hotseat) + lifecycle
+    │   ├── backend-leaderboard-module.md     # Rankings (Redis cache + Postgres fallback)
+    │   ├── backend-achievements-module.md    # 13 achievement badges + evaluation
+    │   ├── backend-player-stats-module.md    # Per-player lifetime statistics
+    │   ├── backend-presence-module.md         # Online / in-game / offline tracking
+    │   ├── backend-notification-module.md    # Real-time notifications (SSE + Redis pub/sub)
+    │   ├── backend-database-schema-system.md # PostgreSQL schema — models, enums, indexes
+    │   └── backend-seeding-system(Dev).md    # Development/test seed data
+    ├── frontend/                 # Frontend deep-dives
+    │   ├── frontend-app-bootstrap-system.md  # App bootstrap, route maps, auth guard
+    │   ├── frontend-router-system.md         # Custom client-side router
+    │   ├── frontend-store-system.md          # Global state (auth, game, settings, match)
+    │   ├── frontend-auth-pages-module.md     # Login and signup pages
+    │   ├── frontend-auth-extras-module.md    # 2FA, forgot/reset password pages
+    │   ├── frontend-home-module.md           # Home page — stats, rank, friends, notifications
+    │   ├── frontend-lobby-module.md          # Lobby — mode/seat setup, match creation
+    │   ├── frontend-game-module.md           # Real-time gameplay page (Socket.IO)
+    │   ├── frontend-results-module.md        # Post-game results card
+    │   ├── frontend-friends-module.md        # Friends page — list, requests, blocked, invites
+    │   ├── frontend-leaderboard-module.md    # Leaderboard page
+    │   ├── frontend-settings-module.md       # Settings (language, 2FA, game preferences)
+    │   ├── frontend-profile-module.md        # Profile page — stats, history, friends
+    │   ├── frontend-components-system.md     # Shared UI components
+    │   ├── frontend-styles-system.md         # Stylesheets, theme tokens, background
+    │   └── frontend-i18n-utilities-system.md # i18n, audio, bot names, legal pages
+    ├── ludo-engine/              # Engine internals
+    │   ├── ludo-engine-core-system.md        # Game state machine, turn logic, win conditions
+    │   ├── ludo-engine-bot-module.md         # Bot AI decision logic
+    │   ├── ludo-engine-lobby-module.md       # Lobby — colors, ready check, game start
+    │   ├── ludo-engine-socket-system.md      # Socket.IO connection + event protocol
+    │   └── ludo-engine-redis-system.md       # Redis persistence + pub/sub
+    └── deploy/                   # Deployment guides
+        ├── nginx.md              # How nginx fronts every mode (local/LAN/tunnel)
+        ├── lan.md                # LAN mode — reach the app from another device
+        └── tunnel.md             # Internet access via an ngrok tunnel
 ```

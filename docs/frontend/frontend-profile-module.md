@@ -37,7 +37,7 @@ When the page loads it reads the profile, game history, achievements, friends an
 | `src/pages/Profile.tsx` | Profile page component |
 | `src/components/RetroNavbar.tsx` | Top navigation bar (profile page is full-screen) |
 | `src/store.tsx` | `useApp` for authentication state, presence and API (Application Programming Interface) calls |
-| `src/theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` styles |
+| `src/theme.ts` | `STATUS_STYLE` (and the `PresenceStatus` type) for the status indicator |
 
 
 ---
@@ -195,6 +195,6 @@ Hotseat games never count towards any achievement. The badge/tab counter shows `
 |-----------|---------|
 | `store.tsx` | `useApp()` for `user` and navigation |
 | `router.tsx` | `useRoute()` to read the `?u=` query parameter |
-| `theme.ts` | `STATUS_STYLE`, `card`, `avatarBlue`, `goldText` |
+| `theme.ts` | `STATUS_STYLE` and the `PresenceStatus` type for the profile/friends status dots |
 | `api.ts` | `translateErrorCode()`, which turns an error code from a `fetch` response into text in the user's language |
 | `components/UserAvatar.tsx` | Renders the avatar; `onPhotoError` runs when a photo fails to load |

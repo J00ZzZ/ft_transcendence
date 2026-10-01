@@ -178,4 +178,4 @@ export function passwordError(pw: string): string | null {
 | `router.tsx` | `navigate`, `useRoute` for token query params |
 | `validatePassword.ts` | Client-side password validation |
 | `RetroAuthLayout.tsx` | Centered card layout wrapper |
-| `theme.ts` | `btnGold`, `goldText`, `input`, `label` styles |
+| `styles/tw.ts` | `RETRO_AUTH_*` class constants (title, input, label, button, error, link) |

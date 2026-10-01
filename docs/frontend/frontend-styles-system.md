@@ -17,11 +17,11 @@
 
 Styling is split between CSS files and TypeScript constants, with a clear rule for what belongs where:
 
-1. **`retrowave.css`** (610 lines) — the theme design system. Defines the Synthwave '84 color and font custom properties on `:root, [data-theme='synthwave']`, plus the scrollbar styles, `@keyframes` animations, and the few rules that must stay in CSS.
+1. **`retrowave.css`** (561 lines) — the theme design system. Defines the Synthwave '84 color and font custom properties on `:root, [data-theme='synthwave']`, plus the scrollbar styles, `@keyframes` animations, and the few rules that must stay in CSS.
 2. **`index.css`** (179 lines) — imports Tailwind, sets base element styles (`body`, `input`, `a`), and holds the Home page's layout rules with two responsive `@media (max-height: …)` breakpoints.
 3. **`styles/tw.ts`** — long Tailwind utility-class strings shared by several components. Each constant replaces one `retrowave.css` rule one-for-one; where a rule cannot be expressed as utilities (`@keyframes`, custom easing curves such as `--flicker`), it stays in `retrowave.css` and is referenced with `var()` or an arbitrary `animation:` value.
 
-**Themes are handled entirely in CSS.** No JavaScript reads theme names to pick colors — a component never checks "which theme is active".
+**Theme switching is CSS-only.** No JavaScript reads a theme name to pick colors — a component never checks "which theme is active". The app ships a single theme, and `theme.ts` holds a few fixed (non-switching) constants for it: the Ludo palette (`COL`), the presence colours (`STATUS_STYLE`) and gold/panel inline styles.
 
 ### Cascade and CSS-only rules
 
@@ -46,7 +46,7 @@ These rules stay in CSS because no utility expresses them:
 | `src/styles/retrowave.css` | Theme design system — the `[data-theme='synthwave']` token set, fonts, scrollbar, `@keyframes` |
 | `src/index.css` | Tailwind import, base element styles, Home page layout rules, scrollbar fallback |
 | `src/styles/tw.ts` | Shared Tailwind utility-class constants (documented in [frontend-components-system.md](frontend-components-system.md)) |
-| `src/theme.ts` | Small TypeScript constants tied to the theme (`STATUS_STYLE`, `goldText`, `BOT_POOL`) |
+| `src/theme.ts` | One-theme TypeScript constants (`COL`, `SEAT_COLORS`, `BOT_POOL`, `STATUS_STYLE`, `goldText`, `btnGold`/`btnGoldSmall`/`btnOutline`, `card`, `input`, `label`, `sectionLabel`, `avatarBlue`/`avatarDim`, `feltPanel`, `pill`) |
 | `src/store.tsx` | Owns the `theme` state and applies `data-theme` to `<html>` |
 
 

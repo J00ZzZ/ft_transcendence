@@ -40,7 +40,7 @@ The User module manages public user profiles, game history, and avatar images.
 |------|------|
 | `user.controller.ts` | HTTP routes: profile, games, avatar CRUD |
 | `user.service.ts` | Business logic: Prisma queries for user data |
-| `user.module.ts` | NestJS module — registers controller and service |
+| `user.module.ts` | NestJS module — registers controller/service and imports `PresenceModule`, `NotificationModule`, `AvatarMetaModule` |
 
 
 ---
@@ -286,4 +286,7 @@ DELETE /api/user/avatar (JWT)
 | Dependency | Purpose |
 |-----------|---------|
 | `PrismaService` | Database access (User, GameParticipant, Game models) |
+| `PresenceService` | `status` (`online`/`playing`/`offline`) on the public profile |
+| `NotificationService` | `profile_updated` push + transient `avatar_changed` broadcast on avatar change |
+| `AvatarMetaService` | Keeps the shared `avatar:<userId>` Redis record in sync (see `avatar-system.md`) |
 | `JwtAuthGuard` | Protects avatar write/delete endpoints |

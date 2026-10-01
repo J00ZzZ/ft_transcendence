@@ -9,6 +9,7 @@
 - [Core Logic / Flow](#core-logic--flow) — Mermaid sequence diagrams for registration, login, 2FA, OAuth, JWT validation, and logout
 - [Logic Paths Summary](#logic-paths-summary) — Plain-text decision trees for quick reference
 - [Email delivery](#email-delivery) — `MailService`: SMTP transport settings, dev fallback, the lapsed-email-change notice, and send-failure behaviour
+- [Localization](#localization) — Per-language transactional-email copy (`i18n/email-messages.ts`)
 - [Dependencies](#dependencies) — npm packages and internal services this module relies on
 - [Configuration / Environment](#configuration--environment) — Secrets and environment variables used
 - [Module Exports](#module-exports) — What AuthModule re-exports for other modules
@@ -53,7 +54,8 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `ngrok_github_strategy.ts` | GitHub OAuth variant for tunnelled requests (same per-request Host check) |
 | `ngrok_fortytwo_strategy.ts` | 42 OAuth variant for tunnelled requests (same per-request Host check) |
 | `oauth.guards.ts` | Guard classes: `GoogleAuthGuard`, `GithubAuthGuard`, `FortyTwoAuthGuard` — pick strategy per request host |
-| `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset and email-change links (degrades to console logging without SMTP config). Also owns the Redis keyspace subscription that emails the lapsed-email-change notice (see [Email delivery](#email-delivery)) |
+| `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset and email-change links (degrades to console logging without SMTP config). Selects the copy from the recipient's `User.language` (see [Localization](#localization)). Also owns the Redis keyspace subscription that emails the lapsed-email-change notice (see [Email delivery](#email-delivery)) |
+| `i18n/email-messages.ts` | Transactional-email copy per language (`en` / `fr` / `ms`) — lives at `src/i18n/`, consumed by `mail.service.ts` (see [Localization](#localization)) |
 | `session.service.ts` | Redis-backed refresh-token management with rotation and revocation |
 | `twofactor.service.ts` | Redis-backed short-lived auth state, stored hashed and single-use: signup verification tokens (`verify:`), password-reset tokens (`reset:`), 2FA login challenges (`2fa:`) and staged email changes (`emailchange:` + its `emailchange:user:<id>` reverse pointer) |
 | `dto/register.dto.ts` | Validation schema for `POST /api/auth/register` |
@@ -63,7 +65,7 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `dto/twofactor.dto.ts` | Validation schema for `POST /api/auth/2fa/verify` |
 | `dto/two-factor-setting.dto.ts` | Validation schema for `GET/PATCH /api/auth/2fa` |
 | `dto/password.rules.ts` | Shared password policy constants used by RegisterDto and ResetPasswordDto |
-| `dto/update-profile.dto.ts` | Validation schema for profile updates (incl. `currentPassword` for the email-change re-auth) |
+| `dto/update-profile.dto.ts` | Validation schema for profile updates (incl. `currentPassword` for the email-change re-auth, and `language` for the transactional-email copy) |
 | `dto/resend-verification.dto.ts` | Validation schema for `POST /api/auth/resend-verification` |
 | `dto/change-password.dto.ts` | Validation schema for `PATCH /api/auth/profile/password` |
 | `dto/delete-account.dto.ts` | Validation schema for `DELETE /api/auth/profile` (optional current password + required acknowledgement) |
@@ -91,6 +93,7 @@ interface JwtPayload {
 | `username` | string | 3–20 chars, alphanumeric + underscore only |
 | `email` | string | **Required** — used for verification link and 2FA codes |
 | `password` | string | 12–72 chars, must contain uppercase, lowercase, number, and special character |
+| `language` | string | Optional — `en` / `fr` / `ms`; selects the transactional-email copy (see [Localization](#localization)). Defaults to `en` |
 
 ### LoginDto
 
@@ -457,7 +460,7 @@ POST /api/auth/login
   ├── If the address is not verified → 200 { code: 'AUTH_EMAIL_NOT_VERIFIED' }, no cookies
   ├── If 2FA enabled:
   │   ├── TwoFactorService.startChallenge(userId)  // returns { pendingToken, code }
-  │   ├── MailService.send2faCode(email, code)     // every call emails a fresh code
+  │   ├── MailService.send2faCode(email, code, ...)  // every call emails a fresh code
   │   └── Return { twoFactorRequired: true, pendingToken }
   └── If 2FA disabled:
       ├── SessionService.issue(userId) → refreshToken
@@ -557,6 +560,46 @@ links, 2FA codes, password-reset links, the verify-then-commit email-change link
 heads-up sent to the current address when a change is requested, and the notice sent
 when a staged change lapses.
 
+### Localization
+
+The backend has no i18n framework, so the copy for every transactional email lives in
+`backend/src/i18n/email-messages.ts` as the single source of strings. Each language
+provides the same six messages:
+
+| Key | Placeholder | Used for |
+|-----|-------------|----------|
+| `verification` | `{link}` | Signup verification link |
+| `passwordReset` | `{link}` | Password-reset link |
+| `twoFactor` | `{code}` | Login 2FA code |
+| `emailChange` | `{link}` | New-address confirmation link |
+| `emailChangeNotice` | `{newEmail}` | Heads-up to the current address when a change is requested |
+| `emailChangeExpired` | — | Notice sent when a staged change lapses |
+
+```typescript
+export type EmailLang = 'en' | 'fr' | 'ms';
+
+interface EmailStrings {
+  verification: { subject: string; text: string };      // {link}
+  passwordReset: { subject: string; text: string };     // {link}
+  twoFactor: { subject: string; text: string };         // {code}
+  emailChange: { subject: string; text: string };       // {link}
+  emailChangeNotice: { subject: string; text: string }; // {newEmail}
+  emailChangeExpired: { subject: string; text: string };
+}
+```
+
+Three complete sets are defined — `EN`, `FR` and `MS`. Helpers:
+
+- `emailStrings(lang)` — returns the set for `lang`, falling back to `EN` for any
+  missing/unknown value.
+- `fill(template, vars)` — substitutes `{placeholder}` tokens (unknown keys become `''`).
+
+Every `mail.service.ts` `send*()` method takes a `lang` argument and resolves it through
+`emailStrings()`. The value comes from the recipient's `User.language`, which
+`RegisterDto.language` seeds on signup (`dto.language ?? 'en'`) and `UpdateProfileDto.language`
+can change afterwards — so the language a user picks is what their verification, 2FA, reset
+and email-change mail is written in.
+
 ### Transport
 
 The transport is built once in the constructor from `SMTP_CREDENTIALS`
@@ -638,7 +681,7 @@ Callers differ:
 | `passport-42` | 42 School OAuth |
 | `bcrypt` | Password hashing |
 | `class-validator` | DTO validation |
-| `nodemailer` | SMTP email delivery (verification, 2FA, password reset) |
+| `nodemailer` | SMTP email delivery (verification, 2FA, password reset, email change — copy localized per recipient) |
 | `ioredis` | Redis client (SessionService, TwoFactorService, MailService's expiry subscription) |
 | `PrismaService` | Database access (User, Account models) |
 | `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
