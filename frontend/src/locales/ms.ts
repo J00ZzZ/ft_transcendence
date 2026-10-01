@@ -355,7 +355,7 @@ export const ms = {
     heroTitle: 'PROFIL PILOT // PANGKALAN TANDA PANGGILAN',
     initTelemetry: 'MENGATURCARA TELEMETRI PROFIL PILOT...',
     playerNotFoundArchives: 'PEMAIN "{{username}}" TIDAK DIJUMPAI DALAM ARKIB.',
-    windowHeader: '// PROFIL PILOT • {{username}} (ID: #{{id}})',
+    windowHeader: '// PROFIL PILOT • {{name}} ( NAMA PENGGUNA: {{username}} )',
     scanningAvatar: 'MENGIMBAS...',
     changeAvatarOverlay: 'TUKAR AVATAR',
     sinceDate: 'SEJAK {{date}}',

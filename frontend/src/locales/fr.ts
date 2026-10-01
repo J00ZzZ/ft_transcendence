@@ -356,7 +356,7 @@ export const fr = {
     heroTitle: 'PROFIL DE PILOTE // BASE D\'INDICATIFS',
     initTelemetry: 'INITIALISATION DE LA TÉLÉMÉTRIE DU PROFIL...',
     playerNotFoundArchives: 'JOUEUR "{{username}}" INTROUVABLE DANS LES ARCHIVES.',
-    windowHeader: '// PROFIL DE PILOTE • {{username}} (ID : #{{id}})',
+    windowHeader: '// PROFIL DE PILOTE • {{name}} ( NOM D\'UTILISATEUR : {{username}} )',
     scanningAvatar: 'ANALYSE...',
     changeAvatarOverlay: 'CHANGER L\'AVATAR',
     sinceDate: 'DEPUIS LE {{date}}',

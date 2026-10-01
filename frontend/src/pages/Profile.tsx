@@ -450,7 +450,7 @@ export function Profile() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '10px 18px',
-                    fontSize: '0.85rem',
+                    fontSize: 'calc(0.85rem + 2pt)',
                     flexShrink: 0,
                   }}
                 >
@@ -466,8 +466,8 @@ export function Profile() {
                   >
                     <span>
                       {t('profile.windowHeader', {
-                        username: (profile.displayName ?? profile.username).toUpperCase(),
-                        id: profile.id.slice(0, 8).toUpperCase(),
+                        name: (profile.displayName ?? profile.username).toUpperCase(),
+                        username: profile.username,
                       })}
                     </span>
                   </div>

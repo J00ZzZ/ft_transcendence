@@ -355,7 +355,7 @@ export const en = {
     heroTitle: 'PILOT PROFILE // CALLSIGN DATABASE',
     initTelemetry: 'INITIALIZING PILOT PROFILE TELEMETRY...',
     playerNotFoundArchives: 'PLAYER "{{username}}" NOT FOUND IN ARCHIVES.',
-    windowHeader: '// PILOT PROFILE • {{username}} (ID: #{{id}})',
+    windowHeader: '// PILOT PROFILE • {{name}} ( USERNAME: {{username}} )',
     scanningAvatar: 'SCANNING...',
     changeAvatarOverlay: 'CHANGE AVATAR',
     sinceDate: 'SINCE {{date}}',
