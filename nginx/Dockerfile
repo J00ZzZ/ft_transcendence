@@ -30,7 +30,9 @@ COPY conf/app.inc /etc/nginx/app.inc
 COPY nginx.sh /usr/local/bin/nginx.sh
 RUN chmod +x /usr/local/bin/nginx.sh
 
-# Open ONLY port 443 (HTTPS) to the public
+# 443 is the public HTTPS port. 444 is the tunnel listener, which compose
+# publishes on the loopback interface only (see the nginx service).
 EXPOSE 443
+EXPOSE 444
 
 ENTRYPOINT ["/usr/local/bin/nginx.sh"]
