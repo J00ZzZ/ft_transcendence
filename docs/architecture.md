@@ -21,7 +21,7 @@ graph TB
     Browser["Browser"]
 
     subgraph net["transcendence_network"]
-        nginx["nginx :443<br/>TLS · serves SPA"]
+        nginx["nginx :443 + :444<br/>TLS · serves SPA"]
         backend["backend :3000<br/>NestJS API"]
         engine["ludo-engine :3001<br/>socket.io + inline bot AI"]
         db[("db :5432<br/>PostgreSQL 16")]
@@ -29,7 +29,7 @@ graph TB
         fe["frontend<br/>long-running publisher<br/>rebuilds + republishes on frontend/src/ change"]
     end
 
-    Browser -->|"https :8443"| nginx
+    Browser -->|"https :8443 / tunnel :8444"| nginx
     nginx -->|"/api/*"| backend
     nginx -->|"/socket.io/*"| engine
     fe -->|"publishes dist/"| spa[("spa_dist volume")]
@@ -89,7 +89,7 @@ attaches to the `transcendence_network` bridge and reaches the others by service
 | `ludo-engine` | `…-ludo-engine` (node:22-alpine) | `node dist/index.js` — **Socket.IO game engine + inline bot AI** on 3001 (clients reach it same-origin via nginx; the host port exists for local `npm run dev`) | `127.0.0.1:3001 → 3001` | redis (healthy) |
 | `frontend` | `…-frontend` (node:22-alpine) | `publish.sh` — builds the **React SPA**, publishes it into the `spa_dist` volume, then watches the bind-mounted `./frontend/src` (`/app/src` in the container) and `package.json` and republishes on change (long-running build job) | — | — |
 | `frontend-dev` *(profile: dev)* | `…-frontend-dev` (node:22-alpine, `Dockerfile.dev`) | `npm run dev` — **Vite dev server with HMR**, serves source from the bind mount | `8080 → 8080` | backend, ludo-engine |
-| `nginx` | `…-nginx` (debian + nginx-extras) | `nginx.sh` waits for the backend health check, then `exec nginx -g "daemon off;"` — **TLS reverse proxy**: serves the SPA and proxies `/api/*` + `/socket.io/*` | `8443 → 443` | frontend (healthy), backend, ludo-engine |
+| `nginx` | `…-nginx` (debian + nginx-extras) | `nginx.sh` waits for the backend health check, then `exec nginx -g "daemon off;"` — **TLS reverse proxy**: serves the SPA and proxies `/api/*` + `/socket.io/*`. Two listeners share one server body (`conf/app.inc`): `:443` for direct clients, `:444` for the ngrok tunnel (loopback-published, resolves the real client IP) | `8443 → 443`, `127.0.0.1:8444 → 444` | frontend (healthy), backend, ludo-engine |
 
 ### Volumes
 
@@ -101,8 +101,9 @@ attaches to the `transcendence_network` bridge and reaches the others by service
 
 The compose file also uses **bind mounts** (host paths, not volumes): `./frontend → /app`
 on `frontend` / `frontend-dev` so Vite watches live source, and
-`./nginx/conf/nginx.conf → /etc/nginx/nginx.conf` so nginx config can be edited
-without a rebuild.
+`./nginx/conf/nginx.conf → /etc/nginx/nginx.conf` and
+`./nginx/conf/app.inc → /etc/nginx/app.inc:ro` (the shared server body) so nginx
+config can be edited without a rebuild.
 
 ### Network
 
@@ -146,9 +147,10 @@ against an empty document root on first boot.
 > marker; a `❌ Build failed` line means the last good build in `/export` is still
 > being served — fix the error and save again.
 
-The nginx config is **bind-mounted** from `nginx/conf/nginx.conf`, so config edits
-need only a container restart, not an image rebuild. The `Dockerfile` also `COPY`s it
-as a fallback so the image stays runnable standalone.
+The nginx config is **bind-mounted** from `nginx/conf/nginx.conf` and
+`nginx/conf/app.inc` (the shared server body), so config edits need only a
+container restart, not an image rebuild. The `Dockerfile` also `COPY`s both as a
+fallback so the image stays runnable standalone.
 
 
 ---
@@ -565,7 +567,8 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   ├── Dockerfile
 │   ├── nginx.sh
 │   └── conf/
-│       └── nginx.conf            # TLS server block, SPA + API routing
+│       ├── nginx.conf            # the two TLS listeners (:443, :444)
+│       └── app.inc               # shared server body both listeners include
 │
 └── docs/                         # Documentation
     ├── architecture.md           # Full architecture reference (this file)

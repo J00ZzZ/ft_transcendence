@@ -6,8 +6,9 @@ knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
 [`tunnel.md`](./tunnel.md).
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
-`nginx/conf/app.inc`, `compose.yaml`). See [Static-asset delivery](#static-asset-delivery-gzip--caching)
-at the bottom for how the SPA is compressed and cached.
+`nginx/conf/app.inc`, `compose.yaml`). The shared routing/limits live in `nginx/conf/app.inc`; see
+[Static-asset delivery](#static-asset-delivery) at the bottom for how the SPA is
+served.
 
 
 ---
@@ -16,31 +17,55 @@ at the bottom for how the SPA is compressed and cached.
 
 ## The one idea that makes this simple
 
-nginx is the **only** server that any client communicates with. Browsers — local or
-tunnelled — connect to `nginx` on port `443` (published on the host as `8443`)
-and nothing else. `nginx` then proxies to `backend:3000` and
-`ludo-engine:3001` over the internal Docker network. The frontend SPA only
-ever calls relative paths (`/api/...`, `/socket.io/...`), so it never needs
-to know or care which mode it's running under — same-origin
-`fetch`/WebSocket calls resolve against whatever host the browser actually
-typed in the address bar.
+nginx is the **only** server that any client communicates with, and it exposes
+**two** TLS listeners that share one server body:
+
+- **`:443`** (published on the host as `8443`, on all interfaces) serves direct
+  clients — a browser on your machine, or another device on the LAN.
+- **`:444`** (published as `127.0.0.1:8444`, loopback only) serves the ngrok
+  tunnel agent and nothing else.
+
+The routing itself — serving the SPA, proxying `/api/*` and `/socket.io/*`, the
+security headers, the rate-limit locations — does not live in either listener.
+It lives once in `nginx/conf/app.inc`, which both `server {}` blocks `include`,
+so the two modes cannot drift.
+
+`nginx` then proxies to `backend:3000` and `ludo-engine:3001` over the internal
+Docker network. The frontend SPA only ever calls relative paths (`/api/...`,
+`/socket.io/...`), so it never needs to know or care which mode it's running
+under — same-origin `fetch`/WebSocket calls resolve against whatever host the
+browser actually typed in the address bar.
 
 ```
-                         ┌─────────────────────────────────────────┐
- browser  ── https ──►   │  nginx :443 (published as host :8443)   │
- (local / ngrok)        │  - TLS termination (self-signed cert)   │
-                         │  - serves the built SPA from spa_dist   │
-                         │  - proxies /api/       → backend:3000   │
-                         │  - proxies /socket.io/ → ludo-engine:3001│
-                         └─────────────────────────────────────────┘
+                    ┌────────────────────────────────────────────────┐
+ browser ─https──►  │ nginx :443   ·  host :8443  ·  all interfaces  │
+ (local / LAN)      │   direct listener — no header trust            │
+                    ├────────────────────────────────────────────────┤
+ ngrok agent ─────► │ nginx :444   ·  host 127.0.0.1:8444 · loopback │
+ (tunnel)           │   tunnel listener — trusts X-Forwarded-For     │
+                    └────────────────────────────────────────────────┘
+                              both include nginx/conf/app.inc:
+                                serves SPA · proxies:
+                                /api/        → backend:3000
+                                /socket.io/  → ludo-engine:3001
 ```
 
-Only `nginx`'s port is published on all interfaces (`"8443:443"` in
-`compose.yaml`). Every other service — `backend`, `db`, `redis`, `studio`,
-`ludo-engine` — publishes `127.0.0.1:<port>:<port>`, loopback-only, for
-host-side debugging (`psql`, Prisma Studio, `npm run dev`'s Vite proxy).
-Nothing but nginx is ever reachable from another device — that's what makes
-[tunnel mode](./tunnel.md) need zero extra routing config of its own.
+Why two listeners rather than one: throttling keys on the client address, and the
+two entry paths see that address very differently. Direct clients reach `:443`
+through Docker's port forwarding, which rewrites the peer address to the bridge
+gateway — so no header trust is possible there, and the limits are honestly a
+shared bucket. The ngrok agent reaches `:444` from inside the host, and the
+loopback-only publish means it is the only process that can — so `:444` can
+safely believe `X-Forwarded-For`, which is what makes per-visitor throttling
+actually work behind the tunnel. See [Rate limiting](#rate-limiting).
+
+Only `nginx`'s `"8443:443"` mapping is published on all interfaces; the
+`"127.0.0.1:8444:444"` tunnel mapping is loopback-only, like every other
+service's debugging port (`backend`, `db`, `redis`, `studio`, `ludo-engine`
+publish `127.0.0.1:<port>:<port>` for host-side `psql`, Prisma Studio and
+`npm run dev`). Nothing but nginx's `:443` is reachable from another device —
+that's what makes [tunnel mode](./tunnel.md) need zero extra routing config of
+its own.
 
 
 ---
@@ -53,10 +78,11 @@ Nothing but nginx is ever reachable from another device — that's what makes
 -x509 ... -days 365`, CN `transcendence-ludo`) and bakes it into the image
 at `/etc/nginx/ssl/`. This is why every mode — local and the ngrok tunnel —
 shows a browser certificate warning once: nginx only ever
-terminates TLS with this one self-signed cert, in every mode. `nginx.conf`
-restricts it to `TLSv1.2`/`TLSv1.3` and sets the standard hardening headers
-(`X-Frame-Options`, `HSTS`, a `Content-Security-Policy`, etc.) directly in
-the `server {}` block.
+terminates TLS with this one self-signed cert, in every mode. Each `server {}`
+block in `nginx.conf` declares that same `ssl_certificate`/`ssl_certificate_key`
+pair and restricts to `TLSv1.2`/`TLSv1.3`; the standard hardening headers
+(`X-Frame-Options`, `HSTS`, a `Content-Security-Policy`, etc.) live once in the
+shared `nginx/conf/app.inc` that both listeners `include`.
 
 
 ---
@@ -78,7 +104,7 @@ resolve correctly on a hard refresh instead of 404ing.
 ---
 
 
-## Routing table (active config, in `nginx.conf`)
+## Routing table (active config, in `nginx/conf/app.inc`)
 
 | Path | Behaviour |
 |---|---|
@@ -87,14 +113,16 @@ resolve correctly on a hard refresh instead of 404ing.
 | `= /api/auth/login` | Rate-limited 5 req/min (burst 5) — brute-force defense in depth behind the backend's own throttler |
 | `= /api/auth/refresh` | Rate-limited 30 req/min (burst 15) — `apiFetch` fires this automatically on any 401, so several tabs can legitimately burst at once |
 | `/api/auth/` | Rate-limited 60 req/min (burst 20) — covers `/api/auth/me`, which the SPA calls on page load for non-public routes (the probe is skipped on `/`, `/login`, `/signup`), and `/api/auth/logout` |
-| `/api/` | Generic proxy to `backend:3000`. `proxy_read_timeout`/`proxy_send_timeout` are raised to 3600s and `proxy_buffering` is off — needed for `/api/notifications/stream`, a long-lived SSE response that can sit idle for minutes between notifications. nginx's 60s default was closing that stream mid-chunk (the client saw `ERR_INCOMPLETE_CHUNKED_ENCODING`), and buffering held back the events that did arrive |
+| `/api/` | Rate-limited 600 req/min (burst 100) — the loose ceiling over everything under `/api/` not matched above. Generic proxy to `backend:3000`; `proxy_read_timeout`/`proxy_send_timeout` are raised to 3600s and `proxy_buffering` is off — needed for `/api/notifications/stream`, a long-lived SSE response that can sit idle for minutes between notifications. nginx's 60s default was closing that stream mid-chunk (the client saw `ERR_INCOMPLETE_CHUNKED_ENCODING`), and buffering held back the events that did arrive |
 | `= /api/health` | Proxied to `backend:3000/health` (rewritten — NestJS mounts `/health` at its root, not under `/api`) |
 | `/socket.io/` | Proxied to `ludo-engine:3001`, with the `Upgrade`/`Connection` headers set from the `map $http_upgrade $connection_upgrade` block so WebSocket upgrades work. Also 3600s timeouts, for long game sessions. The browser therefore never opens a socket to `ludo-engine:3001` itself: a plain `ws://` call would be blocked as mixed content on an HTTPS page, and that port is not published for the host |
 | `~ /\.` | Denies any dotfile path (`.env`, `.git`, etc.) |
 
 All of the `/api/*` locations set `X-Real-IP`, `X-Forwarded-For`, and
-`X-Forwarded-Proto` so the backend sees the client's real IP (used by its own
-rate limiting) and knows the original request was HTTPS.
+`X-Forwarded-Proto`. On the direct `:443` listener these carry the peer address
+(the Docker gateway) and `$scheme`; on the `:444` tunnel listener the `real_ip`
+module has already rewritten `$remote_addr` to the real visitor, so the backend
+sees the visitor's address rather than ngrok's.
 
 `resolver 127.0.0.11 valid=10s;` points nginx at Docker's embedded DNS and
 caches service-name lookups for only 10s. Without this, `proxy_pass` would
@@ -111,8 +139,12 @@ retrying an unreachable IP address until nginx itself restarted.
 
 Every `/api/**` route is also throttled inside the backend by the NestJS throttler;
 nginx adds a per-IP layer in front of it, so a burst is stopped before it reaches
-Node. nginx keys its buckets on `$binary_remote_addr`, the real peer address, which
-a client cannot spoof the way `X-Forwarded-For` can.
+Node. nginx keys its buckets on `$binary_remote_addr`. On the direct `:443`
+listener that is the connection's peer address, which a client cannot spoof; on
+the `:444` tunnel listener the `real_ip` module first rewrites `$remote_addr`
+from `X-Forwarded-For`, so each visitor gets their own bucket instead of every
+tunnel request sharing ngrok's address (see
+[The one idea that makes this simple](#the-one-idea-that-makes-this-simple)).
 
 `limit_req` is a leaky bucket, not a per-minute quota: `rate=60r/m` refills one token
 per second, and `burst=N nodelay` allows up to `N` tokens to be spent at once without
@@ -124,6 +156,7 @@ delay. The zones and the locations that spend them:
 | `login` | 5 r/m | 5 | `= /api/auth/login` | Brute-force defense |
 | `refresh` | 30 r/m | 15 | `= /api/auth/refresh` | `apiFetch` fires this automatically on any 401, so several tabs resuming at once burst legitimately. Kept in step with the route's `@Throttle` in `auth.controller.ts` |
 | `auth` | 60 r/m | 20 | `/api/auth/` prefix, which covers `/api/auth/me` and `/api/auth/logout` | The SPA calls these on every page load and in every tab; at the earlier 10 r/m a handful of tabs spent the bucket and got a 503 mid-session |
+| `api` | 600 r/m | 100 | `/api/` prefix — everything not matched above (user, friends, game, notifications, stats) | Deliberately loose: one SPA page load fans out across several of these, so it is a ceiling on hammering rather than a usage quota |
 
 `limit_req_status 429;` makes a throttled request answer `429 Too Many Requests`,
 matching the NestJS throttler. nginx's default is `503`, which reads as a broken
@@ -132,7 +165,8 @@ server: clients retry it and monitoring counts it as an outage.
 Location precedence matters here, because nginx matches exact (`=`) locations before
 prefixes: `/api/auth/login` is handled by the `login` zone rather than the `auth`
 prefix, and `/api/leaderboard` never reaches the generic `/api/` block (it also
-rejects every method but `GET` with a 405).
+rejects every method but `GET` with a 405). Everything else under `/api/` falls
+through to the loose `api` zone.
 
 
 ---
@@ -155,33 +189,34 @@ Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.c
 ---
 
 
-## Static-asset delivery (gzip + caching)
+## Static-asset delivery
 
-The SPA is served straight off the `spa_dist` volume by `nginx.conf`, and both how
-it goes out and how long it may be cached are configured there:
+The SPA is served straight off the `spa_dist` volume by the shared
+`nginx/conf/app.inc` body (`root /usr/share/nginx/html;` plus
+`try_files $uri $uri/ /index.html`). The current config sets **no compression
+and no explicit cache policy**: `gzip` is not enabled, and there is no
+`expires`/`Cache-Control` override for `/assets/` or `/index.html`, so assets
+go out uncompressed and are revalidated through nginx's default
+`ETag`/`Last-Modified` handling. (Adding `gzip` and an `expires` policy later
+is an `app.inc`-only change.) `text/event-stream` is not compressed either, so
+`/api/notifications/stream` keeps flushing events live.
 
-- **Compression:** `gzip on`, `gzip_comp_level 5`, `gzip_min_length 1024`, with
-  `gzip_types` covering JS, CSS, JSON, XML, SVG and the web manifest. The bundle is
-  ~1 MB of JS+CSS uncompressed and Vite content-hashes every filename, so a rebuild
-  invalidates all of it at once — the browser cache cannot cover a fresh `make`, and
-  gzip is what keeps a cold load to roughly a third of that (measured on the built
-  SPA: JS 452 KB → 125 KB, CSS 108 KB → 18 KB). `text/event-stream` is deliberately
-  *not* in `gzip_types`: `/api/notifications/stream` is long-lived SSE, and
-  compressing it buffers events instead of flushing them. `gzip_proxied` stays at its
-  default (`off`), so proxied API responses — including that SSE stream — are not
-  touched either.
-- **Caching:** `location /assets/ { expires 1y; }` (content-hashed, hence
-  immutable) and `location = /index.html { expires -1; }` (must be revalidated, or
-  a client pins itself to a bundle that a later build replaced). `/` reaches the
-  second location because `try_files` internally redirects to `/index.html`. Both
-  use `expires`, never `add_header`: an `add_header` inside a location cancels
-  every `add_header` inherited from the `server` block, which would silently drop
-  the CSP/HSTS headers from these responses.
+### `nginx/conf/app.inc` — the shared server body
 
-The `nginx/conf/app.inc` "shared server body" is retained in the repo as a
-reference, but nothing wires it into the running nginx: `nginx.conf` never
-`include`s it, `nginx/Dockerfile` does not `COPY` it, and `compose.yaml`
-bind-mounts only `conf/nginx.conf`. Its routing duplicates the inline `server {}`
-block in `nginx.conf` (which additionally carries the rate-limiting zones
-`app.inc` lacks), so `include`-ing it would fail with a duplicate-`location`
-error. `nginx.conf` is the single source of truth.
+`app.inc` holds everything a `server {}` needs to serve traffic:
+
+- the security headers (`X-Frame-Options`, `HSTS`, `CSP`, …),
+- `root`/`index` and the `/` SPA fallback,
+- every `location` block and rate limit listed above,
+- the upstream targets (`backend:3000`, `ludo-engine:3001`).
+
+`nginx/conf/nginx.conf` keeps only what is genuinely per-listener — the
+`listen`/`ssl` directives and, on `:444`, the `real_ip` block — and ends each
+`server {}` with `include /etc/nginx/app.inc;`. There is no duplicated routing
+to keep in sync: one body, two listeners.
+
+Both the `Dockerfile` (`COPY conf/app.inc /etc/nginx/app.inc`) and `compose.yaml`
+(`./nginx/conf/app.inc:/etc/nginx/app.inc:ro`) supply the file, so the image is
+runnable standalone and config edits need only a container restart. Remove
+either while `nginx.conf` still `include`s it and nginx fails to start — the
+include and its two providers move together.

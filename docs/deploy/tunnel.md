@@ -16,16 +16,24 @@ make dev-tunnel   # opens two Terminal.app tabs: `make dev` + `make tunnel` (mac
 make stop-tunnel  # stops ngrok and the compose stack
 ```
 
-## No separate hop — same nginx TLS listener
+## The dedicated `:444` tunnel listener
 
-`make tunnel` points ngrok **straight at nginx's own TLS listener** —
+`make tunnel` points ngrok **straight at nginx's TLS** —
 `ngrok http https://localhost:$(NGROK_PORT)` (the `https://` scheme, not
 `http://`, is deliberate: it tells ngrok to speak TLS to the local upstream
-instead of forwarding plain HTTP at a TLS-only port). There is no separate
-plain-HTTP hop for tunnel mode — the public ngrok URL and the
-local URL both terminate at the exact same nginx TLS listener described in
-[`nginx.md`](./nginx.md). ngrok doesn't verify the self-signed cert by
-default, so that's not an issue.
+instead of forwarding plain HTTP at a TLS-only port). `NGROK_PORT` defaults to
+**8444**, which is nginx's dedicated tunnel listener
+(`127.0.0.1:8444 → :444`, loopback-only) — see [`nginx.md`](./nginx.md).
+ngrok doesn't verify the self-signed cert by default, so that's not an issue.
+
+That listener is separate from the direct `:443` (`localhost:8443`) one because
+ngrok rewrites the client address: the request arrives from the agent on
+loopback, so `:444` takes the real visitor's IP from `X-Forwarded-For`
+(`set_real_ip_from` + `real_ip_header` + `real_ip_recursive`). Per-IP throttling
+thus follows each visitor instead of lumping all tunnel traffic together —
+which is the whole reason the tunnel has its own port. Both listeners `include`
+the same server body (`nginx/conf/app.inc`), so routing, security headers and
+rate limits never drift between the local and tunnel modes.
 
 If `NGROK_DOMAIN` is set in `.env`, `make tunnel` passes
 `--url=https://$(NGROK_DOMAIN)` so you get a stable, reusable ngrok domain
@@ -69,7 +77,7 @@ check to decide which `FRONTEND_URL` to redirect back to after login
 |---|---|---|
 | `NGROK_AUTHTOKEN` | yes | Required by `make ngrok-auth`, which `tunnel` depends on |
 | `NGROK_DOMAIN` | no | Reserved ngrok domain, for a stable URL across restarts |
-| `NGROK_PORT` | no | Default `8443` — the local port ngrok tunnels (nginx's published port); the default is defined in the `Makefile` and can be overridden in `.env` |
+| `NGROK_PORT` | no | Default `8444` — the loopback port ngrok tunnels. It must match the `:444` tunnel listener's published port (`127.0.0.1:8444:444` in `compose.yaml`); the default lives in the `Makefile` and can be overridden in `.env` |
 | `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests |
 | `GOOGLE_/GITHUB_/FORTYTWO_CLIENT_ID` + `_SECRET` + `_CALLBACK_URL` | yes | OAuth app credentials — shared by the local and tunnel strategies |
 | `NGROK_GOOGLE_/GITHUB_/FORTYTWO_CALLBACK_URL` | yes | Tunnel callback URLs registered as extra redirect URIs on the same OAuth apps |
