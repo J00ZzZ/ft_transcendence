@@ -1,7 +1,7 @@
 COMPOSE_FILE   = compose.yaml
 
 env_get = $(shell grep -m1 '^$(1)=' .env 2>/dev/null | cut -d= -f2-)
-NGROK_PORT    := $(or $(call env_get,NGROK_PORT),8443)
+NGROK_PORT    := $(or $(call env_get,NGROK_PORT),8444)
 NGROK_DOMAIN  := $(call env_get,NGROK_DOMAIN)
 HTTPS_PORT    := $(or $(call env_get,HTTPS_PORT),8443)
 NGROK_FLAGS    = $(if $(NGROK_DOMAIN),--url=https://$(NGROK_DOMAIN),)
