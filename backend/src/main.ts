@@ -15,6 +15,9 @@ const VALIDATION_CODES: Record<string, string> = {
   'code.matches': 'VALIDATION_CODE_FORMAT',
   'displayName.isLength': 'VALIDATION_DISPLAY_NAME_LENGTH',
   'displayName.matches': 'VALIDATION_DISPLAY_NAME_CHARS',
+  // `email` is the property name in both RegisterDto and UpdateProfileDto, so
+  // this one line localizes @IsEmail() failures for signup and profile edits.
+  'email.isEmail': 'VALIDATION_EMAIL_FORMAT',
 };
 
 // Which failing constraint to prefer when a field breaks more than one rule

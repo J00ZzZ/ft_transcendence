@@ -4,7 +4,7 @@ import { secret } from '../secrets';
 import Redis from 'ioredis';
 import { AchievementsService } from '../achievements/achievements.service';
 import { NotificationService } from '../notification/notification.service';
-import { isBotUserId } from '../common/bot';
+import { isBotUserId } from '../common/botname-enforce';
 import { ratingDeltaFor } from '../common/scoring';
 
 // Engine → backend payload for POST /api/game/end. Colors arrive uppercase

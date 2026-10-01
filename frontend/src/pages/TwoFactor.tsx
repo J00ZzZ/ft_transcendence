@@ -7,11 +7,11 @@ import { useApp } from '../store';
 import '../styles/retrowave.css';
 import {
   RETRO_AUTH_BTN,
+  RETRO_AUTH_BTN_OUTLINE,
   RETRO_AUTH_ERROR,
   RETRO_AUTH_INPUT,
   RETRO_AUTH_LABEL,
-  RETRO_AUTH_LINK,
-  RETRO_AUTH_MUTED,
+  RETRO_AUTH_SUCCESS,
   RETRO_AUTH_SUBTITLE,
   RETRO_AUTH_TITLE,
 } from '../styles/tw';
@@ -21,12 +21,14 @@ import {
  */
 export function TwoFactor() {
   const { t } = useTranslation();
-  const { verify2fa } = useApp();
+  const { verify2fa, resend2fa } = useApp();
   const { query } = useRoute();
   const pendingToken = query.get('token') ?? '';
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,6 +39,18 @@ export function TwoFactor() {
     setSubmitting(false);
     if (err) setError(err);
     else navigate('/home');
+  }
+
+  // Re-issue a fresh code for the same challenge (previous code is invalidated).
+  async function onResend() {
+    if (resending || !pendingToken) return;
+    setResending(true);
+    setError(null);
+    setNotice(null);
+    const err = await resend2fa(pendingToken);
+    setResending(false);
+    if (err) setError(err);
+    else setNotice(t('auth.codeResent'));
   }
 
   return (
@@ -75,21 +89,18 @@ export function TwoFactor() {
           />
         </div>
         {error && <div className={RETRO_AUTH_ERROR}>{error}</div>}
+        {notice && <div className={RETRO_AUTH_SUCCESS}>{notice}</div>}
         <button type="submit" disabled={submitting || code.length !== 6} className={RETRO_AUTH_BTN}>
           {submitting ? t('auth.checkingBtn') : t('authExtra.verifyEnterArenaBtn')}
         </button>
-        <div className={RETRO_AUTH_MUTED} style={{ textAlign: 'center' }}>
-          {t('auth.codeExpired')}{' '}
-          <a
-            onClick={() => {
-              navigate('/login');
-            }}
-            className={RETRO_AUTH_LINK}
-          >
-            {t('auth.logInAgainLink')}
-          </a>{' '}
-          {t('auth.toGetNewOne')}
-        </div>
+        <button
+          type="button"
+          className={RETRO_AUTH_BTN_OUTLINE}
+          disabled={resending || !pendingToken}
+          onClick={() => void onResend()}
+        >
+          {resending ? t('auth.sendingBtn') : t('auth.resendCode')}
+        </button>
       </form>
     </RetroAuthLayout>
   );

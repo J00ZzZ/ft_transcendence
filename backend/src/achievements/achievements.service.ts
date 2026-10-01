@@ -10,7 +10,7 @@ import {
   GameParticipantLike,
   GameLike,
 } from './achievements.registry';
-import { isBotUserId } from '../common/bot';
+import { isBotUserId } from '../common/botname-enforce';
 import type { GameType } from '../../generated/prisma/client';
 
 // Game types that count toward lifetime achievement counters.

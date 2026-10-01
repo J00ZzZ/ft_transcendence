@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
-import { isBotUserId } from '../common/bot';
+import { isBotUserId } from '../common/botname-enforce';
 import { isSeatFinalized } from './seat-finalization';
 import { ENGINE_WS_URL } from './match.creator.service';
 

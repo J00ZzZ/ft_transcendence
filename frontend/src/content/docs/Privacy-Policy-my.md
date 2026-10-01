@@ -24,7 +24,7 @@ Apl ini hanya mengumpulkan data yang diperlukan untuk menyediakan permainan dan 
 | Sosial | senarai rakan, permintaan rakan, senarai blok, jemputan permainan | dijana oleh aktiviti anda dalam apl |
 | Teknikal | kehadiran/status dalam talian, keutamaan notifikasi | dijana oleh penggunaan Apl |
 
-Kami **tidak** mengumpulkan butiran kad pembayaran, data lokasi, atau sebarang data daripada kanak-kanak di bawah umur 13 tahun. Apl ini adalah permainan dan tidak melakukan profil automatik melebihi menampilkan statistik permainan yang anda sudah lihat.
+Kami **tidak** mengumpulkan butiran kad pembayaran atau data lokasi. Apl ini adalah permainan dan tidak melakukan profil automatik melebihi menampilkan statistik permainan yang anda sudah lihat.
 
 
 ---

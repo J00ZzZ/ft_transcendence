@@ -86,12 +86,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const b = body as { code?: string; message?: string | string[] } | null;
     const msg = b?.message;
     const localized = translateErrorCode(b?.code);
-    throw new Error(
+    const error = new Error(
       localized ??
         (Array.isArray(msg)
           ? msg.join('. ')
           : (msg ?? i18n.t('common.requestFailed', { status: res.status }))),
     );
+    // Carry the backend code so callers can react to it (e.g. field-level errors).
+    (error as { code?: string }).code = b?.code;
+    throw error;
   }
   return res.json() as Promise<T>;
 }

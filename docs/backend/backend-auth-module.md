@@ -40,7 +40,8 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 |------|------|
 | `auth.module.ts` | NestJS module — registers Passport, JwtModule, all strategies, and exports them for other modules |
 | `auth.controller.ts` | HTTP routes: register, verify-email, login, 2fa/verify, refresh, forgot-password, reset-password, logout, me, profile read/update, password change, account deletion, 2FA settings, and 3 OAuth flows |
-| `auth.service.ts` | Core business logic: password hashing (bcrypt), JWT issuance, OAuth validation, 2FA orchestration, email verification |
+| `auth.service.ts` | Core business logic: password hashing (bcrypt), JWT issuance, OAuth validation, 2FA orchestration, email verification, and the verify-then-commit email change |
+| `auth.constants.ts` | `AUTH`: single-source auth tunables (token TTLs, 2FA challenge/resend limits, email-change rate cap) |
 | `jwt.strategy.ts` | Passport strategy that extracts JWT from the `token` cookie |
 | `jwt-auth.guard.ts` | `@UseGuards(JwtAuthGuard)` decorator — protects routes behind JWT |
 | `jwt-payload.ts` | TypeScript interface for the JWT payload: `{ sub: string; username: string }` |
@@ -51,9 +52,9 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `ngrok_github_strategy.ts` | GitHub OAuth variant for tunnelled requests (same per-request Host check) |
 | `ngrok_fortytwo_strategy.ts` | 42 OAuth variant for tunnelled requests (same per-request Host check) |
 | `oauth.guards.ts` | Guard classes: `GoogleAuthGuard`, `GithubAuthGuard`, `FortyTwoAuthGuard` — pick strategy per request host |
-| `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset links (degrades to console logging without SMTP config) |
+| `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset and email-change links (degrades to console logging without SMTP config). Also owns the Redis keyspace subscription that emails the lapsed-email-change notice |
 | `session.service.ts` | Redis-backed refresh-token management with rotation and revocation |
-| `twofactor.service.ts` | Redis-backed short-lived auth state, stored hashed and single-use: signup verification tokens (`verify:`), password-reset tokens (`reset:`) and 2FA login challenges (`2fa:`) |
+| `twofactor.service.ts` | Redis-backed short-lived auth state, stored hashed and single-use: signup verification tokens (`verify:`), password-reset tokens (`reset:`), 2FA login challenges (`2fa:`) and staged email changes (`emailchange:` + its `emailchange:user:<id>` reverse pointer) |
 | `dto/register.dto.ts` | Validation schema for `POST /api/auth/register` |
 | `dto/login.dto.ts` | Validation schema for `POST /api/auth/login` |
 | `dto/forgot-password.dto.ts` | Validation schema for `POST /api/auth/forgot-password` |
@@ -61,7 +62,8 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `dto/twofactor.dto.ts` | Validation schema for `POST /api/auth/2fa/verify` |
 | `dto/two-factor-setting.dto.ts` | Validation schema for `GET/PATCH /api/auth/2fa` |
 | `dto/password.rules.ts` | Shared password policy constants used by RegisterDto and ResetPasswordDto |
-| `dto/update-profile.dto.ts` | Validation schema for profile updates |
+| `dto/update-profile.dto.ts` | Validation schema for profile updates (incl. `currentPassword` for the email-change re-auth) |
+| `dto/resend-verification.dto.ts` | Validation schema for `POST /api/auth/resend-verification` |
 | `dto/change-password.dto.ts` | Validation schema for `PATCH /api/auth/profile/password` |
 | `dto/delete-account.dto.ts` | Validation schema for `DELETE /api/auth/profile` (optional current password + required acknowledgement) |
 
@@ -140,16 +142,19 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/auth/register` | None | Create account, send verification email (no session set) |
-| `GET` | `/api/auth/verify-email` | None | Redeem emailed verification link, redirect to SPA |
+| `GET` | `/api/auth/verify-email` | None | Redeem a signup or email-change link; redirect to the SPA (`?verified=1` / `?emailChanged=1` / `?error=…`) |
+| `POST` | `/api/auth/resend-verification` | None | Resend a signup verification link (generic response, throttled 3/h) |
+| `POST` | `/api/auth/profile/resend-email-change` | JWT | Resend the pending email-change link (throttled 5/h) |
 | `POST` | `/api/auth/login` | None | Authenticate — returns `{ twoFactorRequired }`, the not-verified notice, or sets session |
 | `POST` | `/api/auth/2fa/verify` | None | Redeem 2FA code + pendingToken for session |
+| `POST` | `/api/auth/2fa/resend` | None | Re-issue the 2FA code for a live challenge (3 resends/hour per user) |
 | `POST` | `/api/auth/refresh` | None (refresh cookie) | Rotate refresh token, issue fresh access token |
 | `POST` | `/api/auth/forgot-password` | None | Email reset link (generic response — no enumeration) |
 | `POST` | `/api/auth/reset-password` | None | Redeem reset token with new password |
 | `POST` | `/api/auth/logout` | None | Revoke refresh token, clear both cookies |
 | `GET` | `/api/auth/me` | JWT | Return current user from cookie |
 | `GET` | `/api/auth/profile` | JWT | Full profile for the Edit-Profile card (email, providers, hasPassword) |
-| `PATCH` | `/api/auth/profile` | JWT | Update profile (username, display name, email) |
+| `PATCH` | `/api/auth/profile` | JWT | Update profile (display name, email, 2FA, OAuth). Email changes are verify-then-commit |
 | `PATCH` | `/api/auth/profile/password` | JWT | Change password while logged in (needs current password) |
 | `DELETE` | `/api/auth/profile` | JWT | Permanently delete the account (password-verified) |
 | `GET` | `/api/auth/2fa` | JWT | Get current user's 2FA preference |
@@ -171,6 +176,7 @@ throttler default (300 requests per 60 s, installed in `app.module.ts`).
 | `POST /api/auth/register` | 5 per hour |
 | `POST /api/auth/login` | 5 per minute |
 | `POST /api/auth/2fa/verify` | 5 per minute |
+| `POST /api/auth/2fa/resend` | 5 per hour (+ 3 per hour per user) |
 | `POST /api/auth/refresh` | 30 per minute |
 | `POST /api/auth/forgot-password` | 3 per hour |
 | `POST /api/auth/reset-password` | 5 per 15 minutes |
@@ -191,21 +197,39 @@ Two httpOnly cookies are used:
 | path | `/` | `/api/auth` |
 | maxAge | 15 minutes (`ACCESS_MAX_AGE_MS`) | 7 days (`REFRESH_MAX_AGE_MS` / `REFRESH_TTL_S`) |
 
+### Frontend URL resolution
+
+`frontendUrlFor(req)` returns the public SPA URL for a request. The Host header decides the mode:
+
+| Mode | Host | Result |
+|------|------|--------|
+| Tunnel | contains `ngrok` | `NGROK_FRONTEND_URL` |
+| LAN | equals `LAN_IP` | `https://<LAN_IP>:<HTTPS_PORT>` |
+| Local | anything else | `FRONTEND_URL` |
+
+It is used for OAuth redirects and for every emailed link origin (signup verification, resend,
+password reset, email change), so the link always matches the mode the user reached us through.
+
 ### Tunable constants
 
-Edit these module-level constants to tweak auth behaviour (all defined in `backend/src/auth/`):
+Grouped in `backend/src/auth/auth.constants.ts` (the `AUTH` object). Import from there, so a value
+changes in one place:
 
-| Constant | File | Default | What it controls |
-|----------|------|---------|------------------|
-| `SALT_ROUNDS` | `auth.service.ts` | 10 | bcrypt cost for password hashing |
-| `ACCESS_MAX_AGE_MS` | `auth.controller.ts` | 15 min | Access-cookie lifetime (keep in sync with `JwtModule expiresIn`) |
-| `REFRESH_MAX_AGE_MS` | `auth.controller.ts` | 7 days | Refresh-cookie lifetime |
-| `REFRESH_TTL_S` | `session.service.ts` | 7 days | Refresh-token Redis TTL |
-| `VERIFY_TOKEN_TTL_S` | `twofactor.service.ts` | 24 h | Email-verification link lifetime |
-| `RESET_TOKEN_TTL_S` | `twofactor.service.ts` | 1 h | Password-reset link lifetime |
-| `CODE_TTL_S` | `twofactor.service.ts` | 5 min | 2FA login-code lifetime |
-| `MAX_ATTEMPTS` | `twofactor.service.ts` | 5 | 2FA / reset attempt limit |
-| `PASSWORD_MIN` / `PASSWORD_MAX` | `auth/dto/password.rules.ts` | 12 / 72 | Password length bounds (the same values are used in `frontend/src/validatePassword.ts`) |
+| Constant | Default | What it controls |
+|----------|---------|------------------|
+| `AUTH.verifyTokenTtlS` | 24 h | Signup verification link lifetime |
+| `AUTH.resetTokenTtlS` | 1 h | Password-reset link lifetime |
+| `AUTH.changeTokenTtlS` | 15 min | Email-change confirmation link lifetime |
+| `AUTH.maxEmailChangesPerHour` | 3 | Email-change requests per user per hour |
+| `AUTH.challenge.ttlS` | 5 min | 2FA login-code lifetime |
+| `AUTH.challenge.maxAttempts` | 5 | 2FA code attempts per challenge |
+| `AUTH.challenge.resendWindowS` | 1 h | 2FA resend cap window |
+| `AUTH.challenge.maxResends` | 3 | 2FA resends per window per user |
+
+Other tunables stay in their own files: `SALT_ROUNDS` (`auth.service.ts`, 10, bcrypt cost),
+`ACCESS_MAX_AGE_MS` / `REFRESH_MAX_AGE_MS` (`auth.controller.ts`), `REFRESH_TTL_S`
+(`session.service.ts`), `PASSWORD_MIN` / `PASSWORD_MAX` (`auth/dto/password.rules.ts`, 12 / 72,
+mirrored in `frontend/src/validatePassword.ts`).
 
 
 ---
@@ -539,7 +563,7 @@ GET /api/auth/me (or any @UseGuards(JwtAuthGuard) route)
 | `bcrypt` | Password hashing |
 | `class-validator` | DTO validation |
 | `nodemailer` | SMTP email delivery (verification, 2FA, password reset) |
-| `ioredis` | Redis client (SessionService, TwoFactorService) |
+| `ioredis` | Redis client (SessionService, TwoFactorService, MailService's expiry subscription) |
 | `PrismaService` | Database access (User, Account models) |
 | `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
 
@@ -570,14 +594,14 @@ All configuration is read from environment variables — the root `.env` (compos
 | `FRONTEND_URL` | AuthController (OAuth redirect target for local requests; required, the example `.env` sets `https://localhost:8443`) |
 | `NGROK_FRONTEND_URL` | AuthController (OAuth redirect target when the request Host contains `ngrok`) |
 | `SMTP_CREDENTIALS` | MailService (format: `[smtp.gmail.com]:587 address@gmail.com:app-password`) |
-| `REDIS_PASSWORD` | SessionService, TwoFactorService |
+| `REDIS_PASSWORD` | SessionService, TwoFactorService, MailService |
 
 ### Environment Variables
 
 | Variable | Default | Used By |
 |----------|---------|---------|
-| `REDIS_HOST` | `redis` | SessionService, TwoFactorService |
-| `REDIS_PORT` | `6479` | SessionService, TwoFactorService |
+| `REDIS_HOST` | `redis` | SessionService, TwoFactorService, MailService |
+| `REDIS_PORT` | `6479` | SessionService, TwoFactorService, MailService |
 
 
 ---

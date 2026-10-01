@@ -22,12 +22,15 @@ import {
 
 export function Login() {
   const { t } = useTranslation();
-  const { login } = useApp();
+  const { login, resendVerification } = useApp();
   const { query } = useRoute();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [notVerified, setNotVerified] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   // Human-readable text for ?error= codes the backend redirects here with.
   const QUERY_ERRORS: Record<string, string> = {
@@ -51,9 +54,24 @@ export function Login() {
     setError(null);
     const result = await login(identifier, password);
     setSubmitting(false);
+    setNotVerified(!!result.notVerified);
     if (result.error) setError(result.error);
     else if (result.pendingToken) navigate(`/2fa?token=${result.pendingToken}`);
-    else navigate('/home'); // 2FA off — session already established, skip the code page
+    else navigate('/home'); // 2FA off: session already established, skip the code page
+  }
+
+  // Resend the signup verification link to the entered address.
+  async function onResend() {
+    if (resending || !identifier.includes('@')) return;
+    setResending(true);
+    setResendNotice(null);
+    const err = await resendVerification(identifier.trim());
+    setResending(false);
+    if (err) setError(err);
+    else {
+      setError(null);
+      setResendNotice(t('auth.resendSent'));
+    }
   }
 
   return (
@@ -93,6 +111,17 @@ export function Login() {
           />
         </div>
         {error && <div className={RETRO_AUTH_ERROR}>{error}</div>}
+        {resendNotice && <div className={RETRO_AUTH_SUCCESS}>{resendNotice}</div>}
+        {notVerified && (
+          <button
+            type="button"
+            className={RETRO_AUTH_BTN_OUTLINE}
+            disabled={resending || !identifier.includes('@')}
+            onClick={() => void onResend()}
+          >
+            {resending ? t('auth.sendingBtn') : t('auth.resendVerification')}
+          </button>
+        )}
         <div
           style={{
             display: 'flex',

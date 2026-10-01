@@ -355,6 +355,39 @@ export function Profile() {
 
           {/* Main Content Flow */}
           <div className="sticky top-8 w-full min-w-0 flex-1" style={{ margin: 0, padding: 0 }}>
+            {/* One-shot notice after an emailed email-change link is redeemed. */}
+            {query.get('emailChanged') === '1' && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--accent-cyan)',
+                  color: 'var(--accent-cyan)',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '0.82rem',
+                  textAlign: 'center',
+                }}
+              >
+                {t('profileEdit.emailChangedNotice')}
+              </div>
+            )}
+            {query.get('error') === 'email-taken' && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ff0055',
+                  color: '#ff0055',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '0.82rem',
+                  textAlign: 'center',
+                }}
+              >
+                {t('profileEdit.emailTaken')}
+              </div>
+            )}
             {/* Top Hero Banner */}
             <header
               className={HERO_SECTION}

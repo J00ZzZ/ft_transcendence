@@ -262,7 +262,7 @@ sequenceDiagram
 
     Player->>Engine: Click a piece to move it
     Engine->>Engine: Check the move is legal
-    Engine->>Engine: Move the piece; any opponent piece on that cell goes back to base
+    Engine->>Engine: Move the piece. Any opponent piece on that cell goes back to base
     Engine->>Engine: Did all 4 pieces reach home?
     alt Yes — player wins
         Engine-->>Player: game_ended (winner)

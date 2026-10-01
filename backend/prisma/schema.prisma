@@ -44,8 +44,9 @@ model User {
   displayName      String    @unique
   email            String?   @unique
   password_hash    String? // null for OAuth-only users
-  emailVerified    DateTime?
-  twoFactorEnabled Boolean   @default(false)
+  emailVerified            DateTime?
+  twoFactorEnabled         Boolean   @default(false)
+  language                 String    @default("en") // email language: en | fr | ms
 
   accounts      Account[]
   notifications Notification[]

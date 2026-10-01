@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsBoolean, IsOptional, Length, Matches } from 'class-validator';
+import { IsString, IsEmail, IsBoolean, IsOptional, IsIn, Length, Matches } from 'class-validator';
 
 // Profile-update DTO : every field optional; only provided fields change.
 // displayName: 1-30 chars; email: valid email; twoFactorEnabled toggles 2FA;
@@ -31,11 +31,14 @@ export class UpdateProfileDto {
   @IsString()
   oauthToRemove?: string;
 
+  // Used by the email-change re-auth (bcrypt-checked), not the password-change
+  // flow, which has its own ChangePasswordDto.
   @IsOptional()
   @IsString()
   currentPassword?: string;
 
+  // UI language for transactional email (en/fr/ms).
   @IsOptional()
-  @IsString()
-  newPassword?: string;
+  @IsIn(['en', 'fr', 'ms'])
+  language?: string;
 }

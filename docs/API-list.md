@@ -50,6 +50,9 @@ An error response has one of two shapes:
 | `AUTH_SESSION_EXPIRED` | 401 | Session expired — log in again |
 | `AUTH_DISPLAY_NAME_TAKEN` | 409 | Display name already taken |
 | `AUTH_CURRENT_PASSWORD_INCORRECT` | 401 | Current password wrong |
+| `AUTH_EMAIL_CHANGE_SET_PASSWORD` | 400 | Set a password before changing email (OAuth-only account) |
+| `AUTH_EMAIL_CHANGE_RATE_LIMITED` | 429 | Too many email-change requests (max 3/hour per user) |
+| `NO_PENDING_EMAIL_CHANGE` | 400 | No pending email change to resend |
 | `AUTH_DELETE_CONFIRM_REQUIRED` | 400 | Deletion not confirmed |
 | `AUTH_DELETE_SET_PASSWORD` | 403 | Set a password before deleting |
 | `AUTH_PROVIDER_LINKED` | 409 | Provider linked to another user |
@@ -299,11 +302,36 @@ Create a new user account and send a verification email. This call sets no sessi
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Redeem an emailed verification link. Redirects to the SPA with a query param on success.
+Redeem an emailed link. The token is checked as a signup verification token (`verify:`, Redis) first, then as an email-change confirmation token (`emailchange:`, Redis). Redirects to the SPA:
+
+- signup → `<origin>/login?verified=1`
+- email change → `<origin>/profile?emailChanged=1`
+- commit-time conflict (address taken meanwhile) → `<origin>/profile?error=email-taken`
+- unknown/expired → `<origin>/login?error=invalid-verification-link`
 
 **Headers:** None  
 **Query:** `token` — the 64-char hex token from the email link  
-**Response:** 302 redirect to `<request-origin>/login?verified=1` or `<request-origin>/login?error=invalid-verification-link`. The origin is taken from the request that arrived, so a tunnel visitor is sent back to the tunnel host.
+**Response:** 302 redirect to the frontend URL for the request's mode: `NGROK_FRONTEND_URL` (tunnel), `https://<LAN_IP>:<HTTPS_PORT>` (LAN), or `FRONTEND_URL` (local).
+
+
+---
+---
+
+
+#### `POST /api/auth/resend-verification`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Public. Resends a signup verification link if the address exists and is still unverified; the response is identical either way (no account enumeration). Throttled 3/hour.
+
+**Headers:** None  
+**Body:**
+
+```json
+{ "email": "user@example.com" }
+```
+
+**Response:** `200 { "message": "If that address needs verification, a new link is on its way." }`
 
 
 ---
@@ -391,6 +419,27 @@ Redeem a 2FA code emailed during login. Sets session cookies on success.
 ```
 
 **Errors:** 401 `AUTH_CODE_INVALID` if the code is invalid/expired or there were too many attempts; 400 `VALIDATION_CODE_FORMAT` if the code is not 6 digits.
+
+
+---
+---
+
+
+#### `POST /api/auth/2fa/resend`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Re-issue the 2FA login code for a live challenge (same `pendingToken`; the previous code is invalidated). The `pendingToken` is the credential: no session required. Throttled per-IP, plus a per-user cap of **3 resends per hour**.
+
+**Headers:** None  
+**Body:**
+
+```json
+{ "pendingToken": "string (64-char hex)" }
+```
+
+**Response:** `200 { "code": "AUTH_CODE_RESENT", "message": "A new code is on its way." }`  
+**Errors:** `400 AUTH_CODE_EXPIRED` if the challenge lapsed; `429 AUTH_CODE_RESEND_LOCKED` if the per-user resend cap is hit.
 
 
 ---
@@ -577,21 +626,53 @@ Return the full profile for the logged-in user (used by the Edit-Profile card).
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Update the logged-in user's profile (display name / username, email, etc.).
+Update the logged-in user's profile (display name, email, 2FA toggle, OAuth link/unlink). **Email changes are verify-then-commit**: the new address is *not* applied until the emailed link is opened; the current address stays active meanwhile.
 
 **Headers:** 🔒 (requires `token` cookie)  
 **Body:** (any subset of the editable fields, validated by `UpdateProfileDto`)
 
 ```json
 {
-  "username": "new_username",
   "displayName": "New Display Name",
-  "email": "new@example.com"
+  "email": "new@example.com",
+  "currentPassword": "required with an email change (password accounts)",
+  "twoFactorEnabled": true,
+  "oauthToAdd": "google",
+  "oauthToRemove": "github"
 }
-
 ```
 
-**Response:** the updated profile / success message. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` or `VALIDATION_DISPLAY_NAME_CHARS`.
+- Changing the email requires the account to have a password **and** `currentPassword`; OAuth-only accounts get `400 AUTH_EMAIL_CHANGE_SET_PASSWORD`, a wrong password `401 AUTH_CURRENT_PASSWORD_INCORRECT`.
+- Rate-limited to **3 email changes/hour** per user → `429 AUTH_EMAIL_CHANGE_RATE_LIMITED`.
+
+**Response:**
+
+```json
+{
+  "user": { "id": "…", "username": "…", "displayName": "…", "email": "current@example.com", "hasPassword": true, "providers": ["google"] },
+  "emailChangePending": true,
+  "pendingEmail": "new@example.com",
+  "oauthRedirectUrl": null
+}
+```
+
+`user.email` stays the **current** address while a change is pending. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`.
+
+
+---
+---
+
+
+#### `POST /api/auth/profile/resend-email-change`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Resend the pending email-change confirmation link. Rotates the token (invalidating the previous link) and re-emails the pending address. Throttled 5/hour.
+
+**Headers:** 🔒 (requires `token` cookie)  
+**Body:** none  
+**Response:** `200 { "pendingEmail": "new@example.com" }`  
+**Errors:** `400 NO_PENDING_EMAIL_CHANGE` when there is no pending change.
 
 
 ---
@@ -2392,5 +2473,5 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
 - **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
 - **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
-- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `login` (5/minute), `2fa/verify` (5/minute), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
+- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `resend-verification` (3/hour), `login` (5/minute), `2fa/verify` (5/minute), `2fa/resend` (5/hour, plus 3/hour per user), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
 - **Client IP:** `main.ts` trusts internal hops only (`trust proxy`), so the address behind those limits is the client's own and a client-sent `X-Forwarded-For` cannot spoof it.

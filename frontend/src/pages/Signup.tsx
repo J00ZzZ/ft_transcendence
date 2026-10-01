@@ -6,6 +6,7 @@ import { LegalModal } from '../components/LegalModal';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { passwordError } from '../validatePassword';
+import { isValidEmail } from '../validateEmail';
 import '../styles/retrowave.css';
 import {
   RETRO_AUTH_BTN,
@@ -31,12 +32,20 @@ export function Signup() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [assigned, setAssigned] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
+    // Mirror the backend's @IsEmail() rule (RegisterDto) so a malformed address
+    // fails inline (localized) instead of round-tripping to a 400. The server
+    // still re-checks.
+    if (!isValidEmail(email.trim())) {
+      setError(t('errors.VALIDATION_EMAIL_FORMAT'));
+      return;
+    }
     // Mirror the backend rule (RegisterDto) so weak passwords fail instantly
     // rather than round-tripping to a 400. The server still re-checks.
     const pwError = passwordError(password);
@@ -54,10 +63,13 @@ export function Signup() {
     }
     setSubmitting(true);
     setError(null);
-    const err = await register(username, password, email.trim());
+    const result = await register(username, password, email.trim());
     setSubmitting(false);
-    if (err) setError(err);
-    else setSent(true); // no session yet — the account activates via the emailed link
+    if (result.error) setError(result.error);
+    else {
+      setAssigned(result.username ?? '');
+      setSent(true); // no session yet: the account activates via the emailed link
+    }
   }
 
   if (sent) {
@@ -71,6 +83,12 @@ export function Signup() {
             {t('auth.verificationSentPrefix')} <b style={{ color: '#00f0ff' }}>{email}</b>.{' '}
             {t('auth.verificationSentSuffix')}
           </div>
+          {assigned && (
+            <div className={RETRO_AUTH_MUTED} style={{ lineHeight: 1.5, fontSize: '14px' }}>
+              {t('auth.assignedUsernamePrefix')}{' '}
+              <b style={{ color: '#00f0ff' }}>{assigned}</b>
+            </div>
+          )}
           <div className={RETRO_AUTH_MUTED} style={{ fontSize: '13px' }}>
             {t('auth.doneVerifying')}{' '}
             <a

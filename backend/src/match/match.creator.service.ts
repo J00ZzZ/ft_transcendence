@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
 import { requireSecret, secret } from '../secrets';
 import Redis from 'ioredis';
-import { BOT_PREFIX, isBotUserId } from '../common/bot';
+import { BOT_PREFIX, isBotUserId } from '../common/botname-enforce';
 
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 const FRONTEND_URL = requireSecret('FRONTEND_URL');

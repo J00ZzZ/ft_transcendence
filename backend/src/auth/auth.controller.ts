@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { LoginDto } from './dto/login.dto';
 import { TwoFactorDto } from './dto/twofactor.dto';
 import { TwoFactorSettingDto } from './dto/two-factor-setting.dto';
@@ -40,18 +41,17 @@ const HOUR_MS = 60 * 60 * 1000;
 
 const LOCAL_FRONTEND_URL = requireSecret('FRONTEND_URL');
 const NGROK_FRONTEND_URL = requireSecret('NGROK_FRONTEND_URL');
+// This machine's LAN address (optional; `make lan` writes it) + the published TLS port.
+const LAN_IP = process.env.LAN_IP?.trim();
+const HTTPS_PORT = process.env.HTTPS_PORT ?? '8443';
 
-// After oauth, redirect user to ngrok/local address
+// Public frontend URL for this request: tunnel, LAN, or localhost.
+// See docs/backend/backend-auth-module.md (Frontend URL resolution).
 function frontendUrlFor(req: Request): string {
-  return isTunnelRequest(req.get('host')) ? NGROK_FRONTEND_URL : LOCAL_FRONTEND_URL;
-}
-
-function originFromRequest(req: Request): string {
-  const forwarded = req.headers['x-forwarded-proto'];
-  const forwardedProto = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : '';
-  const proto = forwardedProto || req.protocol || 'https';
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- intentional fallback for missing Host header
-  return `${proto}://${req.get('host') || 'localhost:8443'}`;
+  const host = req.get('host') ?? '';
+  if (isTunnelRequest(host)) return NGROK_FRONTEND_URL;
+  if (LAN_IP && host.split(':')[0] === LAN_IP) return `https://${LAN_IP}:${HTTPS_PORT}`;
+  return LOCAL_FRONTEND_URL;
 }
 
 @Controller('api/auth')
@@ -61,16 +61,31 @@ export class AuthController {
   // POST /register
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() req: Request) {
-    return this.authService.register(dto, originFromRequest(req));
+    return this.authService.register(dto, frontendUrlFor(req));
   }
 
   // GET /verify-email
   @Get('verify-email')
   async verifyEmail(@Req() req: Request, @Res() res: Response, @Query('token') token?: string) {
-    const ok = await this.authService.verifyEmail(token ?? '');
-    res.redirect(
-      `${originFromRequest(req)}/login?${ok ? 'verified=1' : 'error=invalid-verification-link'}`,
-    );
+    const result = await this.authService.verifyEmail(token ?? '');
+    const origin = frontendUrlFor(req);
+    const target =
+      result === 'signup'
+        ? '/login?verified=1'
+        : result === 'change'
+          ? '/profile?emailChanged=1'
+          : result === 'conflict'
+            ? '/profile?error=email-taken'
+            : '/login?error=invalid-verification-link';
+    res.redirect(`${origin}${target}`);
+  }
+
+  // POST /resend-verification: public; resends a signup link. Generic response.
+  @Throttle({ default: { limit: 3, ttl: HOUR_MS } })
+  @Post('resend-verification')
+  @HttpCode(200)
+  async resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
+    return this.authService.resendSignupVerification(dto.email, frontendUrlFor(req));
   }
 
   // POST /login
@@ -107,6 +122,14 @@ export class AuthController {
     return { user };
   }
 
+  // POST /2fa/resend: re-issue the login code for a live challenge.
+  @Throttle({ default: { limit: 5, ttl: HOUR_MS } })
+  @Post('2fa/resend')
+  @HttpCode(200)
+  async resendTwoFactor(@Body('pendingToken') pendingToken: string) {
+    return this.authService.resendTwoFactor(pendingToken ?? '');
+  }
+
   // POST /refresh - swaps a refresh token for new access token
   // Reads the refresh cookie and sets both cookies again
   @Throttle({ default: { limit: 30, ttl: MINUTE_MS } })
@@ -125,7 +148,7 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(200)
   async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
-    return this.authService.forgotPassword(dto.email, originFromRequest(req));
+    return this.authService.forgotPassword(dto.email, frontendUrlFor(req));
   }
 
   // POST /reset-password
@@ -167,14 +190,29 @@ export class AuthController {
 
   // Complete profile update (username / email / 2FA method)
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: HOUR_MS } })
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
-    const result = await this.authService.updateProfile((req.user as { id: string }).id, dto);
+    const result = await this.authService.updateProfile(
+      (req.user as { id: string }).id,
+      dto,
+      frontendUrlFor(req),
+    );
     return {
       user: result.user,
-      emailVerificationSent: result.emailVerificationSent,
+      emailChangePending: result.emailChangePending,
+      pendingEmail: result.pendingEmail,
       oauthRedirectUrl: result.oauthRedirectUrl,
     };
+  }
+
+  // POST /profile/resend-email-change: authenticated; resends the pending change link.
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: HOUR_MS } })
+  @Post('profile/resend-email-change')
+  @HttpCode(200)
+  async resendEmailChange(@Req() req: Request) {
+    return this.authService.resendEmailChange((req.user as { id: string }).id, frontendUrlFor(req));
   }
 
   // Change password while logged in
@@ -261,6 +299,7 @@ export class AuthController {
           username: string;
           email: string | null;
           twoFactorEnabled: boolean;
+          language: string;
         }
       | undefined;
     const frontendUrl = frontendUrlFor(req);
@@ -304,7 +343,7 @@ export class AuthController {
       res.redirect(`${frontendUrl}/login?error=add-email-2fa`);
       return;
     }
-    const { pendingToken } = await this.authService.startTwoFactor(user.id, user.email);
+    const { pendingToken } = await this.authService.startTwoFactor(user.id, user.email, user.username, user.language);
     res.redirect(`${frontendUrl}/2fa?token=${pendingToken}`);
   }
 
