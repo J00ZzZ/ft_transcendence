@@ -101,7 +101,7 @@ attaches to the `transcendence_network` bridge and reaches the others by service
 
 The compose file also uses **bind mounts** (host paths, not volumes): `./frontend → /app`
 on `frontend` / `frontend-dev` so Vite watches live source, and
-`./nginx/conf/nginx.conf` + `app.inc → /etc/nginx/*` so nginx config can be edited
+`./nginx/conf/nginx.conf → /etc/nginx/nginx.conf` so nginx config can be edited
 without a rebuild.
 
 ### Network
@@ -511,8 +511,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   ├── Dockerfile
 │   ├── nginx.sh
 │   └── conf/
-│       ├── nginx.conf            # TLS server block
-│       └── app.inc               # Shared routing (SPA, /api, /socket.io)
+│       └── nginx.conf            # TLS server block, SPA + API routing
 │
 └── docs/                         # Documentation
     ├── architecture.md           # Full architecture reference (this file)

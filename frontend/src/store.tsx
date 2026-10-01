@@ -32,7 +32,7 @@ function apiError(body: unknown, fallback: string): string {
   if (localized) return localized;
   const message = b?.message;
   if (Array.isArray(message)) return message.join('. ');
-  return typeof message === 'string' ? message: fallback;
+  return typeof message === 'string' ? message : fallback;
 }
 
 export type Seat =
@@ -60,7 +60,7 @@ const SEATS_KEY = 'lr.seats';
 
 function storedLang(): Lang {
   const raw = localStorage.getItem(LANG_KEY);
-  return LANGUAGES.some((l) => l.code === raw) ? (raw as Lang): 'en';
+  return LANGUAGES.some((l) => l.code === raw) ? (raw as Lang) : 'en';
 }
 
 function storedTheme(): ThemeType {
@@ -100,7 +100,7 @@ export type ActiveMatch = {
 function storedActiveMatch(): ActiveMatch {
   try {
     const raw = sessionStorage.getItem(ACTIVE_MATCH_KEY);
-    return raw ? JSON.parse(raw): null;
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
@@ -236,7 +236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const waitMs =
             Number.isFinite(retryAfter) && retryAfter > 0
               ? Math.min(retryAfter * 1000, 8000)
-             : 1000 * 2 ** attempt;
+              : 1000 * 2 ** attempt;
           await new Promise((r) => setTimeout(r, waitMs));
         } catch {
           if (cancelled) return;
@@ -593,7 +593,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [playerCount]);
 
   const settingOn = useCallback(
-    (key: string) => (key in settings ? settings[key]: (SETTING_DEFAULTS[key] ?? false)),
+    (key: string) => (key in settings ? settings[key] : (SETTING_DEFAULTS[key] ?? false)),
     [settings],
   );
 
@@ -601,7 +601,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (key: string) =>
       setSettings((prev) => ({
         ...prev,
-        [key]: !(key in prev ? prev[key]: (SETTING_DEFAULTS[key] ?? false)),
+        [key]: !(key in prev ? prev[key] : (SETTING_DEFAULTS[key] ?? false)),
       })),
     [],
   );

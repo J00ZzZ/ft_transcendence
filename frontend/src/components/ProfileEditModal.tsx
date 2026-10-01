@@ -22,6 +22,7 @@ interface ProfileResp {
     hasPassword?: boolean;
     emailVerified?: boolean;
     pendingEmail?: string | null;
+    twoFactorEnabled?: boolean;
   };
   emailChangePending?: boolean;
   pendingEmail?: string | null;
@@ -79,7 +80,14 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
   const [username] = useState(user?.username ?? '');
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [email, setEmail] = useState('');
+  // Baselines taken from the server, so "unchanged" is judged against what the
+  // profile really holds (the session user may be missing fields).
+  const [initialEmail, setInitialEmail] = useState<string | null>(null);
+  const [initialDisplayName, setInitialDisplayName] = useState<string | null>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  // Server value of the toggle; null until the profile load returns. Save only
+  // sends the field when it differs, so a stale default cannot flip it off.
+  const [initialTwoFactor, setInitialTwoFactor] = useState<boolean | null>(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -97,7 +105,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
   const errorFor = (fields: ErrorField[]) =>
     error && fields.includes(errorField) ? (
       <div style={{ fontSize: '0.7rem', color: '#ff0055', margin: '-4px 0 10px' }}>{error}</div>
-    ): null;
+    ) : null;
 
   // Load the full profile (linked providers + email) on open.
   useEffect(() => {
@@ -106,18 +114,30 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       .catch(() => null)
       .then((data) => {
         if (cancelled || !data?.user) return;
-        setDisplayName(data.user.displayName ?? data.user.username);
-        setEmail(data.user.email ?? '');
+        const loadedName = data.user.displayName ?? data.user.username;
+        const loadedEmail = data.user.email ?? '';
+        setDisplayName(loadedName);
+        setInitialDisplayName(loadedName);
+        setEmail(loadedEmail);
+        setInitialEmail(loadedEmail);
         setPendingEmail(data.user.pendingEmail ?? null);
         setProviders(data.user.providers ?? []);
         setHasPassword(!!data.user.hasPassword);
-        setTwoFactorEnabled(!!(data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled);
+        setTwoFactorEnabled(!!data.user.twoFactorEnabled);
+        setInitialTwoFactor(!!data.user.twoFactorEnabled);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Judged against the loaded baseline (falling back to the session user). A user
+  // object without `email` must not read as "address cleared, one typed since" :
+  // that faked an email change and blocked unrelated saves such as the 2FA toggle.
+  const emailBaseline = initialEmail ?? user?.email ?? null;
+  const emailChanging = emailBaseline !== null && !!email.trim() && email.trim() !== emailBaseline;
+  const displayNameBaseline = initialDisplayName ?? user?.displayName ?? user?.username ?? '';
 
   const handleSave = async () => {
     setBusy(true);
@@ -133,7 +153,6 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       setError(t('profileEdit.emailInvalid'));
       return;
     }
-    const emailChanging = !!emailValue && emailValue !== (user?.email ?? '');
     // Strict two-step: never change the password and the email in one save: the
     // email change relies on a password already being active.
     if (isPasswordChange && emailChanging) {
@@ -143,7 +162,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       return;
     }
     const body: Record<string, unknown> = {};
-    if (displayName.trim() && displayName.trim() !== (user?.displayName ?? user?.username))
+    if (displayName.trim() && displayName.trim() !== displayNameBaseline)
       body.displayName = displayName.trim();
     if (emailChanging) {
       if (!hasPassword) {
@@ -161,9 +180,13 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       body.email = emailValue;
       body.currentPassword = emailPassword;
     }
-    body.twoFactorEnabled = twoFactorEnabled;
+    // Send the toggle only when it changed and the real value is known, so an
+    // unrelated save cannot write a stale state over it.
+    if (initialTwoFactor !== null && twoFactorEnabled !== initialTwoFactor) {
+      body.twoFactorEnabled = twoFactorEnabled;
+    }
     if (isPasswordChange) {
-      const pwErr = newPassword ? passwordError(newPassword): t('profileEdit.newPasswordRequired');
+      const pwErr = newPassword ? passwordError(newPassword) : t('profileEdit.newPasswordRequired');
       if (pwErr) {
         setBusy(false);
         setErrorField('password');
@@ -182,10 +205,18 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       if (data.user) {
         setUser(data.user);
         setProviders(data.user.providers ?? []);
-        setTwoFactorEnabled(!!(data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled);
+        // Trust the returned value and keep the baseline in step with it.
+        if (data.user.twoFactorEnabled !== undefined) {
+          setTwoFactorEnabled(data.user.twoFactorEnabled);
+          setInitialTwoFactor(data.user.twoFactorEnabled);
+        }
         // The email is NOT applied until confirmed: keep showing the current one.
         setEmail(data.user.email ?? '');
         setPendingEmail(data.user.pendingEmail ?? data.pendingEmail ?? null);
+        // Re-baseline on what the server now holds, so the next save does not
+        // resend a field the user left untouched.
+        if (data.user.email !== undefined) setInitialEmail(data.user.email ?? '');
+        if (data.user.displayName !== undefined) setInitialDisplayName(data.user.displayName);
       }
       if (data.emailChangePending) {
         setNotice(t('profileEdit.emailChangePending'));
@@ -264,8 +295,6 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       setBusy(false);
     }
   };
-
-  const emailChanging = !!email.trim() && email.trim() !== (user?.email ?? '');
 
   const overlay: CSSProperties = {
     position: 'fixed',
@@ -455,7 +484,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
               onClick={() => setTwoFactorEnabled((v) => !v)}
               style={{ padding: '2px 9px', fontSize: '0.66rem', color: 'var(--accent-cyan)' }}
             >
-              {twoFactorEnabled ? 'ON': 'OFF'}
+              {twoFactorEnabled ? 'ON' : 'OFF'}
             </button>
           </div>
 
@@ -471,7 +500,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
                 marginBottom: 8,
               }}
             >
-              {hasPassword ? t('profileEdit.password'): t('profileEdit.passwordSet')}
+              {hasPassword ? t('profileEdit.password') : t('profileEdit.passwordSet')}
             </div>
             {hasPassword && (
               <>
@@ -554,15 +583,15 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
                       textTransform: 'capitalize',
                     }}
                   >
-                    {p === '42' ? '42': p}
+                    {p === '42' ? '42' : p}
                   </span>
                   <span
                     style={{
                       fontSize: '0.62rem',
-                      color: linked ? 'var(--accent-cyan)': 'var(--text-muted)',
+                      color: linked ? 'var(--accent-cyan)' : 'var(--text-muted)',
                     }}
                   >
-                    {linked ? t('profileEdit.linked'): t('profileEdit.notLinked')}
+                    {linked ? t('profileEdit.linked') : t('profileEdit.notLinked')}
                   </span>
                   <button
                     className={RETRO_BTN}
@@ -575,10 +604,10 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
                     style={{
                       padding: '2px 8px',
                       fontSize: '0.62rem',
-                      color: linked ? '#ff0055': 'var(--accent-cyan)',
+                      color: linked ? '#ff0055' : 'var(--accent-cyan)',
                     }}
                   >
-                    {linked ? t('profileEdit.remove'): t('profileEdit.add')}
+                    {linked ? t('profileEdit.remove') : t('profileEdit.add')}
                   </button>
                 </div>
               );
@@ -597,7 +626,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
             disabled={busy}
             style={{ width: '100%', padding: '10px', fontSize: '0.8rem', fontWeight: 900 }}
           >
-            {busy ? t('profileEdit.saving'): t('profileEdit.save')}
+            {busy ? t('profileEdit.saving') : t('profileEdit.save')}
           </button>
         </form>
 

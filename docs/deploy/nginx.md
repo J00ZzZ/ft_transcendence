@@ -6,8 +6,8 @@ knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
 [`tunnel.md`](./tunnel.md).
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
-`nginx/conf/app.inc`, `compose.yaml`). See [Known issue](#known-issue) at the
-bottom for one place where a comment in the code does not match what runs.
+`compose.yaml`). See [Static-asset delivery](#static-asset-delivery-gzip--caching)
+at the bottom for how the SPA is compressed and cached.
 
 
 ---
@@ -87,9 +87,9 @@ resolve correctly on a hard refresh instead of 404ing.
 | `= /api/auth/login` | Rate-limited 5 req/min (burst 5) — brute-force defense in depth behind the backend's own throttler |
 | `= /api/auth/refresh` | Rate-limited 30 req/min (burst 15) — `apiFetch` fires this automatically on any 401, so several tabs can legitimately burst at once |
 | `/api/auth/` | Rate-limited 60 req/min (burst 20) — covers `/api/auth/me`, which the SPA calls on page load for non-public routes (the probe is skipped on `/`, `/login`, `/signup`), and `/api/auth/logout` |
-| `/api/` | Generic proxy to `backend:3000`. `proxy_read_timeout`/`proxy_send_timeout` are raised to 3600s and buffering is off — needed for `/api/notifications/stream`, a long-lived SSE connection that can sit idle for minutes |
+| `/api/` | Generic proxy to `backend:3000`. `proxy_read_timeout`/`proxy_send_timeout` are raised to 3600s and `proxy_buffering` is off — needed for `/api/notifications/stream`, a long-lived SSE response that can sit idle for minutes between notifications. nginx's 60s default was closing that stream mid-chunk (the client saw `ERR_INCOMPLETE_CHUNKED_ENCODING`), and buffering held back the events that did arrive |
 | `= /api/health` | Proxied to `backend:3000/health` (rewritten — NestJS mounts `/health` at its root, not under `/api`) |
-| `/socket.io/` | Proxied to `ludo-engine:3001`, with the `Upgrade`/`Connection` headers set from the `map $http_upgrade $connection_upgrade` block so WebSocket upgrades work. Also 3600s timeouts, for long game sessions |
+| `/socket.io/` | Proxied to `ludo-engine:3001`, with the `Upgrade`/`Connection` headers set from the `map $http_upgrade $connection_upgrade` block so WebSocket upgrades work. Also 3600s timeouts, for long game sessions. The browser therefore never opens a socket to `ludo-engine:3001` itself: a plain `ws://` call would be blocked as mixed content on an HTTPS page, and that port is not published for the host |
 | `~ /\.` | Denies any dotfile path (`.env`, `.git`, etc.) |
 
 All of the `/api/*` locations set `X-Real-IP`, `X-Forwarded-For`, and
@@ -101,6 +101,38 @@ caches service-name lookups for only 10s. Without this, `proxy_pass` would
 resolve `backend`/`ludo-engine` once and cache the IP for the life of the
 nginx worker — restarting either service in dev would leave nginx stuck
 retrying an unreachable IP address until nginx itself restarted.
+
+
+---
+---
+
+
+## Rate limiting
+
+Every `/api/**` route is also throttled inside the backend by the NestJS throttler;
+nginx adds a per-IP layer in front of it, so a burst is stopped before it reaches
+Node. nginx keys its buckets on `$binary_remote_addr`, the real peer address, which
+a client cannot spoof the way `X-Forwarded-For` can.
+
+`limit_req` is a leaky bucket, not a per-minute quota: `rate=60r/m` refills one token
+per second, and `burst=N nodelay` allows up to `N` tokens to be spent at once without
+delay. The zones and the locations that spend them:
+
+| Zone | Rate | Burst | Used by | Notes |
+|------|------|-------|---------|-------|
+| `leaderboard` | 30 r/m | 20 | `= /api/leaderboard` | Enough for normal page loads and filter changes, tight against scripted hammering |
+| `login` | 5 r/m | 5 | `= /api/auth/login` | Brute-force defense |
+| `refresh` | 30 r/m | 15 | `= /api/auth/refresh` | `apiFetch` fires this automatically on any 401, so several tabs resuming at once burst legitimately. Kept in step with the route's `@Throttle` in `auth.controller.ts` |
+| `auth` | 60 r/m | 20 | `/api/auth/` prefix, which covers `/api/auth/me` and `/api/auth/logout` | The SPA calls these on every page load and in every tab; at the earlier 10 r/m a handful of tabs spent the bucket and got a 503 mid-session |
+
+`limit_req_status 429;` makes a throttled request answer `429 Too Many Requests`,
+matching the NestJS throttler. nginx's default is `503`, which reads as a broken
+server: clients retry it and monitoring counts it as an outage.
+
+Location precedence matters here, because nginx matches exact (`=`) locations before
+prefixes: `/api/auth/login` is handled by the `login` zone rather than the `auth`
+prefix, and `/api/leaderboard` never reaches the generic `/api/` block (it also
+rejects every method but `GET` with a 405).
 
 
 ---
@@ -123,14 +155,31 @@ Under `make dev` the SPA is served by Vite on :8080 instead of nginx, so `vite.c
 ---
 
 
-## Known issue
+## Static-asset delivery (gzip + caching)
 
-**`nginx/conf/app.inc` is unused configuration.** It is copied into the nginx image
-and bind-mounted by `compose.yaml`, and `nginx.conf`'s own comment claims
-*"See conf/app.inc for the actual routing (shared so the local and
-ngrok-tunnelled paths ... can't drift)"* — but `nginx.conf` never `include`s it
-anywhere. The real, active routing is the inline `server {}` block described
-above, which also carries the rate-limiting locations that `app.inc` lacks.
+The SPA is served straight off the `spa_dist` volume by `nginx.conf`, and both how
+it goes out and how long it may be cached are configured there:
 
-Not fixed here — this is reported rather than changed, because editing the
-configuration is outside the scope of the documentation update.
+- **Compression:** `gzip on`, `gzip_comp_level 5`, `gzip_min_length 1024`, with
+  `gzip_types` covering JS, CSS, JSON, XML, SVG and the web manifest. The bundle is
+  ~1 MB of JS+CSS uncompressed and Vite content-hashes every filename, so a rebuild
+  invalidates all of it at once — the browser cache cannot cover a fresh `make`, and
+  gzip is what keeps a cold load to roughly a third of that (measured on the built
+  SPA: JS 452 KB → 125 KB, CSS 108 KB → 18 KB). `text/event-stream` is deliberately
+  *not* in `gzip_types`: `/api/notifications/stream` is long-lived SSE, and
+  compressing it buffers events instead of flushing them. `gzip_proxied` stays at its
+  default (`off`), so proxied API responses — including that SSE stream — are not
+  touched either.
+- **Caching:** `location /assets/ { expires 1y; }` (content-hashed, hence
+  immutable) and `location = /index.html { expires -1; }` (must be revalidated, or
+  a client pins itself to a bundle that a later build replaced). `/` reaches the
+  second location because `try_files` internally redirects to `/index.html`. Both
+  use `expires`, never `add_header`: an `add_header` inside a location cancels
+  every `add_header` inherited from the `server` block, which would silently drop
+  the CSP/HSTS headers from these responses.
+
+The `nginx/conf/app.inc` "shared server body" that used to sit in this repo — and
+that `nginx.conf` never actually `include`d — was removed along with these
+settings. Including it would have failed with a duplicate-`location` error, since
+its routing duplicated the inline `server {}` block (which additionally carries the
+rate-limiting zones `app.inc` lacked). `nginx.conf` is the single source of truth.

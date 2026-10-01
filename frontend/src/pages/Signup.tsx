@@ -85,8 +85,7 @@ export function Signup() {
           </div>
           {assigned && (
             <div className={RETRO_AUTH_MUTED} style={{ lineHeight: 1.5, fontSize: '14px' }}>
-              {t('auth.assignedUsernamePrefix')}{' '}
-              <b style={{ color: '#00f0ff' }}>{assigned}</b>
+              {t('auth.assignedUsernamePrefix')} <b style={{ color: '#00f0ff' }}>{assigned}</b>
             </div>
           )}
           <div className={RETRO_AUTH_MUTED} style={{ fontSize: '13px' }}>

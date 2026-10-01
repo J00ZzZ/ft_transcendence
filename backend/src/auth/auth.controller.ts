@@ -126,7 +126,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: HOUR_MS } })
   @Post('2fa/resend')
   @HttpCode(200)
-  async resendTwoFactor(@Body('pendingToken') pendingToken: string) {
+  async resendTwoFactor(@Body('pendingToken') pendingToken?: string) {
     return this.authService.resendTwoFactor(pendingToken ?? '');
   }
 
@@ -343,7 +343,12 @@ export class AuthController {
       res.redirect(`${frontendUrl}/login?error=add-email-2fa`);
       return;
     }
-    const { pendingToken } = await this.authService.startTwoFactor(user.id, user.email, user.username, user.language);
+    const { pendingToken } = await this.authService.startTwoFactor(
+      user.id,
+      user.email,
+      user.username,
+      user.language,
+    );
     res.redirect(`${frontendUrl}/2fa?token=${pendingToken}`);
   }
 

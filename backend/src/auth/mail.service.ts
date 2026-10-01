@@ -11,34 +11,25 @@ import { secret } from '../secrets';
 import { PrismaService } from '../prisma.service';
 import { emailStrings, fill } from '../i18n/email-messages';
 
-// Prefix of the reverse pointer written by TwoFactorService.createEmailChangeToken
-// (`emailchange:user:<userId>` -> { tokenHash, newEmail }). Its key name carries
-// the userId, so an expiry notification is enough to notify the old address.
+// Reverse pointer to a staged email change; the key carries the user id, so the
+// expiry event alone identifies the address to notify.
 const USER_KEY_PREFIX = 'emailchange:user:';
-// Redis instance 0 is the only DB this app uses, so the expired event channel is
-// fixed. `Ex` in `notify-keyspace-events` (set in redis-init.sh) enables it.
+// Redis instance 0 is the only database in use, so the channel name is fixed.
 const EXPIRED_CHANNEL = '__keyevent@0__:expired';
 
-// Sends transactional email (verification links, 2FA codes) via SMTP from
-// SMTP_CREDENTIALS. Without credentials, mail is logged to the console so
-// every flow stays testable in dev.
-//
-// It also owns the lapsed-email-change notice: it subscribes to Redis key
-// expiry events, so when a staged change lapses the old address is emailed once
-// (this replaced the old @Interval sweep). Redeeming or rotating a link DELETEs
-// its keys, and DEL never emits `expired`, so a completed change can't produce
-// a false notice.
+// Sends transactional email (verification, 2FA, password reset, email change)
+// over SMTP, or logs it when SMTP_CREDENTIALS is unset. Also emails the lapsed
+// email-change notice; see docs/backend/backend-auth-module.md ("Email delivery").
 @Injectable()
 export class MailService implements OnModuleInit, OnModuleDestroy {
-  // Nest logger for connection warnings and dev-mode mail output.
+  // Logger for SMTP and subscription warnings, and for the dev-mode mail lines.
   private readonly logger = new Logger(MailService.name);
-  // SMTP transport from SMTP_CREDENTIALS; null in dev → mail is only logged.
+  // Built from SMTP_CREDENTIALS; null when unset, so mail is only logged.
   private transporter: nodemailer.Transporter | null = null;
   // "From" address, taken from the SMTP credentials.
   private from = '';
-  // Subscriber-mode connection for expiry events: a client in subscribe mode
-  // cannot run ordinary commands, so this one is dedicated to the subscription
-  // (same idiom as session.service.ts / twofactor.service.ts).
+  // Subscriber-mode connection for expiry events. A subscribed client cannot run
+  // ordinary commands, so this connection is not used for anything else.
   private readonly redis: Redis;
 
   constructor(private readonly prisma: PrismaService) {
@@ -52,6 +43,14 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         port: Number(port),
         secure: false, // 587 = STARTTLS
         auth: { user, pass },
+        // Reuse one authenticated socket instead of repeating the TCP, STARTTLS
+        // and AUTH handshake for every email (see docs/backend/backend-auth-module.md).
+        pool: true,
+        maxConnections: 1,
+        maxMessages: 100,
+        // Fail a slow connect or greeting instead of hanging the send.
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
       });
     } else {
       this.logger.warn(
@@ -59,7 +58,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    // Host/port stay plain env : they're topology, not secrets.
+    // Host and port are topology, not secrets, so they stay plain env vars.
     const host = process.env.REDIS_HOST ?? 'redis';
     const port = parseInt(process.env.REDIS_PORT ?? '6479', 10);
     const password = secret('REDIS_PASSWORD');
@@ -67,21 +66,15 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
     this.redis.on('error', (error) => {
       console.error('Redis error:', error.message);
     });
-    // The reverse pointer lapsing is the signal that a pending change went
-    // unconfirmed: look the owner up and send the "expired" heads-up.
+    // A lapsed reverse pointer means the staged change was never confirmed.
     this.redis.on('message', (channel, key) => {
       if (channel === EXPIRED_CHANNEL) void this.onExpired(key);
     });
   }
 
-  // Logs (dev) or sends via SMTP. The dev log deliberately omits the body so a
-  // verification/reset token never lands in the console.
-  private async send(
-    to: string,
-    subject: string,
-    text: string,
-    username?: string,
-  ): Promise<void> {
+  // Logs in dev, sends via SMTP otherwise. The dev log omits the body, so a
+  // verification or reset token never reaches the console.
+  private async send(to: string, subject: string, text: string, username?: string): Promise<void> {
     if (!this.transporter) {
       this.logger.log(`📧 [DEV MAIL] user=${username ?? '-'} to=${to} subject="${subject}"`);
       return;
@@ -133,10 +126,9 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
     return this.send(oldTo, s.subject, s.text, username);
   }
 
-  // Best-effort: a mail/SMTP failure must never crash the process or the
-  // listener loop.
+  // Best-effort: a mail failure must not crash the process or the listener loop.
   private async onExpired(key: string): Promise<void> {
-    if (!key.startsWith(USER_KEY_PREFIX)) return; // ignore the link key's twin
+    if (!key.startsWith(USER_KEY_PREFIX)) return; // only the reverse pointer is handled
     const userId = key.slice(USER_KEY_PREFIX.length);
     try {
       const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
@@ -149,9 +141,8 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     try {
-      // Fail loudly (but never fatally) when the server isn't publishing expiry
-      // events: the whole notice hangs off this one setting.
-      const reply = (await this.redis.config('GET', 'notify-keyspace-events')) as unknown;
+      // Warn (never throw) when expiry events are off: the notice depends on them.
+      const reply = await this.redis.config('GET', 'notify-keyspace-events');
       const flags = Array.isArray(reply) ? String(reply[1] ?? '') : '';
       if (!flags.includes('x')) {
         this.logger.warn(
@@ -167,5 +158,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     await this.redis.unsubscribe(EXPIRED_CHANNEL).catch(() => {});
     await this.redis.quit();
+    // Pooled SMTP sockets outlive a send, so close the pool with the module.
+    this.transporter?.close();
   }
 }

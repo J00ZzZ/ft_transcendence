@@ -144,7 +144,7 @@ export function RetroNavbar({
       const message =
         typeof err === 'object' && err !== null && 'message' in err
           ? String(err.message)
-         : t('common.requestFailed', { status: 0 });
+          : t('common.requestFailed', { status: 0 });
       setRejoinError(message);
       // Only refresh the active-game poll when the seat is genuinely expired;
       // otherwise the poll itself will clear the banner within ≤10 s anyway.
@@ -203,9 +203,9 @@ export function RetroNavbar({
       className={RETRO_FLOATING_DOCK}
       id="mainNav"
       style={{
-        width: isCompact ? 88: 270,
-        minWidth: isCompact ? 88: 270,
-        maxWidth: isCompact ? 88: 270,
+        width: isCompact ? 88 : 270,
+        minWidth: isCompact ? 88 : 270,
+        maxWidth: isCompact ? 88 : 270,
         height: 'calc(100vh - 64px)',
         maxHeight: 'calc(100vh - 64px)',
         margin: 0,
@@ -215,7 +215,7 @@ export function RetroNavbar({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 14,
-        padding: isCompact ? '22px 10px 18px': '22px 16px 18px',
+        padding: isCompact ? '22px 10px 18px' : '22px 16px 18px',
         transition: 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease',
         background: 'linear-gradient(180deg, rgba(20, 6, 46, 0.86), rgba(10, 2, 28, 0.94))',
         backdropFilter: 'blur(32px) saturate(220%)',
@@ -249,18 +249,18 @@ export function RetroNavbar({
         >
           <button
             type="button"
-            className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isAccountPopoverOpen ? 'active': ''}`}
+            className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isAccountPopoverOpen ? 'active' : ''}`}
             id="userAccountBtn"
             aria-label="Account Settings, Language and 2FA"
             style={{
               ...railButtonStyle(isAccountPopoverOpen),
               width: '100%',
               height: 48,
-              padding: isCompact ? 0: '0 12px',
+              padding: isCompact ? 0 : '0 12px',
               borderRadius: 12,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: isCompact ? 'center': 'space-between',
+              justifyContent: isCompact ? 'center' : 'space-between',
               gap: 10,
               color: '#ffffff',
             }}
@@ -268,7 +268,7 @@ export function RetroNavbar({
               e.stopPropagation();
               const next = !isAccountPopoverOpen;
               setIsAccountPopoverOpen(next);
-              retroAudio.playUiBeep(next ? 880: 440, 0.05);
+              retroAudio.playUiBeep(next ? 880 : 440, 0.05);
             }}
             {...railHoverHandlers(isAccountPopoverOpen)}
             title="Account Settings, Language & 2FA"
@@ -277,10 +277,10 @@ export function RetroNavbar({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: isCompact ? 'center': 'flex-start',
+                justifyContent: isCompact ? 'center' : 'flex-start',
                 gap: 10,
                 overflow: 'hidden',
-                flex: isCompact ? 'none': 1,
+                flex: isCompact ? 'none' : 1,
               }}
             >
               <UserAvatar
@@ -324,7 +324,7 @@ export function RetroNavbar({
                   fontSize: '0.7rem',
                   color: 'var(--accent-cyan)',
                   fontWeight: 'bold',
-                  transform: isAccountPopoverOpen ? 'rotate(180deg)': 'none',
+                  transform: isAccountPopoverOpen ? 'rotate(180deg)' : 'none',
                   transition: 'transform 0.2s ease',
                   flexShrink: 0,
                 }}
@@ -418,13 +418,13 @@ export function RetroNavbar({
                             borderRadius: 6,
                             border: isSelected
                               ? '1.5px solid var(--accent-cyan)'
-                             : '1px solid transparent',
+                              : '1px solid transparent',
                             background: isSelected
                               ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(255, 0, 127, 0.2))'
-                             : 'transparent',
-                            color: isSelected ? '#ffffff': 'var(--text-muted)',
+                              : 'transparent',
+                            color: isSelected ? '#ffffff' : 'var(--text-muted)',
                             cursor: 'pointer',
-                            boxShadow: isSelected ? '0 0 10px rgba(0, 240, 255, 0.35)': 'none',
+                            boxShadow: isSelected ? '0 0 10px rgba(0, 240, 255, 0.35)' : 'none',
                             transition: 'all 0.18s ease',
                             outline: 'none',
                           }}
@@ -462,15 +462,15 @@ export function RetroNavbar({
                     justifyContent: 'space-between',
                     padding: '10px 12px',
                     borderRadius: 8,
-                    background: twoFactor ? 'rgba(0, 255, 136, 0.12)': 'rgba(255, 255, 255, 0.04)',
-                    border: twoFactor ? '1px solid #00ff88': '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: twoFactor ? '0 0 10px rgba(0, 255, 136, 0.2)': 'none',
+                    background: twoFactor ? 'rgba(0, 255, 136, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                    border: twoFactor ? '1px solid #00ff88' : '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: twoFactor ? '0 0 10px rgba(0, 255, 136, 0.2)' : 'none',
                     cursor: 'pointer',
                     transition: 'all 0.18s ease',
                   }}
                   onClick={() => {
                     toggleTwoFactor();
-                    retroAudio.playUiBeep(twoFactor ? 440: 880, 0.06);
+                    retroAudio.playUiBeep(twoFactor ? 440 : 880, 0.06);
                   }}
                   title="Toggle Two-Factor Authentication"
                 >
@@ -494,14 +494,14 @@ export function RetroNavbar({
                       fontWeight: 900,
                       padding: '3px 8px',
                       borderRadius: 4,
-                      background: twoFactor ? '#00ff88': 'rgba(255, 255, 255, 0.12)',
-                      color: twoFactor ? '#0b021a': 'var(--text-muted)',
+                      background: twoFactor ? '#00ff88' : 'rgba(255, 255, 255, 0.12)',
+                      color: twoFactor ? '#0b021a' : 'var(--text-muted)',
                       border: twoFactor
                         ? '1px solid #00ff88'
-                       : '1px solid rgba(255, 255, 255, 0.18)',
+                        : '1px solid rgba(255, 255, 255, 0.18)',
                     }}
                   >
-                    {twoFactor ? t('navbar.enabledBadge'): t('navbar.disabledBadge')}
+                    {twoFactor ? t('navbar.enabledBadge') : t('navbar.disabledBadge')}
                   </span>
                 </div>
 
@@ -516,11 +516,11 @@ export function RetroNavbar({
                     borderRadius: 8,
                     background: !soundMuted
                       ? 'rgba(0, 255, 136, 0.12)'
-                     : 'rgba(255, 255, 255, 0.04)',
+                      : 'rgba(255, 255, 255, 0.04)',
                     border: !soundMuted
                       ? '1px solid #00ff88'
-                     : '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: !soundMuted ? '0 0 10px rgba(0, 255, 136, 0.2)': 'none',
+                      : '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: !soundMuted ? '0 0 10px rgba(0, 255, 136, 0.2)' : 'none',
                     cursor: 'pointer',
                     transition: 'all 0.18s ease',
                   }}
@@ -528,7 +528,7 @@ export function RetroNavbar({
                   title="Toggle all game audio (music + sound effects)"
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: '1rem' }}>{soundMuted ? '🔇': '🔊'}</span>
+                    <span style={{ fontSize: '1rem' }}>{soundMuted ? '🔇' : '🔊'}</span>
                     <span
                       style={{
                         fontFamily: 'var(--font-display)',
@@ -547,14 +547,14 @@ export function RetroNavbar({
                       fontWeight: 900,
                       padding: '3px 8px',
                       borderRadius: 4,
-                      background: !soundMuted ? '#00ff88': 'rgba(255, 255, 255, 0.12)',
-                      color: !soundMuted ? '#0b021a': 'var(--text-muted)',
+                      background: !soundMuted ? '#00ff88' : 'rgba(255, 255, 255, 0.12)',
+                      color: !soundMuted ? '#0b021a' : 'var(--text-muted)',
                       border: !soundMuted
                         ? '1px solid #00ff88'
-                       : '1px solid rgba(255, 255, 255, 0.18)',
+                        : '1px solid rgba(255, 255, 255, 0.18)',
                     }}
                   >
-                    {!soundMuted ? t('navbar.enabledBadge'): t('navbar.disabledBadge')}
+                    {!soundMuted ? t('navbar.enabledBadge') : t('navbar.disabledBadge')}
                   </span>
                 </div>
 
@@ -637,7 +637,7 @@ export function RetroNavbar({
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 8,
-              cursor: isRejoining ? 'wait': 'pointer',
+              cursor: isRejoining ? 'wait' : 'pointer',
               color: '#ffffff',
               fontFamily: 'var(--font-display)',
               fontWeight: 900,
@@ -669,7 +669,7 @@ export function RetroNavbar({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {isRejoining ? t('navbar.rejoining'): t('navbar.rejoinActiveBtn')}
+                  {isRejoining ? t('navbar.rejoining') : t('navbar.rejoinActiveBtn')}
                 </span>
                 <span
                   style={{
@@ -683,7 +683,7 @@ export function RetroNavbar({
                 >
                   {activeGame.roomCode
                     ? `${t('navbar.rejoinRoomLabel')} ${activeGame.roomCode}`
-                   : `${t('navbar.rejoinStatusLabel')} ${activeGame.status}`}
+                    : `${t('navbar.rejoinStatusLabel')} ${activeGame.status}`}
                 </span>
               </div>
             </div>
@@ -700,9 +700,9 @@ export function RetroNavbar({
         style={{
           position: 'relative',
           boxSizing: 'border-box',
-          width: `calc(100% + ${isCompact ? 20: 32}px)`,
-          marginLeft: isCompact ? -10: -16,
-          marginRight: isCompact ? -10: -16,
+          width: `calc(100% + ${isCompact ? 20 : 32}px)`,
+          marginLeft: isCompact ? -10 : -16,
+          marginRight: isCompact ? -10 : -16,
           flex: 1,
           minHeight: 0,
           display: 'flex',
@@ -710,7 +710,7 @@ export function RetroNavbar({
           alignItems: 'center',
           justifyContent: 'center',
           overflowY: 'auto',
-          padding: isCompact ? '8px 10px': '8px 16px',
+          padding: isCompact ? '8px 10px' : '8px 16px',
         }}
       >
         {/* Nav Items Track */}
@@ -731,29 +731,29 @@ export function RetroNavbar({
               if (it.path === '/profile') return currentPath.startsWith('/profile');
               return currentPath === it.path;
             });
-            const safeActiveIdx = activeIdx >= 0 ? activeIdx: 0;
+            const safeActiveIdx = activeIdx >= 0 ? activeIdx : 0;
             const isActive = idx === safeActiveIdx;
 
             return (
               <button
                 key={item.path}
-                className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isActive ? 'active': ''}`}
+                className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isActive ? 'active' : ''}`}
                 style={{
                   ...railButtonStyle(isActive),
                   width: '100%',
                   height: 52,
-                  justifyContent: isCompact ? 'center': 'flex-start',
-                  gap: isCompact ? 0: 12,
-                  padding: isCompact ? 0: '0 14px',
+                  justifyContent: isCompact ? 'center' : 'flex-start',
+                  gap: isCompact ? 0 : 12,
+                  padding: isCompact ? 0 : '0 14px',
                   fontSize: '1.02rem',
                   borderRadius: 12,
-                  color: isActive ? '#ffffff': 'var(--text-main)',
+                  color: isActive ? '#ffffff' : 'var(--text-main)',
                   fontWeight: 900,
                   letterSpacing: '1px',
                 }}
                 title={item.label}
                 onClick={() => {
-                  retroAudio.playUiBeep(isActive ? 480: 640, 0.05);
+                  retroAudio.playUiBeep(isActive ? 480 : 640, 0.05);
                   navigate(item.path);
                 }}
                 {...railHoverHandlers(isActive)}
@@ -763,14 +763,14 @@ export function RetroNavbar({
                     width: 34,
                     height: 34,
                     borderRadius: 7,
-                    background: isActive ? 'rgba(255, 255, 255, 0.2)': 'rgba(0, 240, 255, 0.08)',
+                    background: isActive ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 240, 255, 0.08)',
                     display: 'grid',
                     placeItems: 'center',
                     fontFamily: 'var(--font-mono)',
                     fontSize: '1.2rem',
-                    color: isActive ? '#ffffff': 'var(--accent-cyan)',
+                    color: isActive ? '#ffffff' : 'var(--accent-cyan)',
                     flexShrink: 0,
-                    filter: isActive ? 'drop-shadow(0 0 6px #ffffff)': 'none',
+                    filter: isActive ? 'drop-shadow(0 0 6px #ffffff)' : 'none',
                   }}
                 >
                   {item.icon}

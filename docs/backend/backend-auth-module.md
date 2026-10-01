@@ -8,6 +8,7 @@
 - [API Endpoints](#api-endpoints) — All routes with method, path, auth, and description
 - [Core Logic / Flow](#core-logic--flow) — Mermaid sequence diagrams for registration, login, 2FA, OAuth, JWT validation, and logout
 - [Logic Paths Summary](#logic-paths-summary) — Plain-text decision trees for quick reference
+- [Email delivery](#email-delivery) — `MailService`: SMTP transport settings, dev fallback, the lapsed-email-change notice, and send-failure behaviour
 - [Dependencies](#dependencies) — npm packages and internal services this module relies on
 - [Configuration / Environment](#configuration--environment) — Secrets and environment variables used
 - [Module Exports](#module-exports) — What AuthModule re-exports for other modules
@@ -52,7 +53,7 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `ngrok_github_strategy.ts` | GitHub OAuth variant for tunnelled requests (same per-request Host check) |
 | `ngrok_fortytwo_strategy.ts` | 42 OAuth variant for tunnelled requests (same per-request Host check) |
 | `oauth.guards.ts` | Guard classes: `GoogleAuthGuard`, `GithubAuthGuard`, `FortyTwoAuthGuard` — pick strategy per request host |
-| `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset and email-change links (degrades to console logging without SMTP config). Also owns the Redis keyspace subscription that emails the lapsed-email-change notice |
+| `mail.service.ts` | SMTP email sending — verification links, 2FA codes, password-reset and email-change links (degrades to console logging without SMTP config). Also owns the Redis keyspace subscription that emails the lapsed-email-change notice (see [Email delivery](#email-delivery)) |
 | `session.service.ts` | Redis-backed refresh-token management with rotation and revocation |
 | `twofactor.service.ts` | Redis-backed short-lived auth state, stored hashed and single-use: signup verification tokens (`verify:`), password-reset tokens (`reset:`), 2FA login challenges (`2fa:`) and staged email changes (`emailchange:` + its `emailchange:user:<id>` reverse pointer) |
 | `dto/register.dto.ts` | Validation schema for `POST /api/auth/register` |
@@ -543,6 +544,81 @@ GET /api/auth/me (or any @UseGuards(JwtAuthGuard) route)
   │   └── Valid → attach { id, username } to req.user
   └── Execute handler
 ```
+
+
+---
+---
+
+
+## Email delivery (`mail.service.ts`)
+
+`MailService` sends every transactional email the module needs: signup verification
+links, 2FA codes, password-reset links, the verify-then-commit email-change link, the
+heads-up sent to the current address when a change is requested, and the notice sent
+when a staged change lapses.
+
+### Transport
+
+The transport is built once in the constructor from `SMTP_CREDENTIALS`
+(`[host]:port user:password`). When that value is missing or still the `.env`
+placeholder, no transport is created and each `send()` writes a line to the backend
+log instead, so every flow stays testable in dev without a mail account. The dev line
+records user, recipient and subject but never the body, so a verification or reset
+token cannot leak into the console.
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `secure` | `false` | Port 587 upgrades with STARTTLS |
+| `pool` | `true` | Reuse one authenticated socket for all sends |
+| `maxConnections` | `1` | One connection is enough; sends are serialised |
+| `maxMessages` | `100` | Recycle the socket before the server would close it |
+| `connectionTimeout` | `10_000` | Fail a slow connect instead of hanging the send (nodemailer default: 2 min) |
+| `greetingTimeout` | `10_000` | Fail a slow SMTP greeting instead of hanging it (default: 30 s) |
+| `socketTimeout` | default (10 min) | Left alone on purpose — see below |
+
+Without pooling, every email paid a full TCP + STARTTLS + AUTH handshake first.
+Against the configured host that handshake alone costs ~1.5–3 s (a `verify()` of
+`smtp.gmail.com:587` measured 3.9 s), and each auth flow awaits `send()`, so the delay
+was user-visible. With the pool, three consecutive sends shared one connection:
+766 ms for the first (which pays the handshake) and 194 ms / 196 ms for the two after
+it. `socketTimeout` stays at nodemailer's 10-minute default because a pooled
+connection only saves the handshake if it is still open on the next send — it doubles
+as the idle keep-alive, and lowering it would drop the socket between two user actions
+and pay the handshake again. The pool is closed in `onModuleDestroy`, next to the
+Redis subscription release.
+
+### Lapsed email-change notice
+
+An email change is verify-then-commit: the new address is staged in Redis
+(`emailchange:<hash>`, plus the reverse pointer `emailchange:user:<userId>` written by
+`TwoFactorService.createEmailChangeToken`) and only redeeming the emailed link commits
+it. `MailService` keeps one Redis connection in subscriber mode on
+`__keyevent@0__:expired`. Redis instance 0 is the only database this app uses, so the
+channel name is fixed, and the `Ex` flag in `notify-keyspace-events` (set by
+`redis-init.sh`) is what makes the server publish those events. The key that matters
+is the reverse pointer: when it lapses the change was never confirmed, so the handler
+looks the owner up and emails the old address once. Redeeming or rotating a link
+*DELETEs* its keys, and `DEL` never emits `expired`, so a completed change cannot
+produce a false notice. This replaced the earlier `@Interval` sweep. A subscribed
+client cannot run ordinary commands, so that connection is dedicated to the
+subscription — the same idiom as `SessionService` and `TwoFactorService`.
+
+`onModuleInit` reads `notify-keyspace-events` and logs a warning (it never throws)
+when `x` is missing, because the notice depends on that one setting. All handlers are
+best-effort: failures are caught and logged so a mail or Redis error cannot kill the
+process or the listener loop.
+
+### Failure behaviour
+
+`send()` throws `ServiceUnavailableException` (HTTP 503) when SMTP rejects a message.
+Callers differ:
+
+| Caller | On a failed send |
+|--------|------------------|
+| `register`, `forgotPassword`, `startTwoFactor` | Propagates the 503 — the request fails |
+| Profile email change | Clears the staged Redis change, then propagates the 503 |
+| `resendSignupVerification`, `resendEmailChange`, `resendTwoFactor` | Swallowed with `.catch(() => {})`, so the deliberately generic reply is unchanged |
+| Email-change notice, expired-change notice, commit-conflict expiry email | Swallowed — a notice must not fail the action that triggered it |
 
 
 ---

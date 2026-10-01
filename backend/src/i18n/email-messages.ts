@@ -92,7 +92,7 @@ const MS: EmailStrings = {
   },
 };
 
-const EMAIL: Record<EmailLang, EmailStrings> = { en: EN, fr: FR, ms: MS };
+const EMAIL: Partial<Record<EmailLang, EmailStrings>> = { en: EN, fr: FR, ms: MS };
 
 // Unknown/missing language falls back to English.
 export function emailStrings(lang: string | null | undefined): EmailStrings {

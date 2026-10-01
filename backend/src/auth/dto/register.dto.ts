@@ -1,4 +1,12 @@
-import { IsString, MinLength, MaxLength, IsEmail, Matches, IsOptional, IsIn } from 'class-validator';
+import {
+  IsString,
+  MinLength,
+  MaxLength,
+  IsEmail,
+  Matches,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
 import { PASSWORD_MIN, PASSWORD_MAX, PASSWORD_REGEX, PASSWORD_MESSAGE } from './password.rules';
 
 export class RegisterDto {
