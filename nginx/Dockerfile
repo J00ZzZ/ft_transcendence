@@ -25,11 +25,14 @@ RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 # conf/ is bind-mounted by compose so it can be edited without a rebuild; this
 # COPY is the fallback that keeps the image runnable on its own.
 COPY conf/nginx.conf /etc/nginx/nginx.conf
+COPY conf/app.inc /etc/nginx/app.inc
 
 COPY nginx.sh /usr/local/bin/nginx.sh
 RUN chmod +x /usr/local/bin/nginx.sh
 
-# Open ONLY port 443 (HTTPS) to the public
+# 443 is the public HTTPS port. 444 is the tunnel listener, which compose
+# publishes on the loopback interface only (see the nginx service).
 EXPOSE 443
+EXPOSE 444
 
 ENTRYPOINT ["/usr/local/bin/nginx.sh"]
