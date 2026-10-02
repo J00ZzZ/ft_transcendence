@@ -11,3 +11,12 @@ export const AUTH = {
     maxResends: 3,
   },
 } as const;
+
+// JWT scope claims. A token only works where its audience says it belongs:
+// session tokens are bound to the API, oauth-link tokens (signed with their
+// own OAUTH_STATE_SECRET) only to the OAuth callback. Same idea as the
+// engine's `aud: 'ludo-engine'` in match/engine-token.util.ts.
+export const TOKEN_ISSUER = 'ft_transcendence';
+export const SESSION_TOKEN_AUDIENCE = 'ft_transcendence-api';
+export const OAUTH_LINK_AUDIENCE = 'oauth-link';
+export const OAUTH_LINK_TTL = '10m';
