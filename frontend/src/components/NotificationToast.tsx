@@ -351,7 +351,7 @@ function Toast({
               fontWeight: 'bold',
             }}
           >
-            INCOMING TRANSMISSION // {tag}
+            {t('notifications.incomingTransmission')} {tag}
           </span>
         </div>
 
@@ -367,7 +367,7 @@ function Toast({
             lineHeight: 1,
             fontWeight: 'bold',
           }}
-          title="Dismiss Alert"
+          title={t('notifications.dismissAlert')}
         >
           &times;
         </button>
@@ -427,7 +427,7 @@ function Toast({
                     letterSpacing: 0.5,
                   }}
                 >
-                  PILOT
+                  {t('notifications.pilotLabel')}
                 </span>
               </div>
             ) : (
@@ -440,7 +440,7 @@ function Toast({
                   fontWeight: 'bold',
                 }}
               >
-                SYSTEM ALERT
+                {t('notifications.systemAlert')}
               </span>
             )}
 

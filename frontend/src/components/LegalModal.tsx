@@ -157,7 +157,7 @@ export function LegalModal({ isOpen, initialDoc = 'privacy', onClose }: LegalMod
                 retroAudio.playUiBeep(440, 0.05);
                 onClose();
               }}
-              title={t('common.close', 'Close')}
+              title={t('common.close')}
             >
               ✕
             </button>

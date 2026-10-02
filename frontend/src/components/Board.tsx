@@ -227,7 +227,7 @@ function Yard({
             boxShadow: `0 0 6px ${col.base}66`,
           }}
         >
-          GOAL: {goalCount}/4
+          {t('board.goalLabel')} {goalCount}/4
         </span>
       </div>
       <div

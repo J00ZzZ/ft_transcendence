@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { CSSProperties } from 'react';
 import { dicebearAvatar } from '../dicebear';
 import {
@@ -41,6 +42,7 @@ export function UserAvatar({
   // Subscribe to avatar-state changes; the values themselves are read below.
   useAvatarRevision();
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const { t } = useTranslation();
 
   if (!username) {
     return (
@@ -113,7 +115,7 @@ export function UserAvatar({
         flex: 'none',
         ...style,
       }}
-      alt={`${username}'s avatar`}
+      alt={t('common.avatarAlt', { username })}
     />
   );
 }

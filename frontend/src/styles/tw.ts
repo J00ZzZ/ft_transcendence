@@ -207,7 +207,7 @@ export const CYBER_BTN_CORNER =
 export const CYBER_BTN_KBD =
   'relative z-[3] text-[#0d0221] [font-family:var(--font-mono,monospace)] font-bold h-5 min-w-[20px] inline-grid place-items-center text-[0.65rem] px-1 rounded [transition:color_0.2s_ease,background_0.2s_ease] bg-(--btn-accent) group-hover:text-(--btn-accent) group-hover:bg-[#0d0221]';
 
-export const CYBER_BTN_LABEL = 'relative z-[3] text-[0.76rem] tracking-[0.5px]';
+export const CYBER_BTN_LABEL = 'relative z-[3] text-[0.76rem] tracking-[0.5px] uppercase';
 
 export const CYBER_BTN_GLITCH_LAYER =
   'hidden absolute inset-0 items-center gap-[0.6rem] py-[0.6rem] px-[0.8rem] pointer-events-none text-(--btn-accent) [text-shadow:0_1px_var(--btn-shadow)] z-[4] group-hover:inline-flex group-hover:[animation:cyberBtnGlitch_1.8s_infinite]';

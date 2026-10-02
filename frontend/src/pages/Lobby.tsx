@@ -458,7 +458,7 @@ export function Lobby() {
                                     placeItems: 'center',
                                     fontSize: '0.8rem',
                                   }}
-                                  title="Remove Bot"
+                                  title={t('lobby.removeBotTooltip')}
                                 >
                                   ✕
                                 </button>
@@ -592,7 +592,7 @@ export function Lobby() {
                                     placeItems: 'center',
                                     fontSize: '0.8rem',
                                   }}
-                                  title="Remove Player"
+                                  title={t('lobby.removePlayerTooltip')}
                                 >
                                   ✕
                                 </button>

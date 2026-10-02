@@ -813,7 +813,7 @@ export function Game() {
                     marginBottom: 10,
                   }}
                 >
-                  NO MATCH CREDENTIALS DETECTED
+                  {t('game.noMatchCredentials')}
                 </div>
                 <div
                   style={{
@@ -823,7 +823,7 @@ export function Game() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Please initialize or join a tactical Ludo arena from the Game Lobby first.
+                  {t('game.noMatchCredentialsHint')}
                 </div>
                 <button
                   className={RETRO_BTN}
@@ -1017,7 +1017,7 @@ export function Game() {
                     gap: 6,
                   }}
                   onClick={copyRoomCode}
-                  title="Click to copy Room Code"
+                  title={t('game.copyRoomCodeTooltip')}
                 >
                   {t('game.roomLabel', {
                     code: activeMatch.inviteCode,
@@ -1274,7 +1274,7 @@ export function Game() {
                                 background: `${colorAccent}18`,
                               }}
                             >
-                              CHOOSE
+                              {t('game.chooseBadge')}
                             </span>
                           ) : null}
                         </div>
@@ -2057,7 +2057,7 @@ export function Game() {
                     boxSizing: 'border-box',
                     transition: 'all 0.2s ease',
                   }}
-                  title="Return to Ludo Lobby"
+                  title={t('game.returnToLobbyTooltip')}
                 >
                   &lt; {t('game.returnToLobbyBtn')}
                 </button>
@@ -2115,7 +2115,7 @@ export function Game() {
         isOpen={isSystemModalOpen}
         title={t('gameExtra.rulesModalTitle')}
         versionTag={t('gameExtra.rulesVersionTag')}
-        cancelLabel={t('gameExtra.closeBtn')}
+        cancelLabel={t('common.close')}
         proceedLabel={rulesPage < 5 ? t('gameExtra.nextPageBtn') : t('gameExtra.startPlayingBtn')}
         cancelShortcut="ESC"
         proceedShortcut={rulesPage < 5 ? '→' : '↵'}

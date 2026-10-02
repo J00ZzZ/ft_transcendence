@@ -432,7 +432,7 @@ export function Home() {
                         : undefined
                     }
                     onClick={launchToLobby}
-                    title="Click or press Spacebar to enter Ludo Lobby"
+                    title={t('home.enterLobbyTooltip')}
                   >
                     <canvas id="arcadeCanvas" ref={canvasRef} width={720} height={400} />
 
@@ -499,9 +499,9 @@ export function Home() {
                           retroAudio.playUiBeep(650, 0.05);
                           navigate('/friends');
                         }}
-                        title={`${pendingRequestsCount} pending friend request${pendingRequestsCount > 1 ? 's' : ''} - Click to review`}
+                        title={t('home.pendingRequestsTooltip', { count: pendingRequestsCount })}
                       >
-                        {pendingRequestsCount} NEW
+                        {pendingRequestsCount} {t('home.newBadge')}
                       </button>
                     )}
                   </div>
@@ -730,7 +730,7 @@ export function Home() {
             {/* Footer */}
             <footer className={RETRO_FOOTER}>
               <p>
-                © 1942-2026 RETROLUDO '42 // 42KL // ALL RIGHTS RESERVED // WEB AUDIO & CANV-ARCADE
+                {t('home.footerLegal')}
               </p>
               <div
                 style={{

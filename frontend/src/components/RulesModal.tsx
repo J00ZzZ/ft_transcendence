@@ -110,7 +110,7 @@ export function RulesModal({ onClose }: Props) {
         </div>
 
         <button onClick={onClose} style={{ ...btnGold, width: '100%', padding: 13, marginTop: 26 }}>
-          {t('rules.close')}
+          {t('common.close')}
         </button>
       </div>
     </div>
