@@ -199,7 +199,7 @@ schema is applied with `prisma db push` on every boot, so a fresh database is bu
 
 ## Database Schema
 
-![Database schema](frontend/public/Schema_Team-Submit.png)
+![Database schema](docs/images/Schema_Team-Submit.png)
 
 ## Modules
 

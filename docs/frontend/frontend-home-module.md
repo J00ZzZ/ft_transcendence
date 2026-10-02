@@ -18,8 +18,8 @@
 
 The Home page is the main landing page after login (`/home`, full-screen). It also acts as the player dashboard, and shows:
 
-1. **Hero header** — the page title, a greeting with the player's display name, and a live online-player count from `GET /api/presence/online-count` (polled every 15 seconds).
-2. **Arcade panel** — a 720×400 canvas that draws the sun, the star field, the horizon grid, four army nodes and the marquee, with a "press start" overlay. Clicking it, or pressing Space or Enter, opens `/gamelobby`.
+1. **Hero header** — the localized brand title, a greeting with the player's display name, and a live online-player count from `GET /api/presence/online-count` (polled every 15 seconds).
+2. **Arcade panel** — a window titled with the localized arena title, holding a 720×400 canvas that draws the sun, the star field, the horizon grid, four army nodes and the localized marquee, with a "press start" overlay. Clicking it, or pressing Space or Enter, opens `/gamelobby`.
 3. **Friends widget** — read from `GET /api/friends` + `GET /api/friends/requests`, refreshed every 12 seconds; shows live presence status.
 4. **Notifications** — bell icon and toasts from `useNotifications()`, which uses an SSE (Server-Sent Events) stream.
 5. **Footer** — the copyright line and the Privacy Policy and Terms of Service modals.
@@ -105,6 +105,22 @@ sequenceDiagram
 ### Arcade attract-mode canvas
 
 The arcade panel renders its scene on one 720×400 canvas: the background gradient, the sun, the star field, the horizon grid, the four army nodes and the marquee. The sun's disc and its scanlines are drawn under a single clip path, so a scanline stroke cannot extend past the disc even though each stroke is wider than the disc near its top.
+
+### Localized hero and canvas strings
+
+The hero title, the greeting, the canvas marquee, the arena title and the footer line all come from the locale sheets, so they follow the language selector:
+
+| Element | Key | English value |
+|---------|-----|---------------|
+| Hero title | `homeExtended.brandTitle` | `RETRO LUDO '42` |
+| Greeting | `home.greeting` | `Welcome, Pilot {{name}}` |
+| Canvas marquee | `homeExtended.heroMarquee` | `[ ft_Transcendence // Team: Pace 24 ]` |
+| Arena title | `homeExtended.arcadeArenaTitle` | `RETRO LUDO '42 // ARCADE ARENA` |
+| Footer line | `home.footerLegal` | `© 1942-2026 RETRO LUDO '42 // 42KL // ALL RIGHTS RESERVED // WEB AUDIO & CANV-ARCADE` |
+
+French swaps the brand for `LUDO RÉTRO`, the marquee team word for `Équipe` and the greeting for `Bienvenue, pilote {{name}}`. Malay uses `LUDO RETRO`, `Pasukan` and `Selamat datang, Pilot {{name}}`.
+
+The marquee text is held in a ref, so a language switch only swaps the text and the canvas effect keeps running: the star field is not reshuffled.
 
 
 ---

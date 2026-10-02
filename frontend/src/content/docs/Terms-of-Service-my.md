@@ -1,9 +1,9 @@
-# Syarat Perkhidmatan — ft-Transcendence (RetroLudo '42)
+# Syarat Perkhidmatan — ft-Transcendence (Ludo Retro '42)
 
 **Tarikh berkuat kuasa:** 2026-08-26
-**Penguasa:** Team Pace 24, pembangawa ft-Transcendence (RetroLudo '42) (kami, "Tim")
+**Penguasa:** Team Pace 24, pembangawa ft-Transcendence (Ludo Retro '42) (kami, "Tim")
 
-Syarat Perkhidmatan ini ("Syarat") mengawal penggunaan anda terhadap aplikasi web ft-Transcendence (RetroLudo '42) ("Apl"). Dengan mencipta akaun atau menggunakan Apl, anda bersetuju untuk diikat oleh Syarat ini. Jika anda tidak bersetuju, sila jangan gunakan Apl.
+Syarat Perkhidmatan ini ("Syarat") mengawal penggunaan anda terhadap aplikasi web ft-Transcendence (Ludo Retro '42) ("Apl"). Dengan mencipta akaun atau menggunakan Apl, anda bersetuju untuk diikat oleh Syarat ini. Jika anda tidak bersetuju, sila jangan gunakan Apl.
 
 
 ---

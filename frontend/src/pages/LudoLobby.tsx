@@ -293,7 +293,7 @@ export function LudoLobby() {
                     border: hasActiveGame
                       ? '1px solid var(--accent-yellow)'
                       : '1px dashed rgba(255,255,255,0.2)',
-                    color: hasActiveGame ? 'var(--accent-yellow)' : 'var(--text-muted)',
+                    color: hasActiveGame ? 'var(--accent-yellow)' : 'var(--text-soft)',
                   }}
                 >
                   {t('ludoLobbyExtra.activeRoomLabel', {
@@ -392,8 +392,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -483,8 +483,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -572,8 +572,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -661,8 +661,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -840,8 +840,8 @@ export function LudoLobby() {
                           style={{
                             padding: '28px 0',
                             textAlign: 'center',
-                            color: 'var(--text-muted)',
-                            fontSize: '0.78rem',
+                            color: 'var(--text-soft)',
+                            fontSize: 'calc(0.78rem + 1pt)',
                           }}
                         >
                           {t('ludoLobbyPasses.noOpenRooms')}
@@ -909,7 +909,7 @@ export function LudoLobby() {
                                   >
                                     {room.host}
                                   </div>
-                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                                  <div style={{ color: 'var(--text-soft)', fontSize: '0.65rem' }}>
                                     {room.maxSeats}P • {room.mode}
                                   </div>
                                 </div>

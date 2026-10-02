@@ -1,9 +1,9 @@
-# Terms of Service — ft-Transcendence (RetroLudo '42)
+# Terms of Service — ft-Transcendence (Retro Ludo '42)
 
 **Effective date:** 2026-08-26
-**Controller:** Team Pace 24, developers of ft-Transcendence (RetroLudo '42) (the "Team")
+**Controller:** Team Pace 24, developers of ft-Transcendence (Retro Ludo '42) (the "Team")
 
-These Terms of Service ("Terms") govern your use of the ft-Transcendence (RetroLudo '42) web application ("the App"). By creating an account or using the App, you agree to be bound by these Terms. If you do not agree, please do not use the App.
+These Terms of Service ("Terms") govern your use of the ft-Transcendence (Retro Ludo '42) web application ("the App"). By creating an account or using the App, you agree to be bound by these Terms. If you do not agree, please do not use the App.
 
 
 ---

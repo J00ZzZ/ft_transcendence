@@ -1225,7 +1225,7 @@ export function Profile() {
                           }}
                         >
                           {mainTab === 'history'
-                            ? t('profile.cyberLudoTelemetry')
+                            ? t('profile.retroLudoTelemetry')
                             : t('profile.synchronizedPercent', { percent: achievementPercent })}
                         </div>
                       </div>

@@ -1,6 +1,6 @@
 # Architecture
 
-**Project:** ft_transcendence — RetroLudo '42
+**Project:** ft_transcendence — RETRO LUDO '42
 **Updated:** 2026-10-02
 
 An eight-service Docker Compose stack: a React 19 SPA built, published, and
@@ -501,6 +501,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │   ├── match.query.service.ts     # read-only open-rooms / my-rooms queries
 │   │   │   ├── match.postgame.service.ts  # POST /api/game/end handling
 │   │   │   ├── seat-finalization.ts       # terminal-seat lookup from engine state
+│   │   │   ├── engine-token.util.ts       # signEngineToken() — engine secret, aud, 24 h TTL
 │   │   │   ├── dto/invite-friend.dto.ts   # required-UUID body for the game-invite route
 │   │   │   └── match.module.ts
 │   │   ├── leaderboard/          # Rankings (Redis sorted sets, Postgres backfill when empty)
@@ -551,6 +552,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │           ├── bot-scheduler.ts      # One timer per game for bot turns
 │   │   │           ├── post-game.ts          # End-of-game flow → result-submitter
 │   │   │           ├── auth.ts               # JWT middleware, GameSocket type
+│   │   │           ├── auth.spec.ts          # vitest unit tests for token verification
 │   │   │           ├── event-publisher.ts    # Redis pub/sub → Socket.IO bridge
 │   │   │           ├── redis-broadcaster.ts  # Room-based state broadcasts
 │   │   │           └── result-submitter.ts   # POST /api/game/end to backend
@@ -581,7 +583,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   ├── index.html
 │   ├── .npmrc / .oxlintrc.json    # npm registry config / oxlint rules
 │   ├── publish.sh                # Build, publish, watch src/ (long-running)
-│   ├── public/                   # Static assets copied as-is (logo, OAuth icons, cityscape, DB-schema image)
+│   ├── public/                   # Static assets copied as-is: logo.png, google.png, github.png, forty_two.png, synthwave-cityscape.jpeg
 │   │
 │   └── src/
 │       ├── main.tsx              # React entry point
@@ -603,12 +605,11 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       │                         # Leaderboard, Profile, LegalPage
 │       ├── components/           # RetroAuthLayout, RetroNavbar,
 │       │                         # NotificationBell/Toast, Board, Die,
-│       │                         # JoinByCode, OAuthButtons, ProfileEditModal,
-│       │                         # RulesModal, UserAvatar, CyberModal,
-│       │                         # DeleteAccountModal, LegalModal, MarkdownViewer,
-│       │                         # ResultsModal, railButton.ts
+│       │                         # OAuthButtons, ProfileEditModal, UserAvatar,
+│       │                         # CyberModal, DeleteAccountModal, LegalModal,
+│       │                         # MarkdownViewer, ResultsModal, railButton.ts
 │       ├── game/                 # reducer.ts, types.ts
-│       ├── hooks/                # useNotifications.tsx
+│       ├── hooks/                # useFitTextSize.ts, useNotifications.tsx
 │       ├── locales/              # en.ts, fr.ts, ms.ts
 │       ├── content/docs/         # Markdown docs rendered by LegalPage
 │       │                         # (Terms-of-Service + Privacy-Policy in en/fr/my)
@@ -657,6 +658,9 @@ See the [README](../README.md) **Commands** section for the full list of make ta
     │   ├── frontend-components-system.md     # Shared UI components
     │   ├── frontend-styles-system.md         # Stylesheets, theme tokens, background
     │   └── frontend-i18n-utilities-system.md # i18n, audio, bot names, legal pages
+    ├── images/                   # Diagram + brand assets for the README (repo-only, never bundled)
+    │   ├── logo-master.png       # Full-resolution source of frontend/public/logo.png
+    │   └── Schema_Team-Submit.png
     ├── ludo-engine/              # Engine internals
     │   ├── ludo-engine-core-system.md        # Game state machine, turn logic, win conditions
     │   ├── ludo-engine-bot-module.md         # Bot AI decision logic

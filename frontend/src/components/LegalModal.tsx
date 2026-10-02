@@ -175,7 +175,7 @@ export function LegalModal({ isOpen, initialDoc = 'privacy', onClose }: LegalMod
         {/* Modal Footer Bar */}
         <div className="flex items-center justify-between border-t border-[rgba(0,240,255,0.2)] bg-[rgba(18,6,42,0.95)] p-3 px-6">
           <span className="font-mono text-[0.68rem] text-[var(--text-muted)]">
-            // PACE 24 · RETROLUDO '42 LEGAL ARCHIVE [{docLang.toUpperCase()}]
+            // PACE 24 · RETRO LUDO '42 LEGAL ARCHIVE [{docLang.toUpperCase()}]
           </span>
           <button
             type="button"

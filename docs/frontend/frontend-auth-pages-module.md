@@ -23,6 +23,8 @@ These pages are the entry point to the app. They are:
 
 Both pages use the `RetroAuthLayout` container and share the same styling: the retro/cyber theme and the provider buttons.
 
+Login shows the brand title and the tagline from `authExtra.brandTitle` and `authExtra.brandTagline`, so its header follows the selected language. The other auth pages keep their own headings.
+
 
 ---
 ---

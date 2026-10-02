@@ -23,6 +23,8 @@ Supporting modules shared by every screen:
 4. **Legal pages** — `LegalPage` renders the Privacy Policy and Terms of Service (public routes `/privacy` and `/terms`) from markdown files bundled with Vite's `?raw` imports, one variant per language.
 5. **Entry point** — `main.tsx` mounts `<App />` in `StrictMode` and imports the CSS plus `./i18n` so translations are ready before the first render.
 
+The brand name is translated instead of hardcoded: `homeExtended.brandTitle` (the Home hero title, with the `'42` suffix) and `authExtra.brandTitle` (the Login header) render `RETRO LUDO` in English, `LUDO RÉTRO` in French and `LUDO RETRO` in Malay. The browser tab title in `index.html` stays static at `RETRO LUDO '42`, since it sits outside the locale sheets.
+
 
 ---
 ---

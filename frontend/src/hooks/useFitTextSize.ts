@@ -99,7 +99,7 @@ export function useFitTextSize<T extends HTMLElement = HTMLInputElement>(
 
     fit();
     // Web fonts may still be loading on first paint: re-fit once they are ready.
-    void document.fonts?.ready.then(() => fit());
+    void document.fonts.ready.then(() => fit());
     const observer = new ResizeObserver(fit);
     observer.observe(el);
 
