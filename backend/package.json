@@ -11,7 +11,8 @@
     "db:fresh": "prisma db execute --file ./prisma/drop-all.sql",
     "db:truncate": "prisma db execute --file ./prisma/truncate-all.sql",
     "db:seed": "prisma generate && prisma db seed",
-    "db:reset": "npm run db:truncate && npm run db:seed"
+    "db:reset": "npm run db:truncate && npm run db:seed",
+    "db:fix-human-wins": "prisma db execute --file ./prisma/fix-human-wins.sql"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

@@ -126,7 +126,7 @@ export class MatchPostgameService {
               highestRating: Math.max(user.highestRating, newRating),
               wins: isWinner ? { increment: 1 } : undefined,
               losses: isWinner ? undefined : { increment: 1 },
-              humanWins: isWinner ? { increment: 1 } : undefined,
+              humanWins: gameType === 'PVP' && isWinner ? { increment: 1 } : undefined,
               botWins: gameType === 'PVE' && isWinner ? { increment: 1 } : undefined,
               winStreak: isWinner ? { increment: 1 } : 0,
               bestWinStreak: isWinner
