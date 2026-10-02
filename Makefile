@@ -19,7 +19,7 @@ TUNNEL_VARS    = NGROK_AUTHTOKEN NGROK_DOMAIN NGROK_FRONTEND_URL \
 # teammate). SMTP_CREDENTIALS counts too: without it mail only gets logged, but
 # an empty value still means the .env was copied incompletely. LAN_IP is the
 # only key left out of the list (`make env` writes it itself).
-CORE_VARS      = JWT_SECRET ENGINE_JWT_SECRET POSTGRES_PASSWORD REDIS_PASSWORD ENGINE_API_KEY \
+CORE_VARS      = JWT_SECRET ENGINE_JWT_SECRET OAUTH_STATE_SECRET POSTGRES_PASSWORD REDIS_PASSWORD ENGINE_API_KEY \
                  POSTGRES_USER POSTGRES_DB DATABASE_URL CONTAINER_DATABASE_URL \
                  FRONTEND_URL NGROK_PORT HTTPS_PORT SMTP_CREDENTIALS
 
