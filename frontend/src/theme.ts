@@ -13,7 +13,11 @@ export type ColorKey = keyof typeof COL;
 /** Seat index → color is fixed: 0 = blue (you), 1 = red, 2 = green, 3 = yellow. */
 export const SEAT_COLORS: ColorKey[] = ['blue', 'red', 'green', 'yellow'];
 
-export const BOT_POOL = ['Rook', 'Bishop', 'Knight', 'Castle', 'Duke', 'Marla', 'Otto', 'Vex'];
+/**
+ * The names come from real-life bot assistants, so they need no translation.
+ * Three is enough: seat 0 is always you, so a 4-seat table holds at most 3 bots.
+ */
+export const BOT_POOL = ['Siri', 'Alexa', 'Cortana'];
 
 /** Mirrors backend/src/presence/presence.service.ts's PresenceStatus. */
 export type PresenceStatus = 'online' | 'playing' | 'offline';

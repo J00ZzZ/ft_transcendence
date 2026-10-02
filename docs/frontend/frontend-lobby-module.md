@@ -64,8 +64,11 @@ export type PlayerCount = 2 | 3 | 4
 
 ```typescript
 // From theme.ts
-export const BOT_POOL = ['Rook', 'Bishop', 'Knight', 'Castle', 'Duke', 'Marla', 'Otto', 'Vex']
+export const BOT_POOL = ['Siri', 'Alexa', 'Cortana']
 ```
+
+The names come from real-life bot assistants, so they need no translation. Three is
+enough: seat 0 is always the host, so a 4-seat table holds at most 3 bots.
 
 
 ---
