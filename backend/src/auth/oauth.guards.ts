@@ -1,9 +1,9 @@
 import { CanActivate, ConflictException, ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Observable } from 'rxjs';
-import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 import { requireSecret, isTunnelRequest } from '../secrets';
+import { AuthService } from './auth.service';
 
 // Per-mode frontend origin for OAuth redirects (local vs ngrok tunnel). Both
 // are required by the make env preflight, so no hardcoded fallback here.
@@ -23,7 +23,7 @@ function tunnelAwareGuard(localStrategy: string, tunnelStrategy: string, provide
     // This class is returned from a factory and used as an exported base :
     // EVERY member must be public or `nest build` fails. (#-private fields and
     // private constructor params both trip the rule.)
-    constructor(public readonly jwt: JwtService) {}
+    constructor(public readonly auth: AuthService) {}
 
     // Entry point called by Nest on the /api/auth/<provider> route: picks the
     // strategy, injects oauth-link state when needed, and handles rejections.
@@ -44,21 +44,12 @@ function tunnelAwareGuard(localStrategy: string, tunnelStrategy: string, provide
       // "Add a sign-in method" intent: with a valid access-token cookie, sign
       // a short-lived oauth-link token into the provider `state` so the
       // callback links the provider to the logged-in user. No cookie = login.
-      let state: string | undefined;
-      const accessToken = req.cookies['token'];
-      if (typeof accessToken === 'string') {
-        try {
-          const payload = this.jwt.verify<{ sub?: string }>(accessToken);
-          if (payload.sub) {
-            state = this.jwt.sign(
-              { sub: payload.sub, p: provider, purpose: 'oauth-link' },
-              { expiresIn: '10m' },
-            );
-          }
-        } catch {
-          // invalid/expired access token -> normal login
-        }
-      }
+      // An invalid/expired access token means a normal login.
+      const accessToken: unknown = req.cookies['token'];
+      const userId = this.auth.verifyAccessToken(
+        typeof accessToken === 'string' ? accessToken : undefined,
+      );
+      const state = userId ? this.auth.createOAuthLinkToken(userId, provider) : undefined;
 
       // `guard.options` isn't part of the public AuthGuard type, so read/write
       // it through a narrow structural type instead of `any`.

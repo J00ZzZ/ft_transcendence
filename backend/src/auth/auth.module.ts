@@ -15,6 +15,7 @@ import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
 import { PrismaService } from '../prisma.service';
 import { requireSecret } from '../secrets';
+import { SESSION_TOKEN_AUDIENCE, TOKEN_ISSUER } from './auth.constants';
 import { NotificationModule } from '../notification/notification.module';
 import { AvatarMetaModule } from '../avatar/avatar-meta.module';
 
@@ -29,7 +30,19 @@ import { AvatarMetaModule } from '../avatar/avatar-meta.module';
       secret: requireSecret('JWT_SECRET'),
       // Access tokens are now short-lived; the refresh token (SessionService)
       // keeps the user signed in for 7 days by minting new access tokens.
-      signOptions: { expiresIn: '15m' },
+      // Every session token is stamped with our issuer and the API audience,
+      // and every jwt.verify() defaults to requiring both, so a token signed
+      // with the same key for another purpose is not a session.
+      signOptions: {
+        expiresIn: '15m',
+        issuer: TOKEN_ISSUER,
+        audience: SESSION_TOKEN_AUDIENCE,
+      },
+      verifyOptions: {
+        issuer: TOKEN_ISSUER,
+        audience: SESSION_TOKEN_AUDIENCE,
+        algorithms: ['HS256'],
+      },
     }),
     NotificationModule,
     AvatarMetaModule,

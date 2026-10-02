@@ -18,7 +18,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtPayload } from './jwt-payload';
-import { AUTH } from './auth.constants';
+import { AUTH, OAUTH_LINK_AUDIENCE, OAUTH_LINK_TTL } from './auth.constants';
 import { MailService } from './mail.service';
 import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
@@ -544,8 +544,9 @@ export class AuthService implements OnModuleDestroy {
   verifyAccessToken(token: string | undefined): string | null {
     if (!token) return null;
     try {
-      const payload = this.jwt.verify<{ sub?: string }>(token);
-      return payload.sub ?? null;
+      // Issuer/audience/algorithm are enforced by JwtModule's verifyOptions.
+      const payload = this.jwt.verify<{ sub?: unknown }>(token);
+      return typeof payload.sub === 'string' && payload.sub ? payload.sub : null;
     } catch {
       return null;
     }
@@ -987,9 +988,17 @@ export class AuthService implements OnModuleDestroy {
   }
 
   // Signed 10-minute token carried in the OAuth `state` when a logged-in
-  // user wants to ADD a provider sign-in method.
+  // user wants to ADD a provider sign-in method. It travels in a URL, so it
+  // gets its own key and audience: it can never pass as a session token.
   createOAuthLinkToken(userId: string, provider: string): string {
-    return this.jwt.sign({ sub: userId, p: provider, purpose: 'oauth-link' }, { expiresIn: '10m' });
+    return this.jwt.sign(
+      { sub: userId, p: provider, purpose: 'oauth-link' },
+      {
+        secret: requireSecret('OAUTH_STATE_SECRET'),
+        audience: OAUTH_LINK_AUDIENCE,
+        expiresIn: OAUTH_LINK_TTL,
+      },
+    );
   }
 
   // Verify a `state` token from the provider callback. Returns the userId
@@ -1011,9 +1020,12 @@ export class AuthService implements OnModuleDestroy {
   private resolveOAuthLink(state: unknown, provider: string): string | undefined {
     if (typeof state !== 'string' || !state) return undefined;
     try {
-      const payload = this.jwt.verify<{ sub?: string; p?: string; purpose?: string }>(state);
+      const payload = this.jwt.verify<{ sub?: unknown; p?: string; purpose?: string }>(state, {
+        secret: requireSecret('OAUTH_STATE_SECRET'),
+        audience: OAUTH_LINK_AUDIENCE,
+      });
       if (payload.purpose !== 'oauth-link' || payload.p !== provider) return undefined;
-      return payload.sub;
+      return typeof payload.sub === 'string' && payload.sub ? payload.sub : undefined;
     } catch {
       return undefined;
     }
