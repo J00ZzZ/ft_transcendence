@@ -35,7 +35,7 @@ export function MarkdownViewer({ content }: MarkdownViewerProps) {
           </thead>
           <tbody className="divide-y divide-[rgba(255,255,255,0.08)]">
             {cleanRows.map((row, rIdx) => (
-              <tr key={rIdx} className="transition-colors hover:bg-[rgba(0,240,255,0.05)]">
+              <tr key={rIdx}>
                 {row.map((cell, cIdx) => (
                   <td key={cIdx} className="px-3 py-2 text-[var(--text-main)]">
                     {renderInline(cell.trim())}

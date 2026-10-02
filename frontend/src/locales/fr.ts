@@ -1028,6 +1028,7 @@ export const fr = {
     cancelBtn: 'ANNULER',
     confirmAbortBtn: "CONFIRMER L'ABANDON",
     abortSimulationBtn: 'ABANDONNER LA SIMULATION',
+    abortVersionTag: 'ARÈNE.{{code}}',
     rulesModalTitle: "PROTOCOLES & RÈGLES DE L'ARÈNE",
     rulesVersionTag: 'RÈGLES.v42.SYS',
     // closeBtn: 'FERMER',

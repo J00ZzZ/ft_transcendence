@@ -2090,7 +2090,9 @@ export function Game() {
         isOpen={isAbortModalOpen}
         title={t('gameExtra.protocolTerminationTitle')}
         versionTag={
-          activeMatch.gameId ? `ARENA.${activeMatch.gameId.slice(0, 8)}` : 'v001.e1349837856'
+          activeMatch.gameId
+            ? t('gameExtra.abortVersionTag', { code: activeMatch.gameId.slice(0, 8) })
+            : 'v001.e1349837856'
         }
         message={
           activeMatch.mode === 'pve' || activeMatch.mode === 'hotseat'

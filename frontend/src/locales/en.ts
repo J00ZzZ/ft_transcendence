@@ -1027,6 +1027,7 @@ export const en = {
     cancelBtn: 'CANCEL',
     confirmAbortBtn: 'CONFIRM ABORT',
     abortSimulationBtn: 'ABORT SIMULATION',
+    abortVersionTag: 'ARENA.{{code}}',
     rulesModalTitle: 'ARENA PROTOCOLS & RULES',
     rulesVersionTag: 'RULES.v42.SYS',
     // closeBtn: 'CLOSE',

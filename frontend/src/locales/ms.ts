@@ -1026,6 +1026,7 @@ export const ms = {
     cancelBtn: 'BATAL',
     confirmAbortBtn: 'SAHKAN PEMBATALAN',
     abortSimulationBtn: 'BATALKAN SIMULASI',
+    abortVersionTag: 'ARENA.{{code}}',
     rulesModalTitle: 'PROTOKOL & PERATURAN ARENA',
     rulesVersionTag: 'PERATURAN.v42.SYS',
     // closeBtn: 'TUTUP',

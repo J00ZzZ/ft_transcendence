@@ -4,6 +4,7 @@ import { getApi, postApi } from '../api';
 import { UserAvatar } from '../components/UserAvatar';
 import { RetroNavbar } from '../components/RetroNavbar';
 import type { PlayerColor } from '../game/types';
+import { useFitTextSize } from '../hooks/useFitTextSize';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { COL } from '../theme';
@@ -98,6 +99,14 @@ export function LudoLobby() {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // PASS #04 room-code field is a fixed-width box, so scale its text down to fit:
+  // the Malay placeholder ("MASUKKAN KOD") is longer than the EN/FR ones and was
+  // overflowing the input.
+  const { ref: roomCodeInputRef, fontSize: roomCodeFontSize } = useFitTextSize(
+    [t('ludoLobbyPasses.enterCodePlaceholder'), roomCodeInput],
+    { maxFontSize: 16, reserve: 4 },
+  );
 
   const fetchRooms = () => {
     getApi<Room[]>('/api/games/rooms')
@@ -673,6 +682,7 @@ export function LudoLobby() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
+                      ref={roomCodeInputRef}
                       value={roomCodeInput}
                       onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => {
@@ -694,7 +704,7 @@ export function LudoLobby() {
                         borderRadius: 6,
                         color: '#ffe600',
                         padding: '0 14px',
-                        fontSize: '1rem',
+                        fontSize: roomCodeFontSize,
                         fontWeight: 'bold',
                         fontFamily: 'var(--font-mono)',
                         letterSpacing: '2px',
