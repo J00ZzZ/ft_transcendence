@@ -68,7 +68,7 @@ Anda bersetuju **tidak** untuk:
 
 ## 5. Hak milik intelek
 
-- Apl, termasuk perisian, reka bentuk, dan jenama, disediakan sebagai sebahagian daripada projek pelajar sekolah 42. Apl dilesenkan di bawah **lesen GPL-3.0** (lihat fail `LICENSE` projek).
+- Apl, termasuk perisian, reka bentuk, dan jenama, disediakan sebagai sebahagian daripada projek pelajar sekolah 42. Apl dilesenkan di bawah **lesen GPL-3.0**.
 - Tiada apa-apa dalam Syarat ini memindahkan kepemilikan anda terhadap Apl, teknologi asas, atau kod sumbernya.
 
 

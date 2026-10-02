@@ -68,7 +68,7 @@ You agree **not** to:
 
 ## 5. Intellectual property
 
-- The App, including its software, design, and branding, is provided as part of a 42 school student project. The App is licensed under the **GPL-3.0** license (see the project's `LICENSE` file).
+- The App, including its software, design, and branding, is provided as part of a 42 school student project. The App is licensed under the **GPL-3.0** license.
 - Nothing in these Terms transfers to you any ownership of the App, its underlying technology or source code.
 
 

@@ -68,7 +68,7 @@ Vous acceptez **ne pas** :
 
 ## 5. Propriété intellectuelle
 
-- L'App, y compris son logiciel, sa conception et sa marque, est fournie dans le cadre d'un projet étudiant de l'école 42. L'App est diffusée sous licence **GPL-3.0** (voir le fichier `LICENSE` du projet).
+- L'App, y compris son logiciel, sa conception et sa marque, est fournie dans le cadre d'un projet étudiant de l'école 42. L'App est diffusée sous licence **GPL-3.0**.
 - Rien dans ces Conditions ne vous transfère aucune propriété de l'App, de sa technologie sous-jacente ou de son code source.
 
 
