@@ -852,7 +852,7 @@ export function Profile() {
                             fontFamily: 'var(--font-display)',
                           }}
                         >
-                          CURRENT ELO
+                          {t('profile.currentElo')}
                         </div>
                       </div>
                     </div>
@@ -915,7 +915,7 @@ export function Profile() {
                             fontFamily: 'var(--font-display)',
                           }}
                         >
-                          PEAK RECORD
+                          {t('profile.peakRecord')}
                         </div>
                       </div>
                     </div>
@@ -1225,7 +1225,7 @@ export function Profile() {
                           }}
                         >
                           {mainTab === 'history'
-                            ? t('profile.cyberLudoTelemetry')
+                            ? t('profile.retroLudoTelemetry')
                             : t('profile.synchronizedPercent', { percent: achievementPercent })}
                         </div>
                       </div>

@@ -67,7 +67,7 @@ The application runs one theme, Synthwave '84. Its tokens are declared on `:root
 ```css
 --bg-primary, --bg-secondary, --bg-card   /* backgrounds */
 --accent-cyan, --accent-pink, --accent-yellow, --accent-purple
---text-main, --text-muted
+--text-main, --text-muted, --text-soft  /* white, muted lavender, paler step for captions */
 --border-color, --box-shadow, --card-border-style
 --font-heading, --font-display, --font-mono  /* Press Start 2P, Orbitron, Share Tech Mono */
 --crt-scanline-opacity, --crt-flicker-opacity

@@ -1,5 +1,5 @@
 // Reduces engine Socket.IO events into a renderable GameViewState.
-// The reducer is a renderer — it never decides outcomes.
+// The reducer is a renderer: it never decides outcomes.
 // The engine is authoritative; the reducer just keeps the UI in sync.
 
 import type { GameState, LegalMove, MoveResult, PlayerColor } from './types';
@@ -158,7 +158,7 @@ export function applyEvent(
     case 'player_disconnected':
       return {
         ...state,
-        // Keep all data/pieces — the player is temporarily away, not gone.
+        // Keep all data/pieces: the player is temporarily away, not gone.
         players: state.players.map((p) =>
           p.color === (event.color as PlayerColor) ? { ...p, status: 'disconnected' } : p,
         ),

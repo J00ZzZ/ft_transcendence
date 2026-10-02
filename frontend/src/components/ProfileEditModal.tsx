@@ -348,7 +348,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             style={{ padding: '3px 9px', fontSize: '0.66rem', color: 'var(--text-muted)' }}
           >
-            {t('profileEdit.close')}
+            {t('common.close')}
           </button>
         </div>
 

@@ -20,6 +20,8 @@
   --accent-purple: #9d00ff;
   --text-main: #ffffff;
   --text-muted: #b8a6e4;
+  /* Lighter than --text-muted: pass captions and empty-state lines. */
+  --text-soft: #d4caef;
   --border-color: #ff007f;
   --box-shadow: 0 0 15px rgba(255, 0, 127, 0.5), inset 0 0 15px rgba(0, 240, 255, 0.2);
   --font-heading: 'Press Start 2P', cursive;

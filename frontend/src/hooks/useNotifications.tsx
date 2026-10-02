@@ -103,7 +103,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           if (!event.data) return;
           const notification: Notification = JSON.parse(event.data);
           if (notification.id) {
-            // Global broadcasts are SHORT-LIVED/TRANSIENT — toast only, never the bell/unread
+            // Global broadcasts are SHORT-LIVED/TRANSIENT: toast only, never the bell/unread
             // badge. The actor also skips their own announcement (they already
             // get the persisted `profile_updated` toast instead).
             if (notification.type === 'display_name_changed') {
@@ -112,7 +112,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
               setToasts((prev) => [notification, ...prev]);
               return;
             }
-            // Friend presence is SHORT-LIVED/TRANSIENT — toast only, never the bell/unread
+            // Friend presence is SHORT-LIVED/TRANSIENT: toast only, never the bell/unread
             // badge (the backend sends these via notifyTransient, so they aren't
             // persisted). Skip the actor's own tabs defensively.
             if (notification.type === 'friend_online' || notification.type === 'friend_offline') {
@@ -121,7 +121,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
               setToasts((prev) => [notification, ...prev]);
               return;
             }
-            // Avatar photo changes are SHORT-LIVED/TRANSIENT state updates — no bell entry,
+            // Avatar photo changes are SHORT-LIVED/TRANSIENT state updates: no bell entry,
             // no toast. The event carries the new state, so every open
             // <UserAvatar> for that user flips immediately, with no request.
             if (notification.type === 'avatar_changed') {

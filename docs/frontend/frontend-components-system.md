@@ -26,9 +26,7 @@ The shared components are reusable UI (user interface) building blocks used on s
 4. **UserAvatar** — avatar rendering.
 5. **OAuthButtons** — Google, GitHub and 42 provider buttons.
 6. **NotificationBell / NotificationToast** — the notification bell and toasts.
-7. **JoinByCode** — invite-code input for joining a game.
-8. **ProfileEditModal / RulesModal** — edit-profile dialog and rules popup.
-9. **CyberModal / ResultsModal** — cyber-styled modal base and the post-game results overlay.
+7. **CyberModal / ResultsModal** — cyber-styled modal base and the post-game results overlay.
 
 
 ---
@@ -49,10 +47,8 @@ The shared components are reusable UI (user interface) building blocks used on s
 | `src/components/OAuthButtons.tsx` | OAuth provider buttons (42, GitHub, Google) |
 | `src/components/NotificationBell.tsx` | Bell icon, unread badge and dropdown |
 | `src/components/NotificationToast.tsx` | Toast notifications |
-| `src/components/JoinByCode.tsx` | Invite-code input for joining a game |
 | `src/components/ProfileEditModal.tsx` | Edit-profile dialog |
 | `src/components/DeleteAccountModal.tsx` | Delete-account dialog (sets a password first for OAuth-only accounts) |
-| `src/components/RulesModal.tsx` | "How to Play" rules popup |
 | `src/components/LegalModal.tsx` | Privacy Policy / Terms of Service popup, opened from Home's footer and from the Signup terms link |
 | `src/components/MarkdownViewer.tsx` | Renders the markdown legal documents |
 | `src/components/CyberModal.tsx` | Cyber-styled modal base (`CyberButton`, `CyberModal`) used for confirmations and dialogs |

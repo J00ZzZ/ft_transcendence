@@ -1218,6 +1218,7 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
   "playerCount": 2,
   "botCount": 0,
   "botColors": ["red", "green"],
+  "botNames": ["Siri", "Alexa"],
   "seatColors": ["yellow", "blue"]
 }
 
@@ -1242,6 +1243,7 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
 - `mode` is **required** and must be `pvp`, `pve`, or `hotseat` (no silent fallback).
 - `playerCount` accepts 2-4; `botCount` must be 0 to `playerCount-1`. Bots are only allowed in PvE games.
 - `botColors` / `seatColors` (optional string arrays) can override the default slot colors. Seat `color` is otherwise assigned by the server.
+- `botNames` (optional string array) is index-aligned with `botColors`. Each entry is the name the lobby gave that bot: the backend stores it as `player{n}_displayName` in the form `bot-<color> (<assistant>)`, so every client shows the lobby's own assistant name. An entry that is missing, blank or unusable is dropped, and the seat then shows its plain `bot-<color>` id. The stored label is not translated, so clients re-localize the colour word with the `lobby.color*` keys and keep the assistant name as sent.
 - **Reuse:** creating a `pvp` room while you already sit in one of your own still-`WAITING` PvP rooms hands that room back — the response carries its `gameId`, `inviteCode` and your existing seat colour, and nothing in the stored room is modified. A room whose game has already started (engine state is anything but `waiting`, or your seat in it is finalized) is never reused: a fresh room is created instead, so a player who left a live game can start or join another one while their old seat stays ghosted.
 - `pve`/`hotseat` always create a fresh room (they start `ACTIVE` and are never reused).
 
@@ -2499,7 +2501,7 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 
 - **Auth:** All auth endpoints use httpOnly cookies. Set by login, 2FA verify, OAuth completion, and refresh; cleared by logout. No `Authorization: Bearer` header is used.
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
-- **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
+- **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`. The shown name comes from our own `player{n}_displayName` entry when the creator sent a `botNames` value: it reads `bot-<color> (<assistant>)`, and the client re-localizes the colour word.
 - **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
 - **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `resend-verification` (3/hour), `login` (5/minute), `2fa/verify` (5/minute), `2fa/resend` (5/hour, plus 3/hour per user), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
 - **Client IP:** `main.ts` trusts internal hops only (`trust proxy`), so the address behind those limits is the client's own and a client-sent `X-Forwarded-For` cannot spoof it.

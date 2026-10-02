@@ -66,9 +66,12 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
   playerCount?: number;      // 2-4 (2 or 4 for PvE)
   botCount?: number;         // 0 - (playerCount-1), PvE only
   botColors?: string[];      // Optional per-bot slot colors
+  botNames?: string[];       // Optional per-bot assistant names, index-aligned with botColors
   seatColors?: string[];     // Optional human seat colors
 }
 ```
+
+`botNames` names the bot on each `botColors` slot. The backend stores each one as `player{n}_displayName = bot-<color> (<assistant>)`, which the engine copies to that seat's `displayName`; the seat keeps its `bot-<color>` identity. An empty or missing entry leaves the seat showing its plain id.
 
 ### InviteFriendDto
 

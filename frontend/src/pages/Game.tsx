@@ -86,8 +86,8 @@ function MiniDie({ value }: { value: number }) {
   );
 }
 
-// Matches the backend's SLOT_COLORS — hotseat seat index i always maps to
-// this color, regardless of the Lobby seat-picker's own (unrelated) display order.
+// Matches the backend's SLOT_COLORS: hotseat seat index i always maps to this
+// color, regardless of the Lobby seat-picker's own (unrelated) display order.
 const SLOT_COLORS: PlayerColor[] = ['blue', 'red', 'green', 'yellow'];
 
 export function Game() {
@@ -127,9 +127,9 @@ export function Game() {
     }
   };
 
-  // Custom names typed into the Lobby seat-setup for local (hotseat) seats —
-  // seat 0 is always the logged-in host (uses their real username instead),
-  // so only look at seats[1..].
+  // Custom names typed into the Lobby seat-setup for local (hotseat) seats: seat
+  // 0 is always the logged-in host (uses their real username instead), so only
+  // look at seats[1..].
   const localNames = useMemo<Partial<Record<PlayerColor, string>>>(() => {
     const names: Partial<Record<PlayerColor, string>> = {};
     seats.forEach((seat, i) => {
@@ -138,6 +138,19 @@ export function Game() {
     });
     return names;
   }, [seats]);
+  // Seat label for the move log / podium rows: a hotseat seat's typed-in name
+  // first, then the engine's display label (bots carry "bot-<color>
+  // (<assistant>)", localized by localizedBotName), then the raw id.
+  const seatLabel = (p: {
+    color: PlayerColor;
+    username: string;
+    displayName?: string;
+    isBot: boolean;
+  }): string =>
+    localNames[p.color] ||
+    localizedBotName(t, p.displayName) ||
+    localizedBotName(t, p.username) ||
+    (p.isBot ? t('common.bot') : 'Pilot');
   const socketRef = useRef<ReturnType<typeof connectSocket> | null>(null);
   const [view, dispatch] = useReducer(applyEvent, null, () =>
     initialView(activeMatch?.color ?? 'red'),
@@ -159,8 +172,8 @@ export function Game() {
   const isGameEnded = lastResult != null || view.status === 'finished';
 
   // Box-by-box move animation: while set, Board renders this piece at `step`
-  // instead of its real (already-updated) logical position — see the
-  // piece_moved handler below, which steps through the server's `path`.
+  // instead of its real (already-updated) logical position. See the piece_moved
+  // handler below, which steps through the server's `path`.
   const [animatingPiece, setAnimatingPiece] = useState<{ pieceId: string; step: number } | null>(
     null,
   );
@@ -171,9 +184,9 @@ export function Game() {
   // second click from firing a duplicate move the engine rejects.
   const pendingMoveRef = useRef(false);
   const STEP_ANIM_MS = 180;
-  // Capture burst FX: a short cosmetic ring + sparks on the landing square
-  // when a piece is captured. Set at the end of the mover's walk, cleared
-  // after the burst plays out — purely visual, no game state involved.
+  // Capture burst FX: a short ring + sparks on the landing square when a piece
+  // is captured. Set at the end of the mover's walk and cleared after the burst
+  // plays out, so it is visual only and never touches game state.
   const [captureFx, setCaptureFx] = useState<{ color: string; to: number } | null>(null);
 
   useEffect(() => {
@@ -300,9 +313,9 @@ export function Game() {
       const current = activeMatchRef.current;
       if (!current) return;
       const me = userRef.current;
-      // Hotseat: one physical device controls every seat — the engine has no
-      // separate accounts to join with, so this single socket must join_game
-      // for every local color up front.
+      // Hotseat: one physical device controls every seat. The engine has no
+      // separate accounts to join with, so this single socket must join_game for
+      // every local color up front.
       if (current.mode === 'hotseat') {
         for (const ck of Object.keys(localNames) as PlayerColor[]) {
           socket.emit('join_game', current.gameId, ck, undefined, localNames[ck]);
@@ -465,9 +478,7 @@ export function Game() {
             const inGoal = p.color === e.winner ? 4 : p.piecesInGoal;
             return {
               color: p.color,
-              username:
-                (localNames[p.color] ?? localizedBotName(t, p.username)) ||
-                (p.isBot ? t('common.bot') : 'Pilot'),
+              username: seatLabel(p),
               isBot: p.isBot,
               piecesInGoal: inGoal,
             };
@@ -524,9 +535,7 @@ export function Game() {
         .filter((p) => p.status !== 'inactive')
         .map((p) => ({
           color: p.color,
-          username:
-            (localNames[p.color] ?? localizedBotName(t, p.username)) ||
-            (p.isBot ? t('common.bot') : 'Pilot'),
+          username: seatLabel(p),
           isBot: p.isBot,
           piecesInGoal: p.piecesInGoal,
         }));
@@ -727,9 +736,7 @@ export function Game() {
       .filter((p) => p.status !== 'inactive')
       .map((p) => ({
         color: p.color,
-        username:
-          (localNames[p.color] ?? localizedBotName(t, p.username)) ||
-          (p.isBot ? t('common.bot') : 'Pilot'),
+        username: seatLabel(p),
         isBot: p.isBot,
         piecesInGoal: p.piecesInGoal,
       }));
@@ -813,7 +820,7 @@ export function Game() {
                     marginBottom: 10,
                   }}
                 >
-                  NO MATCH CREDENTIALS DETECTED
+                  {t('game.noMatchCredentials')}
                 </div>
                 <div
                   style={{
@@ -823,7 +830,7 @@ export function Game() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Please initialize or join a tactical Ludo arena from the Game Lobby first.
+                  {t('game.noMatchCredentialsHint')}
                 </div>
                 <button
                   className={RETRO_BTN}
@@ -1017,7 +1024,7 @@ export function Game() {
                     gap: 6,
                   }}
                   onClick={copyRoomCode}
-                  title="Click to copy Room Code"
+                  title={t('game.copyRoomCodeTooltip')}
                 >
                   {t('game.roomLabel', {
                     code: activeMatch.inviteCode,
@@ -1108,8 +1115,8 @@ export function Game() {
                       ) {
                         return null;
                       }
-                      // `ck === view.myColor` lags the server's seat assignment for a PvP joiner, so
-                      // fall back to a username match — that recognises the seat on first paint.
+                      // `ck === view.myColor` lags the server's seat assignment for a PvP joiner,
+                      // so fall back to a username match, which recognises the seat on first paint.
                       const isYou =
                         ck === view.myColor ||
                         (occupied && !!user?.username && playerMeta?.username === user.username);
@@ -1274,14 +1281,14 @@ export function Game() {
                                 background: `${colorAccent}18`,
                               }}
                             >
-                              CHOOSE
+                              {t('game.chooseBadge')}
                             </span>
                           ) : null}
                         </div>
                       );
                     }
 
-                    // Active game pilot card — only render participating pilots
+                    // Active game pilot card: only render participating pilots
                     if (!playerMeta || playerMeta.status === 'inactive') return null;
                     const isDisconnected = playerMeta.status === 'disconnected';
                     // An exited seat is shown as gone: it has no pieces left, but
@@ -2057,7 +2064,7 @@ export function Game() {
                     boxSizing: 'border-box',
                     transition: 'all 0.2s ease',
                   }}
-                  title="Return to Ludo Lobby"
+                  title={t('game.returnToLobbyTooltip')}
                 >
                   &lt; {t('game.returnToLobbyBtn')}
                 </button>
@@ -2090,7 +2097,9 @@ export function Game() {
         isOpen={isAbortModalOpen}
         title={t('gameExtra.protocolTerminationTitle')}
         versionTag={
-          activeMatch.gameId ? `ARENA.${activeMatch.gameId.slice(0, 8)}` : 'v001.e1349837856'
+          activeMatch.gameId
+            ? t('gameExtra.abortVersionTag', { code: activeMatch.gameId.slice(0, 8) })
+            : 'v001.e1349837856'
         }
         message={
           activeMatch.mode === 'pve' || activeMatch.mode === 'hotseat'
@@ -2115,7 +2124,7 @@ export function Game() {
         isOpen={isSystemModalOpen}
         title={t('gameExtra.rulesModalTitle')}
         versionTag={t('gameExtra.rulesVersionTag')}
-        cancelLabel={t('gameExtra.closeBtn')}
+        cancelLabel={t('common.close')}
         proceedLabel={rulesPage < 5 ? t('gameExtra.nextPageBtn') : t('gameExtra.startPlayingBtn')}
         cancelShortcut="ESC"
         proceedShortcut={rulesPage < 5 ? '→' : '↵'}

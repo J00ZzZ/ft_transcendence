@@ -21,7 +21,7 @@ COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/package*.json ./
 # Reuse the deps the builder stage already installed (same base image, same
 # lockfile) instead of hitting the npm registry a second time for the exact
-# same install — this stage's node_modules must match builder's anyway.
+# same install: this stage's node_modules must match builder's anyway.
 COPY --from=builder /app/node_modules ./node_modules
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

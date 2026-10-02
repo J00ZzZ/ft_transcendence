@@ -1,9 +1,9 @@
-# Politique de Confidentialité — ft-Transcendence (RetroLudo '42)
+# Politique de Confidentialité — ft-Transcendence (Ludo Rétro '42)
 
 **Date d'entrée en vigueur :** 2026-08-26
-**Responsable :** Team Pace 24, développeurs de ft-Transcendence (RetroLudo '42) (les « Team »)
+**Responsable :** Team Pace 24, développeurs de ft-Transcendence (Ludo Rétro '42) (les « Team »)
 
-Cette Politique de Confidentialité explique comment l'application web ft-Transcendence (RetroLudo '42) (« l'App », « nous », « nous ») collecte, utilise, divulgue et protège vos données personnelles. Elle est élaborée conformément à la **Loi malaisienne sur la protection des données personnelles 2010 (« PDPA »)** et à ses principes directeurs : Général, Avis et Choix, Divulgation, Sécurité, Conservation, Intégrité des Données et Accès.
+Cette Politique de Confidentialité explique comment l'application web ft-Transcendence (Ludo Rétro '42) (« l'App », « nous », « nous ») collecte, utilise, divulgue et protège vos données personnelles. Elle est élaborée conformément à la **Loi malaisienne sur la protection des données personnelles 2010 (« PDPA »)** et à ses principes directeurs : Général, Avis et Choix, Divulgation, Sécurité, Conservation, Intégrité des Données et Accès.
 
 
 ---

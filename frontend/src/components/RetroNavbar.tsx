@@ -319,7 +319,7 @@ export function RetroNavbar({
             type="button"
             className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isAccountPopoverOpen ? 'active' : ''}`}
             id="userAccountBtn"
-            aria-label="Account Settings, Language and 2FA"
+            aria-label={t('navbar.accountMenuAria')}
             style={{
               ...railButtonStyle(isAccountPopoverOpen),
               width: '100%',
@@ -339,7 +339,7 @@ export function RetroNavbar({
               retroAudio.playUiBeep(next ? 880 : 440, 0.05);
             }}
             {...railHoverHandlers(isAccountPopoverOpen)}
-            title="Account Settings, Language & 2FA"
+            title={t('navbar.accountMenuTitle')}
           >
             <div
               style={{
@@ -540,7 +540,7 @@ export function RetroNavbar({
                     toggleTwoFactor();
                     retroAudio.playUiBeep(twoFactor ? 440 : 880, 0.06);
                   }}
-                  title="Toggle Two-Factor Authentication"
+                  title={t('navbar.toggle2fa')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '1rem' }}>🛡️</span>
@@ -593,7 +593,7 @@ export function RetroNavbar({
                     transition: 'all 0.18s ease',
                   }}
                   onClick={toggleSound}
-                  title="Toggle all game audio (music + sound effects)"
+                  title={t('navbar.toggleAudio')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '1rem' }}>{soundMuted ? '🔇' : '🔊'}</span>

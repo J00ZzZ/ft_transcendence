@@ -4,6 +4,7 @@ import { getApi, postApi } from '../api';
 import { UserAvatar } from '../components/UserAvatar';
 import { RetroNavbar } from '../components/RetroNavbar';
 import type { PlayerColor } from '../game/types';
+import { useFitTextSize } from '../hooks/useFitTextSize';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { COL } from '../theme';
@@ -31,7 +32,7 @@ import {
 } from '../styles/tw';
 
 // How often the room list and the "am I already seated?" check are polled.
-// Original: 1000 ms. Recommended: 5000 ms — at 1 s those two endpoints sent
+// Original: 1000 ms. Recommended: 5000 ms. At 1 s those two endpoints sent
 // 120 requests/min per user, close to the 300 requests/min per-IP limit.
 const ROOM_POLL_MS = 5_000;
 
@@ -98,6 +99,14 @@ export function LudoLobby() {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // PASS #04 room-code field is a fixed-width box, so scale its text down to fit:
+  // the Malay placeholder ("MASUKKAN KOD") is longer than the EN/FR ones and was
+  // overflowing the input.
+  const { ref: roomCodeInputRef, fontSize: roomCodeFontSize } = useFitTextSize(
+    [t('ludoLobbyPasses.enterCodePlaceholder'), roomCodeInput],
+    { maxFontSize: 16, reserve: 4 },
+  );
 
   const fetchRooms = () => {
     getApi<Room[]>('/api/games/rooms')
@@ -284,7 +293,7 @@ export function LudoLobby() {
                     border: hasActiveGame
                       ? '1px solid var(--accent-yellow)'
                       : '1px dashed rgba(255,255,255,0.2)',
-                    color: hasActiveGame ? 'var(--accent-yellow)' : 'var(--text-muted)',
+                    color: hasActiveGame ? 'var(--accent-yellow)' : 'var(--text-soft)',
                   }}
                 >
                   {t('ludoLobbyExtra.activeRoomLabel', {
@@ -383,8 +392,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -474,8 +483,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -563,8 +572,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -652,8 +661,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -673,6 +682,7 @@ export function LudoLobby() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
+                      ref={roomCodeInputRef}
                       value={roomCodeInput}
                       onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => {
@@ -694,7 +704,7 @@ export function LudoLobby() {
                         borderRadius: 6,
                         color: '#ffe600',
                         padding: '0 14px',
-                        fontSize: '1rem',
+                        fontSize: roomCodeFontSize,
                         fontWeight: 'bold',
                         fontFamily: 'var(--font-mono)',
                         letterSpacing: '2px',
@@ -830,8 +840,8 @@ export function LudoLobby() {
                           style={{
                             padding: '28px 0',
                             textAlign: 'center',
-                            color: 'var(--text-muted)',
-                            fontSize: '0.78rem',
+                            color: 'var(--text-soft)',
+                            fontSize: 'calc(0.78rem + 1pt)',
                           }}
                         >
                           {t('ludoLobbyPasses.noOpenRooms')}
@@ -899,7 +909,7 @@ export function LudoLobby() {
                                   >
                                     {room.host}
                                   </div>
-                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                                  <div style={{ color: 'var(--text-soft)', fontSize: '0.65rem' }}>
                                     {room.maxSeats}P • {room.mode}
                                   </div>
                                 </div>

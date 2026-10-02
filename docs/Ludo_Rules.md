@@ -1,4 +1,4 @@
-# RetroLudo '42 — Full Ruleset
+# RETRO LUDO '42: Full Ruleset
 
 
 ---

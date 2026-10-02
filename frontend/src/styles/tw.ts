@@ -118,8 +118,10 @@ export const TICKET_YELLOW =
 export const TICKET_GREEN =
   'bg-[linear-gradient(90deg,rgba(0,255,136,.2)_0%,rgba(20,6,42,.96)_100%)] border-2 border-[#00ff88] shadow-[0_4px_20px_rgba(0,0,0,.6),0_0_16px_rgba(0,255,136,.22)] hover:border-[#33ffaa] hover:bg-[linear-gradient(90deg,rgba(0,255,136,.3)_0%,rgba(30,8,55,.98)_100%)] hover:shadow-[0_8px_30px_rgba(0,0,0,.75),0_0_28px_rgba(255,0,127,.55),inset_0_0_16px_rgba(0,255,136,.18)]';
 
+// LudoLobby room-code ticket only. Deliberately no hover styles: the strip
+// keeps its resting look while the mouse is over it.
 export const TICKET_CYAN =
-  'bg-[linear-gradient(90deg,rgba(0,240,255,.2)_0%,rgba(20,6,42,.96)_100%)] border-2 border-(--accent-cyan) shadow-[0_4px_20px_rgba(0,0,0,.6),0_0_16px_rgba(0,240,255,.22)] hover:border-[#33f6ff] hover:bg-[linear-gradient(90deg,rgba(0,240,255,.3)_0%,rgba(30,8,55,.98)_100%)] hover:shadow-[0_8px_30px_rgba(0,0,0,.75),0_0_28px_rgba(240,255,.5),inset_0_0_16px_rgba(0,240,255,.18)]';
+  'bg-[linear-gradient(90deg,rgba(0,240,255,.2)_0%,rgba(20,6,42,.96)_100%)] border-2 border-(--accent-cyan) shadow-[0_4px_20px_rgba(0,0,0,.6),0_0_16px_rgba(0,240,255,.22)]';
 
 export const TICKET_ACTION_PILL =
   'inline-flex items-center justify-center py-3 px-6 rounded-md [font-family:var(--font-heading)] text-[0.9rem] font-black tracking-[1px] [transition:all_0.2s_ease] pointer-events-none shrink-0';
@@ -207,7 +209,7 @@ export const CYBER_BTN_CORNER =
 export const CYBER_BTN_KBD =
   'relative z-[3] text-[#0d0221] [font-family:var(--font-mono,monospace)] font-bold h-5 min-w-[20px] inline-grid place-items-center text-[0.65rem] px-1 rounded [transition:color_0.2s_ease,background_0.2s_ease] bg-(--btn-accent) group-hover:text-(--btn-accent) group-hover:bg-[#0d0221]';
 
-export const CYBER_BTN_LABEL = 'relative z-[3] text-[0.76rem] tracking-[0.5px]';
+export const CYBER_BTN_LABEL = 'relative z-[3] text-[0.76rem] tracking-[0.5px] uppercase';
 
 export const CYBER_BTN_GLITCH_LAYER =
   'hidden absolute inset-0 items-center gap-[0.6rem] py-[0.6rem] px-[0.8rem] pointer-events-none text-(--btn-accent) [text-shadow:0_1px_var(--btn-shadow)] z-[4] group-hover:inline-flex group-hover:[animation:cyberBtnGlitch_1.8s_infinite]';
@@ -262,13 +264,13 @@ export const PAYERS_LIST = 'list-none my-[0.8em]';
 export const PAYERS_LI = 'flex items-center py-[0.2em] border-b-[1.5px] border-b-white/10';
 
 export const PAYERS_LI_P =
-  'grow flex justify-between items-center text-[1.02rem] py-[0.6em] px-[0.8em] text-(--text-main) [font-family:var(--font-display)] font-bold max-[520px]:text-[0.88rem]';
+  'grow min-w-0 flex justify-between items-center text-[1.02rem] py-[0.6em] px-[0.8em] text-(--text-main) [font-family:var(--font-display)] font-bold max-[520px]:text-[0.88rem]';
 
 export const PAYER_IMAGE_CONTAINER =
-  'flex items-center justify-center py-[0.5em] px-[0.8em] border-r-[1.5px] border-r-white/10';
+  'shrink-0 flex items-center justify-center py-[0.5em] px-[0.8em] border-r-[1.5px] border-r-white/10';
 
 export const PAY_TAG_BASE =
-  'inline-flex items-center gap-1.5 whitespace-nowrap border-[1.5px] border-[rgba(0,240,255,.4)] rounded-lg py-[0.35em] px-[0.65em] text-[0.78rem] [font-family:var(--font-mono)] font-bold max-[520px]:text-[0.7rem]';
+  'shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap border-[1.5px] border-[rgba(0,240,255,.4)] rounded-lg py-[0.35em] px-[0.65em] text-[0.78rem] [font-family:var(--font-mono)] font-bold max-[520px]:text-[0.7rem]';
 
 export const PAY_TAG_WIN =
   'border-[#ffe600] text-[#ffe600] bg-[rgba(255,230,0,.15)] shadow-[0_0_8px_rgba(255,230,0,.3)]';

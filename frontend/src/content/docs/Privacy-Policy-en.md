@@ -1,9 +1,9 @@
-# Privacy Policy — ft-Transcendence (RetroLudo '42)
+# Privacy Policy — ft-Transcendence (Retro Ludo '42)
 
 **Effective date:** 2026-08-26
-**Controller:** Team Pace 24, developers of ft-Transcendence (RetroLudo '42) (the "Team")
+**Controller:** Team Pace 24, developers of ft-Transcendence (Retro Ludo '42) (the "Team")
 
-This Privacy Policy explains how the ft-Transcendence (RetroLudo '42) web application ("the App", "we", "us") collects, uses, discloses, and protects your personal data. It is prepared in accordance with the **Malaysian Personal Data Protection Act 2010 ("PDPA")** and its guiding principles: General, Notice and Choice, Disclosure, Security, Retention, Data Integrity, and Access.
+This Privacy Policy explains how the ft-Transcendence (Retro Ludo '42) web application ("the App", "we", "us") collects, uses, discloses, and protects your personal data. It is prepared in accordance with the **Malaysian Personal Data Protection Act 2010 ("PDPA")** and its guiding principles: General, Notice and Choice, Disclosure, Security, Retention, Data Integrity, and Access.
 
 
 ---

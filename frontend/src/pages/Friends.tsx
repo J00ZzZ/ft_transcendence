@@ -621,7 +621,7 @@ export function Friends() {
                                     : 'none';
                                 e.currentTarget.style.transform = 'translateX(0)';
                               }}
-                              title={`Click to view ${f.username}'s Pilot Profile`}
+                              title={t('friends.viewProfileTooltip', { username: f.username })}
                             >
                               {/* Left: Avatar + Callsign + Presence */}
                               <div
@@ -761,7 +761,7 @@ export function Friends() {
                                     opacity: invitingId === f.id ? 0.6 : 1,
                                     borderRadius: 4,
                                   }}
-                                  title="Challenge Operative to Match"
+                                  title={t('friends.challengeTooltip')}
                                 >
                                   {invitingId === f.id
                                     ? t('friends.invitingBtnState')
@@ -784,7 +784,7 @@ export function Friends() {
                                     background: 'rgba(255, 255, 255, 0.06)',
                                     borderRadius: 4,
                                   }}
-                                  title="Remove Comrade"
+                                  title={t('friends.removeTooltip')}
                                 >
                                   {t('friends.removeComradeBtn')}
                                 </button>
@@ -805,7 +805,7 @@ export function Friends() {
                                     background: 'rgba(255, 0, 85, 0.14)',
                                     borderRadius: 4,
                                   }}
-                                  title="Block Pilot"
+                                  title={t('friends.blockTooltip')}
                                 >
                                   {t('friends.blockPilotBtn')}
                                 </button>
@@ -1199,7 +1199,7 @@ export function Friends() {
                                   borderColor: '#00ff88',
                                   borderRadius: 3,
                                 }}
-                                title="Accept Friend Request"
+                                title={t('friends.acceptTooltip')}
                               >
                                 {t('friends.acceptActionBtn')}
                               </button>
@@ -1214,7 +1214,7 @@ export function Friends() {
                                   fontFamily: 'var(--font-display)',
                                   borderRadius: 3,
                                 }}
-                                title="Decline Request"
+                                title={t('friends.declineTooltip')}
                               >
                                 {t('friends.declineActionBtn')}
                               </button>

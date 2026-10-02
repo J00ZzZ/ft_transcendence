@@ -90,6 +90,7 @@ input/output. Each event is documented in full below; see
 | `socket/server.ts` | `SocketServer` class — event routing, JWT middleware, engine lifecycle |
 | `socket/auth.ts` | `GameSocket` type, JWT extraction middleware |
 | `socket/auth.spec.ts` | Vitest cover for `verifyToken` — accepts a valid engine token, rejects a wrong secret, a missing/ wrong `aud`, `alg:none`, a tampered signature and an expired token |
+| `socket/join-manager.spec.ts` | Vitest cover for the PvE bot fill: the lobby's label reaches the seat's `displayName` while `username` stays `bot-<color>`, plus the missing-name and blank-name fallbacks |
 | `socket/socket-handlers.ts` | All client→server event handlers (join, roll, move, etc.) |
 | `socket/join-manager.ts` | `JoinManager` — seat resolution, game creation, reconnect vs fresh join, PvE/hotseat auto-start |
 | `socket/bot-scheduler.ts` | One timer per game that drives bot turns |
@@ -216,7 +217,7 @@ socket.emit('join_game', gameId, playerColor, userId?, displayName?);
 | `gameId` | string | Match UUID |
 | `playerColor` | `'red'` \| `'green'` \| `'yellow'` \| `'blue'` | Your chosen color |
 | `userId` | string | (optional) Account id of the joining user; omitted for hotseat's local seats |
-| `displayName` | string | (optional) Display name for the seat |
+| `displayName` | string | (optional) Display name for the seat. A bot seat takes it from the match's own `player{n}_displayName`, which the backend writes as `bot-<color> (<assistant>)`, so it can differ from the immutable `bot-<color>` `username` |
 
 **Response:** `game_joined` event with full `GameState`
 
@@ -438,7 +439,7 @@ The pause is cleared when its owner reconnects (`handlePlayerReconnect`, which a
   color: PlayerColor;                  // Seat color
   status: 'active' | 'exited' | 'inactive' | 'disconnected';  // Player lifecycle state
   username: string;                    // Immutable account name (bots: `bot-<color>`)
-  displayName?: string;                // Name shown in the UI
+  displayName?: string;                // Name shown in the UI (bot seats: `bot-<color> (<assistant>)`)
   userId?: string;                     // Account id used to key the avatar; absent for bots and hotseat seats
   hasAvatarPhoto: boolean;             // Whether the account has an uploaded photo
   avatarStyle?: string;                // DiceBear style used when there is no photo

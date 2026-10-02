@@ -64,7 +64,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6479
       # Overrides .env's host-reachable DATABASE_URL with the container form
-      # (hostname "db" instead of "localhost") — see backend/prisma.config.ts.
+      # (hostname "db" instead of "localhost"): see backend/prisma.config.ts.
       DATABASE_URL: ${CONTAINER_DATABASE_URL}
     ports:
       # Loopback-only: clients always reach the backend through nginx's
@@ -130,7 +130,7 @@ services:
     ports:
       # Loopback-only, same reasoning as backend's: a host-run `npm run dev`
       # (vite.config.ts's default, non-containerized proxy target) needs this
-      # reachable at localhost:3001 — clients in prod/nginx still go through
+      # reachable at localhost:3001, while clients in prod/nginx still go through
       # the container network via `expose`, this is purely for host-side dev.
       - 127.0.0.1:3001:3001
     expose:
@@ -143,7 +143,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    # See backend's `develop.watch` comment above — same reasoning applies here.
+    # See backend's `develop.watch` comment above: same reasoning applies here.
     develop:
       watch:
         - action: rebuild

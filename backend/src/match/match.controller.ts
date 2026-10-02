@@ -52,6 +52,7 @@ export class MatchController {
     @Body('playerCount') playerCount: number,
     @Body('botCount') botCount?: number,
     @Body('botColors') botColors?: string[],
+    @Body('botNames') botNames?: string[],
     @Body('seatColors') seatColors?: string[],
   ) {
     if (mode !== 'pvp' && mode !== 'pve' && mode !== 'hotseat') {
@@ -72,6 +73,7 @@ export class MatchController {
       playerCount || 2,
       botCount ?? 0,
       botColors,
+      botNames,
       seatColors,
     );
   }

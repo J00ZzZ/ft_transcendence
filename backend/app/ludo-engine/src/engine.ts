@@ -78,7 +78,7 @@ export class LudoEngine {
   private static seededRand(seed: number): () => number {
     let s = seed >>> 0;
     return () => {
-      // 0x6d2b79f5: mulberry32's fixed odd accumulator — cycles s through all
+      // 0x6d2b79f5: mulberry32's fixed odd accumulator, which cycles s through all
       // 2^32 states (full period); `| 0` wraps the sum back into 32-bit range.
       s = (s + 0x6d2b79f5) | 0;
       let t = Math.imul(s ^ (s >>> 15), 1 | s);
@@ -112,7 +112,7 @@ export class LudoEngine {
       // Frozen for a disconnect grace window: no rolls until the paused seat
       // reconnects or is pruned.
       if (state.paused) {
-        throw new Error('Game is paused — waiting for player to reconnect');
+        throw new Error('Game is paused: waiting for player to reconnect');
       }
 
       // Math.random() cannot be seeded directly, so it seeds the per-roll stream.
@@ -209,7 +209,7 @@ export class LudoEngine {
       // Paused for a disconnect grace window: no moves either. The paused seat
       // keeps its pending dice/moves; a reconnect resumes exactly here.
       if (state.paused) {
-        throw new Error('Game is paused — waiting for player to reconnect');
+        throw new Error('Game is paused: waiting for player to reconnect');
       }
 
       // Validate: must be in WAITING_FOR_MOVE phase
