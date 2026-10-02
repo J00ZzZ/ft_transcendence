@@ -1214,9 +1214,9 @@ export function Friends() {
                                   fontFamily: 'var(--font-display)',
                                   borderRadius: 3,
                                 }}
-                                title="Ignore Request"
+                                title="Decline Request"
                               >
-                                {t('friends.ignoreActionBtn')}
+                                {t('friends.declineActionBtn')}
                               </button>
                             </div>
                           </div>

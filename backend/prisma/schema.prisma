@@ -14,8 +14,10 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum FriendshipStatus {
+  none
   pending
   accepted
+  declined
   blocked
 }
 
@@ -53,8 +55,8 @@ model User {
   achievement   Achievement?
 
   gameParticipants    GameParticipant[]
-  sentFriendships     Friendship[]      @relation("SentFriendships")
-  receivedFriendships Friendship[]      @relation("ReceivedFriendships")
+  friendshipsAsUser1 Friendship[] @relation("FriendshipUser1")
+  friendshipsAsUser2 Friendship[] @relation("FriendshipUser2")
 
   rating                 Int        @default(0)
   highestRating          Int        @default(0)
@@ -143,17 +145,34 @@ model GameParticipant {
 
 // ─── Friendship ──────────────────────────────────────────────────────────────
 
+// One row per unordered user pair (a "superset" row). Each direction carries
+// its own status (user1Status = user1's action toward user2), so a block on one
+// side can never be silently rewritten from the other side. pairKey is the
+// sorted "min:max" id pair and enforces one row per pair.
 model Friendship {
-  id        String           @id
-  userId    String
-  friendId  String
-  status    FriendshipStatus @default(pending)
-  createdAt DateTime         @default(now())
+  id      String @id
+  pairKey String @unique
 
-  user   User @relation("SentFriendships", fields: [userId], references: [id], onDelete: Cascade)
-  friend User @relation("ReceivedFriendships", fields: [friendId], references: [id], onDelete: Cascade)
+  user1Id String
+  user2Id String
 
-  @@unique([userId, friendId])
+  user1Status   FriendshipStatus @default(none)
+  user2Status   FriendshipStatus @default(none)
+  user1StatusAt DateTime?
+  user2StatusAt DateTime?
+
+  // Re-request bookkeeping for the 24h pending TTL / 1h decline cooldown.
+  requestCount  Int       @default(0)
+  lastRequestAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user1 User @relation("FriendshipUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2 User @relation("FriendshipUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  @@index([user1Id, user1Status])
+  @@index([user2Id, user2Status])
 }
 
 // ─── Notification ────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { NotificationService } from '../notification/notification.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
 import { isBotUserId } from '../common/botname-enforce';
+import { pairKey, isFriendPair, isBlockedPair } from '../friends/friendship-pair';
 import { isEngineGameStarted, isSeatFinalized } from './seat-finalization';
 import { ENGINE_WS_URL } from './match.creator.service';
 import { signEngineToken } from './engine-token.util';
@@ -176,26 +177,26 @@ export class MatchPlayerService {
         message: 'Game already started',
       });
 
-    const isHost =
+    const isSeated =
       data.player1_id === hostId ||
       data.player2_id === hostId ||
       data.player3_id === hostId ||
       data.player4_id === hostId;
-    if (!isHost)
+    if (!isSeated)
       throw new ForbiddenException({
         code: 'MATCH_NOT_PLAYER',
         message: 'You are not a player in this game',
       });
 
-    const friendship = await this.prisma.db.friendship.findFirst({
-      where: {
-        OR: [
-          { userId: hostId, friendId, status: 'accepted' },
-          { userId: friendId, friendId: hostId, status: 'accepted' },
-        ],
-      },
+    const pair = await this.prisma.db.friendship.findUnique({
+      where: { pairKey: pairKey(hostId, friendId) },
     });
-    if (!friendship)
+    if (pair && isBlockedPair(pair))
+      throw new ForbiddenException({
+        code: 'FRIEND_BLOCKED',
+        message: 'Cannot invite - user is blocked',
+      });
+    if (!pair || !isFriendPair(pair))
       throw new ForbiddenException({
         code: 'NOT_FRIENDS_WITH_USER',
         message: 'You are not friends with this user',

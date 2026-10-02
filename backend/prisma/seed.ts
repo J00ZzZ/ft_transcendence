@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import Redis from 'ioredis';
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { pairKey } from '../src/friends/friendship-pair';
 
 loadEnv({ path: join(__dirname, '..', '..', '.env') });
 
@@ -212,6 +213,38 @@ async function main() {
   const targetsForRequests =
     nonSeedUsers.length > 0 ? nonSeedUsers : [createdUsers[0], createdUsers[1]];
 
+  // One row per unordered pair (schema enforces pairKey uniqueness), so guard
+  // against inserting the same pair twice across the blocks below.
+  const seenPairs = new Set<string>();
+  const addPair = async (
+    a: string,
+    b: string,
+    status: {
+      user1Status: 'pending' | 'accepted' | 'blocked';
+      user2Status: 'none' | 'accepted';
+      createdAt: Date;
+    },
+  ) => {
+    const key = pairKey(a, b);
+    if (seenPairs.has(key)) return;
+    seenPairs.add(key);
+    await prisma.friendship.create({
+      data: {
+        id: randomUUID(),
+        pairKey: key,
+        user1Id: a,
+        user2Id: b,
+        user1Status: status.user1Status,
+        user2Status: status.user2Status,
+        user1StatusAt: status.createdAt,
+        user2StatusAt: status.user2Status === 'none' ? null : status.createdAt,
+        requestCount: status.user1Status === 'pending' ? 1 : 0,
+        lastRequestAt: status.user1Status === 'pending' ? status.createdAt : null,
+        createdAt: status.createdAt,
+      },
+    });
+  };
+
   for (const target of targetsForRequests) {
     // 1. Incoming Pending Friend Requests sent TO target
     const requestSenders = [
@@ -222,14 +255,10 @@ async function main() {
 
     for (const sender of requestSenders) {
       if (sender && sender.id !== target.id) {
-        await prisma.friendship.create({
-          data: {
-            id: randomUUID(),
-            userId: sender.id,
-            friendId: target.id,
-            status: 'pending',
-            createdAt: new Date(now - Math.floor(Math.random() * 48) * HOUR),
-          },
+        await addPair(sender.id, target.id, {
+          user1Status: 'pending',
+          user2Status: 'none',
+          createdAt: new Date(now - Math.floor(Math.random() * 48) * HOUR),
         });
       }
     }
@@ -246,14 +275,10 @@ async function main() {
 
     for (const f of friendList) {
       if (f && f.id !== target.id) {
-        await prisma.friendship.create({
-          data: {
-            id: randomUUID(),
-            userId: f.id,
-            friendId: target.id,
-            status: 'accepted',
-            createdAt: new Date(now - (10 + Math.floor(Math.random() * 30)) * 24 * HOUR),
-          },
+        await addPair(f.id, target.id, {
+          user1Status: 'accepted',
+          user2Status: 'accepted',
+          createdAt: new Date(now - (10 + Math.floor(Math.random() * 30)) * 24 * HOUR),
         });
       }
     }
@@ -261,14 +286,10 @@ async function main() {
     // 3. Sample Blocked Pilot
     const blockedPilot = createdUsers.find((u) => u.username === 'NeonSprout');
     if (blockedPilot && blockedPilot.id !== target.id) {
-      await prisma.friendship.create({
-        data: {
-          id: randomUUID(),
-          userId: target.id,
-          friendId: blockedPilot.id,
-          status: 'blocked',
-          createdAt: new Date(now - 5 * 24 * HOUR),
-        },
+      await addPair(target.id, blockedPilot.id, {
+        user1Status: 'blocked',
+        user2Status: 'none',
+        createdAt: new Date(now - 5 * 24 * HOUR),
       });
     }
   }

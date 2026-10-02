@@ -70,6 +70,15 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 }
 ```
 
+### InviteFriendBody
+
+```typescript
+{
+  friendId: string;  // REQUIRED, UUID — validated by class-validator. The route
+                     // then requires a both-directions-accepted, unblocked pair.
+}
+```
+
 ### MatchResponse
 
 ```typescript
@@ -108,6 +117,13 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 | `GET` | `/api/games/mine` | JWT | List rooms the user is seated in |
 | `POST` | `/api/game/end` | engine key | Engine callback — process game end (scoring/achievements) |
 | `POST` | `/api/game/:id/started` | engine key | Engine callback — mark game started |
+
+> **Invite body validation:** `POST /api/game/:id/invite` takes an
+> `InviteFriendBody` (`{ friendId }`). `friendId` is validated as a required UUID
+> by the global `ValidationPipe`, so an empty or malformed body is rejected at the
+> boundary instead of silently skipping the friendship check. The handler then
+> requires one friendship pair row where both directions are `accepted` and
+> neither is `blocked`, reusing the shared `friendship-pair.ts` predicates.
 
 
 ---

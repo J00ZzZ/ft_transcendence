@@ -40,6 +40,7 @@ export const en = {
     FRIEND_NOT_FOUND: 'Friendship not found',
     FRIEND_BLOCK_SELF: 'Cannot block yourself',
     FRIEND_BLOCK_NOT_FOUND: 'Blocked user record not found',
+    FRIEND_REQUEST_COOLDOWN: 'You need to wait 1 hr after your previous friend request',
     MATCH_MODE_REQUIRED: 'Mode is required and must be pvp, pve, or hotseat',
     MATCH_BOTS_PVE_ONLY: 'Bots are only allowed in PvE games',
     MATCH_PLAYER_COUNT_RANGE: 'Player count must be between 2 and 4',
@@ -310,6 +311,7 @@ export const en = {
     sentYouRequestText: 'SENT YOU A REQUEST',
     acceptActionBtn: 'ACCEPT',
     ignoreActionBtn: 'IGNORE',
+    declineActionBtn: 'DECLINE',
   },
   profile: {
     title: 'Player Profile',

@@ -40,6 +40,7 @@ export const ms = {
     FRIEND_NOT_FOUND: 'Persahabatan tidak dijumpai',
     FRIEND_BLOCK_SELF: 'Tidak boleh menyekat diri sendiri',
     FRIEND_BLOCK_NOT_FOUND: 'Rekod pengguna disekat tidak dijumpai',
+    FRIEND_REQUEST_COOLDOWN: 'Anda perlu menunggu 1 jam selepas permintaan kawan anda sebelum ini',
     MATCH_MODE_REQUIRED: 'Mod diperlukan dan mesti pvp, pve, atau hotseat',
     MATCH_BOTS_PVE_ONLY: 'Bot hanya dibenarkan dalam permainan PvE',
     MATCH_PLAYER_COUNT_RANGE: 'Bilangan pemain mesti antara 2 dan 4',
@@ -310,6 +311,7 @@ export const ms = {
     sentYouRequestText: 'MENGHANTAR PERMINTAAN KEPADA ANDA',
     acceptActionBtn: 'TERIMA',
     ignoreActionBtn: 'ABAIKAN',
+    declineActionBtn: 'TOLAK',
   },
   profile: {
     title: 'Profil Pemain',

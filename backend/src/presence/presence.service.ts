@@ -100,14 +100,14 @@ export class PresenceService implements OnModuleDestroy {
       const friends = await this.prisma.db.friendship.findMany({
         where: {
           OR: [
-            { userId, status: 'accepted' },
-            { friendId: userId, status: 'accepted' },
+            { user1Id: userId, user1Status: 'accepted', user2Status: 'accepted' },
+            { user2Id: userId, user1Status: 'accepted', user2Status: 'accepted' },
           ],
         },
-        select: { userId: true, friendId: true },
+        select: { user1Id: true, user2Id: true },
       });
       const friendIds = [
-        ...new Set(friends.flatMap((f) => (f.userId === userId ? [f.friendId] : [f.userId]))),
+        ...new Set(friends.map((f) => (f.user1Id === userId ? f.user2Id : f.user1Id))),
       ];
       if (friendIds.length === 0) return;
 

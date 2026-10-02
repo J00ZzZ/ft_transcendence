@@ -40,6 +40,7 @@ export const fr = {
     FRIEND_NOT_FOUND: 'Amitié introuvable',
     FRIEND_BLOCK_SELF: 'Vous ne pouvez pas vous bloquer vous-même',
     FRIEND_BLOCK_NOT_FOUND: 'Enregistrement d\'utilisateur bloqué introuvable',
+    FRIEND_REQUEST_COOLDOWN: 'Vous devez attendre 1 h après votre précédente demande d\'ami',
     MATCH_MODE_REQUIRED: 'Le mode est requis et doit être pvp, pve ou hotseat',
     MATCH_BOTS_PVE_ONLY: 'Les bots ne sont autorisés que dans les parties PvE',
     MATCH_PLAYER_COUNT_RANGE: 'Le nombre de joueurs doit être compris entre 2 et 4',
@@ -311,6 +312,7 @@ export const fr = {
     sentYouRequestText: 'VOUS A ENVOYÉ UNE DEMANDE',
     acceptActionBtn: 'ACCEPTER',
     ignoreActionBtn: 'IGNORER',
+    declineActionBtn: 'REFUSER',
   },
   profile: {
     title: 'Profil du Joueur',

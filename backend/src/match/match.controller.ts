@@ -11,6 +11,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { MatchService, type GameEndPayload } from './match.service';
+import { InviteFriendDto } from './dto/invite-friend.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { requireSecret } from '../secrets';
 
@@ -103,9 +104,9 @@ export class MatchController {
   inviteFriend(
     @Request() req: { user: { id: string } },
     @Param('id') gameId: string,
-    @Body('friendId') friendId: string,
+    @Body() dto: InviteFriendDto,
   ) {
-    return this.match.inviteFriendToGame(gameId, req.user.id, friendId);
+    return this.match.inviteFriendToGame(gameId, req.user.id, dto.friendId);
   }
 
   @UseGuards(JwtAuthGuard)
