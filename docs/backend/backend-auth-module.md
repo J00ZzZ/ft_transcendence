@@ -44,7 +44,7 @@ The module also provides the `JwtAuthGuard` used by other modules to protect the
 | `auth.controller.ts` | HTTP routes: register, verify-email, login, 2fa/verify, refresh, forgot-password, reset-password, logout, me, profile read/update, password change, account deletion, 2FA settings, and 3 OAuth flows |
 | `auth.service.ts` | Core business logic: password hashing (bcrypt), JWT issuance, OAuth validation, 2FA orchestration, email verification, and the verify-then-commit email change |
 | `auth.constants.ts` | `AUTH`: single-source auth tunables (token TTLs, 2FA challenge/resend limits, email-change rate cap) |
-| `jwt.strategy.ts` | Passport strategy that extracts JWT from the `token` cookie |
+| `jwt.strategy.ts` | Passport strategy that extracts JWT from the `token` cookie and requires our issuer, the API audience, `HS256` and a string `sub` |
 | `jwt-auth.guard.ts` | `@UseGuards(JwtAuthGuard)` decorator — protects routes behind JWT |
 | `jwt-payload.ts` | TypeScript interface for the JWT payload: `{ sub: string; username: string }` |
 | `google.strategy.ts` | Passport strategy for Google OAuth 2.0 |
@@ -206,6 +206,25 @@ Two httpOnly cookies are used:
 | secure | `true` in production | `true` in production |
 | path | `/` | `/api/auth` |
 | maxAge | 15 minutes (`ACCESS_MAX_AGE_MS`) | 7 days (`REFRESH_MAX_AGE_MS` / `REFRESH_TTL_S`) |
+
+### Token scope
+
+A valid signature is not enough for a JWT to count as a session. Each token family is bound to
+the one place it may be used:
+
+| Token | Secret | `iss` / `aud` | Accepted by |
+|-------|--------|---------------|-------------|
+| Session access token (`token` cookie) | `JWT_SECRET` | `ft_transcendence` / `ft_transcendence-api` | `JwtStrategy` (every `JwtAuthGuard` route) and `verifyAccessToken()` |
+| oauth-link token (OAuth `state`) | `OAUTH_STATE_SECRET` | `ft_transcendence` / `oauth-link` | `resolveOAuthLink()` only |
+| Engine match token | `ENGINE_JWT_SECRET` | `ft_transcendence` / `ludo-engine` | ludo-engine handshake only |
+
+`JwtModule` stamps the session claims on every `jwt.sign()` and requires them, plus `HS256`, on
+every `jwt.verify()` (`signOptions` / `verifyOptions` in `auth.module.ts`). The oauth-link and
+engine tokens override the secret and audience per call, so neither can pass as a session.
+`JwtStrategy.validate()` also rejects a token without a string `sub`: controllers trust
+`req.user.id`, and Prisma ignores an `undefined` filter, so `where: { userId: undefined }` would
+match every user's rows. The values live in `auth.constants.ts` (`TOKEN_ISSUER`,
+`SESSION_TOKEN_AUDIENCE`, `OAUTH_LINK_AUDIENCE`, `OAUTH_LINK_TTL`).
 
 ### Frontend URL resolution
 
@@ -525,7 +544,7 @@ POST /api/auth/reset-password
 ```
 GET /api/auth/{provider}
   ├── TunnelAwareAuthGuard picks the local or ngrok strategy from the Host header
-  ├── With a valid access-token cookie it signs a 10-minute oauth-link token into the provider `state`
+  ├── With a valid access-token cookie it signs a 10-minute oauth-link token (`OAUTH_STATE_SECRET`, `aud: oauth-link`) into the provider `state`
   └── Redirect to the provider consent screen
 
 GET /api/auth/{provider}/callback
@@ -690,7 +709,7 @@ Callers differ:
 | `nodemailer` | SMTP email delivery (verification, 2FA, password reset, email change — copy localized per recipient) |
 | `ioredis` | Redis client (SessionService, TwoFactorService, MailService's expiry subscription) |
 | `PrismaService` | Database access (User, Account models) |
-| `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, ENGINE_JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
+| `secrets.ts` | Single env-var lookup (`secret` / `requireSecret`) over the root `.env` — JWT_SECRET, OAUTH_STATE_SECRET, ENGINE_JWT_SECRET, OAuth client IDs/secrets/callback URLs, SMTP credentials |
 
 
 ---
@@ -703,7 +722,8 @@ All configuration is read from environment variables — the root `.env` (compos
 
 | Variable | Used By |
 |--------|---------|
-| `JWT_SECRET` | JwtModule, JwtStrategy |
+| `JWT_SECRET` | JwtModule, JwtStrategy (session access tokens only) |
+| `OAUTH_STATE_SECRET` | `AuthService.createOAuthLinkToken` / `resolveOAuthLink` (the oauth-link `state` token, a separate key so it can never pass as a session) |
 | `ENGINE_JWT_SECRET` | `MatchModule` (signs the ludo-engine match tokens — deliberately a separate key, not read by AuthModule) |
 | `GOOGLE_CLIENT_ID` | GoogleStrategy |
 | `GOOGLE_CLIENT_SECRET` | GoogleStrategy |
