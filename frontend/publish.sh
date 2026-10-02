@@ -5,11 +5,11 @@
 # normal long-running service instead of a one-shot job.
 set -e
 
-# Build outside the bind-mounted /app entirely (see vite.config.ts) — a
+# Build outside the bind-mounted /app entirely (see vite.config.ts): a
 # Docker Desktop for Mac VirtioFS bug intermittently fails "Unknown system
 # error -35" (ENOLCK) reading files under the bind mount. Confirmed by direct
 # testing: it's not tied to any one method (fs.copyFileSync, `cp`, `tar`, even
-# plain `cat` all hit it some of the time) — it's genuinely non-deterministic,
+# plain `cat` all hit it some of the time): it's genuinely non-deterministic,
 # so the real fix is retrying, not avoiding a specific syscall. /tmp is the
 # container's own filesystem, not bind-mounted, so it's unaffected; only the
 # final copy into /export (a real Docker volume, also not bind-mounted) needs
@@ -30,7 +30,7 @@ with_retry() {
   return 1
 }
 
-# Stage public/ into /tmp first (see comment above) — copying straight from
+# Stage public/ into /tmp first (see comment above): copying straight from
 # the bind mount happens here instead of inside Vite's own build, so a
 # transient failure can be retried per-file instead of aborting the build.
 stage_public() {
@@ -47,14 +47,14 @@ publish() {
   with_retry stage_public
   # `publish` runs as the tested command of an `if`/`||` in every caller
   # (with_retry, and the watch loop's `... || echo`), which suppresses
-  # `set -e` for the rest of this function on a failure deep inside it —
+  # `set -e` for the rest of this function on a failure deep inside it:
   # POSIX/dash don't propagate errexit out of a function once its result is
   # itself being tested. Without this explicit check, a failed `npm run
   # build` fell through to `rm -rf /export/*`, wiping the last good build
   # and leaving nginx with an empty document root (directory-listing-
   # forbidden / index.html redirect-loop errors) until the next good build.
   if ! npm run build; then
-    echo "❌ [$(date '+%H:%M:%S')] Build failed — keeping the last published build in place."
+    echo "❌ [$(date '+%H:%M:%S')] Build failed: keeping the last published build in place."
     return 1
   fi
   rm -rf /export/*
@@ -67,7 +67,7 @@ publish() {
 # whenever the volume was last populated. Installing on every start keeps it
 # in sync with the current lockfile instead of silently going stale.
 #
-# Retried here too (not just in the watch loop below) — a transient VirtioFS
+# Retried here too (not just in the watch loop below): a transient VirtioFS
 # failure on the very first boot would otherwise crash the container
 # immediately under `set -e`, and Docker's restart policy would just hit the
 # same class of failure again on every restart.
@@ -77,7 +77,7 @@ with_retry publish
 echo "👀 Watching /app/src and package.json for changes..."
 # Deliberately NOT watching package-lock.json: npm install can rewrite it
 # (e.g. to sync with package.json), which would re-trigger this same watch,
-# re-running npm install before the first one finished — two installs racing
+# re-running npm install before the first one finished: two installs racing
 # against the same node_modules volume, which is exactly what corrupts it.
 while inotifywait -qr -e modify,create,delete,move \
   /app/src /app/package.json; do
@@ -85,5 +85,5 @@ while inotifywait -qr -e modify,create,delete,move \
   # `set -e` would otherwise kill this whole script (and the container) on a
   # single broken save, silently ending the watch loop until someone notices
   # and restarts it. Catch the failure so the next save gets a fresh attempt.
-  (with_retry npm install && with_retry publish) || echo "❌ [$(date '+%H:%M:%S')] Build failed — fix the error and save again."
+  (with_retry npm install && with_retry publish) || echo "❌ [$(date '+%H:%M:%S')] Build failed: fix the error and save again."
 done

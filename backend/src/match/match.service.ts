@@ -23,9 +23,18 @@ export class MatchService {
     playerCount: number,
     botCount: number,
     botColors?: string[],
+    botNames?: string[],
     seatColors?: string[],
   ) {
-    return this.creator.createMatch(userId, mode, playerCount, botCount, botColors, seatColors);
+    return this.creator.createMatch(
+      userId,
+      mode,
+      playerCount,
+      botCount,
+      botColors,
+      botNames,
+      seatColors,
+    );
   }
   async createInvite(userId: string) {
     return this.creator.createInvite(userId);

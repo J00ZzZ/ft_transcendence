@@ -92,6 +92,12 @@ export function Lobby() {
       const botColors = visible
         .map((s, i) => (s.type === 'bot' ? SEAT_COLORS[i] : null))
         .filter((c): c is ColorKey => c !== null);
+      // The assistant name each bot seat was assigned here, index-aligned with
+      // botColors. The engine has no locale, so the label travels with the match
+      // and each client re-localizes the color word (FR: "bot-rouge (Siri)").
+      const botNames = visible
+        .map((s) => (s.type === 'bot' ? s.name : null))
+        .filter((n): n is string => n !== null);
       // Hotseat/PvE: send the exact seat colors, otherwise the engine's
       // playerCount-based default re-densifies slots the user skipped.
       const seatColors = visible
@@ -115,6 +121,7 @@ export function Lobby() {
           gameMode === 'hotseat' ? filledCount : gameMode === 'pve' ? 1 + botCount : playerCount,
         botCount,
         botColors: botColors.length > 0 ? botColors : undefined,
+        botNames: botNames.length > 0 ? botNames : undefined,
         seatColors:
           (gameMode === 'hotseat' || gameMode === 'pve') && seatColors.length > 0
             ? seatColors
@@ -328,7 +335,14 @@ export function Lobby() {
                                 marginTop: 4,
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  minWidth: 0,
+                                }}
+                              >
                                 <UserAvatar
                                   username={user?.username ?? ''}
                                   userId={user?.id}
@@ -344,16 +358,26 @@ export function Lobby() {
                                     display: 'grid',
                                     placeItems: 'center',
                                   }}
-                                  style={{ borderRadius: 6, border: `1px solid ${hue}` }}
+                                  style={{
+                                    borderRadius: 6,
+                                    border: `1px solid ${hue}`,
+                                    flex: 'none',
+                                  }}
                                 />
-                                <div>
+                                <div style={{ minWidth: 0 }}>
                                   <div
                                     style={{
                                       fontWeight: 800,
                                       fontSize: '0.92rem',
                                       color: '#ffffff',
                                       fontFamily: 'var(--font-heading)',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
                                     }}
+                                    title={
+                                      (user?.displayName ?? user?.username ?? '') || t('common.you')
+                                    }
                                   >
                                     {(user?.displayName ?? user?.username ?? '').toUpperCase() ||
                                       t('common.you')}
@@ -400,7 +424,14 @@ export function Lobby() {
                                   justifyContent: 'space-between',
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    minWidth: 0,
+                                  }}
+                                >
                                   <div
                                     style={{
                                       width: 38,
@@ -414,18 +445,23 @@ export function Lobby() {
                                       placeItems: 'center',
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: '0.82rem',
+                                      flex: 'none',
                                     }}
                                   >
                                     AI
                                   </div>
-                                  <div>
+                                  <div style={{ minWidth: 0 }}>
                                     <div
                                       style={{
                                         fontWeight: 800,
                                         fontSize: '0.92rem',
                                         color: '#ffffff',
                                         fontFamily: 'var(--font-heading)',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
                                       }}
+                                      title={seat.name}
                                     >
                                       {seat.name}
                                     </div>
@@ -457,6 +493,7 @@ export function Lobby() {
                                     display: 'grid',
                                     placeItems: 'center',
                                     fontSize: '0.8rem',
+                                    flex: 'none',
                                   }}
                                   title={t('lobby.removeBotTooltip')}
                                 >
@@ -499,6 +536,7 @@ export function Lobby() {
                                     alignItems: 'center',
                                     gap: 10,
                                     flex: 1,
+                                    minWidth: 0,
                                   }}
                                 >
                                   <div
@@ -514,11 +552,12 @@ export function Lobby() {
                                       placeItems: 'center',
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: '0.82rem',
+                                      flex: 'none',
                                     }}
                                   >
                                     P{i + 1}
                                   </div>
-                                  <div style={{ flex: 1 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     {editingSeat === i ? (
                                       <input
                                         autoFocus
@@ -552,6 +591,10 @@ export function Lobby() {
                                           setEditName(seat.name);
                                         }}
                                         style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                          minWidth: 0,
                                           fontWeight: 800,
                                           fontSize: '0.92rem',
                                           color: '#ffffff',
@@ -560,7 +603,19 @@ export function Lobby() {
                                         }}
                                         title={t('lobby.clickToRename')}
                                       >
-                                        {seat.name} ✎
+                                        {/* The pencil stays outside the ellipsized span, so a
+                                            long name cannot hide the rename affordance. */}
+                                        <span
+                                          style={{
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            minWidth: 0,
+                                          }}
+                                        >
+                                          {seat.name}
+                                        </span>
+                                        <span style={{ flex: 'none' }}>✎</span>
                                       </div>
                                     )}
                                     <div
@@ -591,6 +646,7 @@ export function Lobby() {
                                     display: 'grid',
                                     placeItems: 'center',
                                     fontSize: '0.8rem',
+                                    flex: 'none',
                                   }}
                                   title={t('lobby.removePlayerTooltip')}
                                 >

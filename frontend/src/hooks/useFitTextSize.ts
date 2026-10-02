@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
 type FitTextSizeOptions = {
-  /** Font size (px) kept whenever the text already fits — the design size. */
+  /** Font size (px) kept whenever the text already fits: the design size. */
   maxFontSize: number;
   /** Lower bound (px) so long locales never shrink into illegibility. */
   minFontSize?: number;
@@ -46,8 +46,8 @@ function measureTextWidth(text: string, font: string): number {
  * Keeps single-line text (input placeholder/value, nowrap labels) inside its own
  * box regardless of locale: the returned `fontSize` is the largest size at or
  * below `maxFontSize` for which every entry of `texts` fits the element's
- * content box. Sizes only ever shrink, so locales that already fit — and every
- * desktop width — render exactly as designed.
+ * content box. Sizes only ever shrink, so locales that already fit (and every
+ * desktop width) render exactly as designed.
  *
  * Attach the returned `ref` to the measured element and feed `fontSize` into its
  * own `font-size`. Everything else (font family, weight, letter-spacing, padding)

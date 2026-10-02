@@ -39,10 +39,13 @@ colors, mark ready, and trigger the start.
 
 ### Lobby data
 
-The **match metadata hash** (`match:{gameId}`) tracks seats — `player1_id`,
-`player1_color`, `status`, `gameType`, etc. Readiness is NOT stored there: the
-roster and ready flags live in the engine GameState (`state.players` +
-`state.readyPlayers`), which `emitLobbyUpdate` broadcasts to clients.
+The **match metadata hash** (`match:{gameId}`) tracks seats: `player1_id`,
+`player1_color`, `player{n}_displayName`, `status`, `gameType`, etc.
+`player{n}_displayName` is the shown name, and for a bot seat the backend writes
+it as `bot-<color> (<assistant>)` from the lobby's `botNames`, while the seat
+keeps its `bot-<color>` id. Readiness is NOT stored there: the roster and ready
+flags live in the engine GameState (`state.players` + `state.readyPlayers`),
+which `emitLobbyUpdate` broadcasts to clients.
 
 Beside the per-slot fields the hash holds one account record per seat,
 `seatUser_<color>`. It is written when the seat is taken, kept in step when a

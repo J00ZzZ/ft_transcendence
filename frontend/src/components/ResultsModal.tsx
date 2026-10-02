@@ -224,7 +224,16 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
                           />
                         </div>
                         <p className={PAYERS_LI_P}>
-                          <span>
+                          <span
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              // The rank badge is `shrink-0`, so the name must be able to
+                              // shrink for its ellipsis to apply.
+                              minWidth: 0,
+                            }}
+                          >
                             {pName} ({p.piecesInGoal}/4)
                           </span>
                           {renderRankBadge(index + 1, isWinner)}

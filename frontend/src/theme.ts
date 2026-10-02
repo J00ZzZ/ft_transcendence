@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-/** The four Ludo player colors — base / dark / yard (dim home-quadrant fill). */
+/** The four Ludo player colors: base / dark / yard (dim home-quadrant fill). */
 export const COL = {
   red: { base: '#ff007f', dark: '#a00050', yard: 'rgba(255, 0, 127, 0.15)' },
   green: { base: '#00ff88', dark: '#009950', yard: 'rgba(0, 255, 136, 0.15)' },
@@ -14,8 +14,8 @@ export type ColorKey = keyof typeof COL;
 export const SEAT_COLORS: ColorKey[] = ['blue', 'red', 'green', 'yellow'];
 
 /**
- * The names come from real-life bot assistants, so they need no translation.
- * Three is enough: seat 0 is always you, so a 4-seat table holds at most 3 bots.
+ * Bot assistant names, shown as-is because they need no translation. Three is
+ * enough: seat 0 is always you, so a 4-seat table holds at most 3 bots.
  */
 export const BOT_POOL = ['Siri', 'Alexa', 'Cortana'];
 

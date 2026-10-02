@@ -351,5 +351,7 @@ Then in the browser, with DevTools open:
 - **Uploads are checked by MIME and magic bytes, not decoded.** An unusual image with a valid
   signature can still fail to decode in the browser; the `broken` marker handles that case instead of
   retrying it.
-- **`PlayerMeta.username` is still the display name.** Avatars use `userId` and do not depend on
-  it, but other checks that compare `playerMeta.username` with `user?.username` break after a rename.
+- **`PlayerMeta.username` lags a rename.** Avatars use `userId` and do not depend on it, but other
+  checks that compare `playerMeta.username` with `user?.username` break after a rename. `displayName`
+  is the name the UI shows: the client prefers it over `username`, and a bot seat takes it from the
+  match (`bot-<color> (<assistant>)`).

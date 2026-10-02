@@ -179,7 +179,7 @@ export function Home() {
   }, [launchToLobby]);
 
   // **1b. HERO MARQUEE // Held in a ref so a language switch only swaps the
-  // text — the canvas effect below keeps running (no starfield reshuffle).
+  // text: the canvas effect below keeps running (no starfield reshuffle).
   const heroMarqueeRef = useRef(t('homeExtended.heroMarquee'));
   useEffect(() => {
     heroMarqueeRef.current = t('homeExtended.heroMarquee');

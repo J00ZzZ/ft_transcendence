@@ -31,6 +31,16 @@ function generateInviteCode(): string {
   return code;
 }
 
+// Display label for a bot seat: `bot-<color> (<assistant>)`, from the name the
+// lobby assigned that seat. The engine keeps `bot-<color>` as the identity, so
+// this label is display only. The client re-localizes the colour word (FR: bot-rouge).
+function botLabel(color: string, name?: unknown): string | null {
+  const id = BOT_PREFIX + color;
+  if (typeof name !== 'string') return null;
+  const clean = name.replace(/[()]/g, '').trim().slice(0, 20);
+  return clean ? `${id} (${clean})` : null;
+}
+
 @Injectable()
 // Match creation: PvP rooms, PvE bot games, hotseat rooms, invite codes and
 // random-match matching. Writes match:* hashes to Redis. Used by
@@ -60,6 +70,7 @@ export class MatchCreatorService {
     playerCount: number,
     botCount: number,
     botColors?: string[],
+    botNames?: string[],
     seatColors?: string[],
   ) {
     if (playerCount < 2 || playerCount > 4) {
@@ -100,7 +111,7 @@ export class MatchCreatorService {
     }
 
     return this.withUserCreateLock(userId, () =>
-      this.createMatchLocked(userId, mode, playerCount, botCount, botColors, seatColors),
+      this.createMatchLocked(userId, mode, playerCount, botCount, botColors, botNames, seatColors),
     );
   }
 
@@ -132,6 +143,7 @@ export class MatchCreatorService {
     playerCount: number,
     botCount: number,
     botColors?: string[],
+    botNames?: string[],
     seatColors?: string[],
   ) {
     // Idempotent create: a PvP create by a player who already has a seat in one
@@ -198,13 +210,18 @@ export class MatchCreatorService {
           message: 'botColors must match botCount',
         });
       }
-      for (const color of assignedBotColors) {
+      for (const [index, color] of assignedBotColors.entries()) {
         const slot = colorSlot.get(color);
         if (!slot || slot < 2 || slot > 4) {
           throw new BadRequestException(`Invalid bot color: ${color}`);
         }
         updates[`player${slot}_id`] = BOT_PREFIX + color;
         updates[`player${slot}_color`] = color;
+        // Display label only: the bot's identity stays `bot-<color>`. `botNames`
+        // is index-aligned with `botColors`, so it carries the name the lobby
+        // assigned each seat. A blank or missing name leaves the key out.
+        const botName = botLabel(color, botNames?.[index]);
+        if (botName) updates[`player${slot}_displayName`] = botName;
       }
     }
 

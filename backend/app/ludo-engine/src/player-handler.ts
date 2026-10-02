@@ -25,7 +25,7 @@ export function advanceTurnInState(state: GameState): void {
       delete state.pauseTurnOwner;
       delete state.pausedReason;
     } else {
-      // Still in grace window — stay paused
+      // Still in grace window: stay paused
       return;
     }
   }
@@ -58,7 +58,7 @@ export function advanceTurnInState(state: GameState): void {
         break;
       }
     }
-    // 'exited' or 'inactive' or expired disconnected — skip
+    // 'exited' or 'inactive' or expired disconnected: skip
     nextIdx = (nextIdx + 1) % state.players.length;
     loopCount++;
   }
@@ -222,7 +222,7 @@ export async function handlePlayerReconnect(
 
   // If the game was paused waiting for this player, clear the pause so the
   // game can resume. Without this the game stays paused on a now-active
-  // player — no one can end their turn to trigger clearance in advanceTurnInState.
+  // player: no one can end their turn to trigger clearance in advanceTurnInState.
   if (state.paused && state.pauseTurnOwner === color && player?.status === 'active') {
     delete state.paused;
     delete state.pauseTurnOwner;

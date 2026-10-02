@@ -264,13 +264,13 @@ export const PAYERS_LIST = 'list-none my-[0.8em]';
 export const PAYERS_LI = 'flex items-center py-[0.2em] border-b-[1.5px] border-b-white/10';
 
 export const PAYERS_LI_P =
-  'grow flex justify-between items-center text-[1.02rem] py-[0.6em] px-[0.8em] text-(--text-main) [font-family:var(--font-display)] font-bold max-[520px]:text-[0.88rem]';
+  'grow min-w-0 flex justify-between items-center text-[1.02rem] py-[0.6em] px-[0.8em] text-(--text-main) [font-family:var(--font-display)] font-bold max-[520px]:text-[0.88rem]';
 
 export const PAYER_IMAGE_CONTAINER =
-  'flex items-center justify-center py-[0.5em] px-[0.8em] border-r-[1.5px] border-r-white/10';
+  'shrink-0 flex items-center justify-center py-[0.5em] px-[0.8em] border-r-[1.5px] border-r-white/10';
 
 export const PAY_TAG_BASE =
-  'inline-flex items-center gap-1.5 whitespace-nowrap border-[1.5px] border-[rgba(0,240,255,.4)] rounded-lg py-[0.35em] px-[0.65em] text-[0.78rem] [font-family:var(--font-mono)] font-bold max-[520px]:text-[0.7rem]';
+  'shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap border-[1.5px] border-[rgba(0,240,255,.4)] rounded-lg py-[0.35em] px-[0.65em] text-[0.78rem] [font-family:var(--font-mono)] font-bold max-[520px]:text-[0.7rem]';
 
 export const PAY_TAG_WIN =
   'border-[#ffe600] text-[#ffe600] bg-[rgba(255,230,0,.15)] shadow-[0_0_8px_rgba(255,230,0,.3)]';

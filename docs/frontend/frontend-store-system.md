@@ -297,6 +297,10 @@ endTurn()
   └── setTurn((t + 1) % playerCount)
 ```
 
+The names a bot seat shows come from `BOT_POOL`. `Lobby.tsx` sends the same names
+to the backend as `botNames`, and they come back on each seat as `displayName`
+(`bot-<color> (<assistant>)`); the in-game client translates only the colour word.
+
 ### Settings Path
 ```
 settingOn(key)
@@ -331,7 +335,7 @@ toggleSetting(key)
 
 | Dependency | Purpose |
 |-----------|---------|
-| `theme.ts` | `BOT_POOL` for bot seat names |
+| `theme.ts` | `BOT_POOL` for bot seat names (sent as `botNames`, shown as the seat's `displayName`) |
 | `i18n.ts` | `i18n.changeLanguage` and `i18n.t` for default player names |
 | `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` (called on the store's 14-minute timer, before the access token expires), and `translateErrorCode`, which turns an error code into text in the user's language |
 | `game/types.ts` | `PlayerColor` for `ActiveMatch` |

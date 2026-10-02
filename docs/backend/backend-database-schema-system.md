@@ -227,10 +227,11 @@ One row per player per game.
 
 Bots are not stored: a bot's id is the literal string `bot-<color>`
 (`bot-red`, `bot-green`, `bot-yellow`, `bot-blue`), built per seat from
-`BOT_PREFIX + color`. That id lives in the `match:*` hashes, in the engine's game
-state and in the engine JWT, and it never reaches Postgres. The engine reports
-only the human seats that finished, and `match.postgame` skips a bot id before it
-writes anything.
+`BOT_PREFIX + color`. That id lives in the `match:*` hashes and in the engine's
+game state, and it never reaches Postgres. A bot seat gets no token of its own:
+the backend writes its slot into the match hash and the engine auto-fills it. The
+engine reports only the human seats that finished, and `match.postgame` skips a
+bot id before it writes anything.
 
 `backend/src/common/botname-enforce.ts` defines `BOT_PREFIX`, `isBotUserId()` and
 `isReservedBotName()` (which stops a human display name from masquerading as a
@@ -238,11 +239,17 @@ bot). The engine process keeps its own copy of the bot prefix/check in
 `backend/app/ludo-engine/src/socket/auth.ts`, so bot identity must be changed in
 both places at once.
 
+The name a bot seat shows is not its id. The creator sends the lobby's own names
+as `botNames`, index-aligned with `botColors`, and writes each one to
+`player{n}_displayName` as `bot-<color> (<assistant>)`. The engine copies it into
+the seat's `displayName`, so the label travels with the match and each client
+translates only the colour word.
+
 Modules that must tell humans from bots:
 
 | Module | What it does with bots |
 |--------|------------------------|
-| Match (`match.creator`, `match.player`, `match.postgame`) | Builds bot seats as `BOT_PREFIX + color`; excludes bots from seat and invite lists; skips them for rating, scoring, winner selection and persisted results, so a bot never gets an Elo change, a win/loss tally, a game row or a leaderboard entry |
+| Match (`match.creator`, `match.player`, `match.postgame`) | Builds bot seats as `BOT_PREFIX + color` and stores the lobby's `botNames` label as `player{n}_displayName`; excludes bots from seat and invite lists; skips them for rating, scoring, winner selection and persisted results, so a bot never gets an Elo change, a win/loss tally, a game row or a leaderboard entry |
 | Achievements (`achievements.service`) | Skips a bot `user_id`, so a bot never collects achievements (games against bots still count toward the human's own bot-win achievements) |
 | Leaderboard (`leaderboard.service`) | Excludes bots when it rebuilds from Postgres, using `startsWith BOT_PREFIX` in the query plus `!isBotUserId()` in memory |
 

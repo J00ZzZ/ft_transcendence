@@ -241,12 +241,17 @@ sequenceDiagram
 
 A bot is not an account: its user id is the literal string `bot-<color>`
 (`bot-green`), and it leaves no `User` row. That id lives in the `match:{gameId}`
-hash, in the engine's game state and in the engine JWT.
+hash and in the engine's game state. A bot seat gets no token of its own: the
+engine auto-fills it from the hash when a human joins, so `bot-<color>` is never
+a credential.
+The same hash also carries the shown name, `player{n}_displayName`: for a bot seat
+the backend writes `bot-<color> (<assistant>)` from the lobby's `botNames`, so the
+label travels with the match and each client translates only the colour word.
 Each process has one helper that answers "is this a bot?" by checking the `bot-`
 prefix: `isBotUserId()` in `socket/auth.ts` inside the engine, and
-`isBotUserId()` in `common/bot.ts` inside the backend. The backend's copy is
-used by the match postgame scorer and the achievements service, so those two
-always agree; the engine's copy keeps the engine free of backend imports.
+`isBotUserId()` in `common/botname-enforce.ts` inside the backend. The backend's
+copy is used by the match postgame scorer and the achievements service, so those
+two always agree; the engine's copy keeps the engine free of backend imports.
 
 
 ---

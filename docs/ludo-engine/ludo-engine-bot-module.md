@@ -65,12 +65,16 @@ Bot turns are scheduled by the `SocketServer` (not by the bot itself) so two bot
 
 A bot is not an account: its user id is the literal string `bot-<color>`
 (`bot-red`, `bot-green`, `bot-yellow`, `bot-blue`), created by the backend when
-it fills a seat.
+it fills a seat. That id is identity only. The name the UI shows is the seat's
+`displayName`, which the backend writes as `bot-<color> (<assistant>)` from the
+name the lobby assigned, so the assistant name is never translated and each
+client translates only the colour word. See
+[`ludo-engine-socket-system.md`](ludo-engine-socket-system.md) → `PlayerMeta`.
 
 | Where | Helper | Rule |
 |-------|--------|------|
 | Engine | `isBotUserId()` in `socket/auth.ts` | `userId.startsWith('bot-')` |
-| Backend | `BOT_PREFIX` / `isBotUserId()` in `backend/src/common/bot.ts` | same prefix, separate copy |
+| Backend | `BOT_PREFIX` / `isBotUserId()` in `backend/src/common/botname-enforce.ts` | same prefix, separate copy |
 
 The backend writes the id and the engine reads it, so the two copies must be
 changed together. The backend keeps the list of modules that filter bots — see

@@ -328,13 +328,13 @@ type BoardProps = {
     isHomeEntry: boolean;
   }>;
   onPieceClick?: (pieceId: string) => void;
-  /** While set, this piece renders at `step` (box by box) instead of its real logical step — see Game.tsx's move animation. */
+  /** While set, this piece renders at `step` (box by box) instead of its real logical step: see Game.tsx's move animation. */
   animating?: { pieceId: string; step: number } | null;
   /** Transient capture burst: expanding ring + sparks on the cell the mover landed on. Pure cosmetic overlay. */
   fx?: { color: string; to: number } | null;
 };
 
-/** The classic 15×15 cross board, rendered procedurally — no images. */
+/** The classic 15×15 cross board, rendered procedurally: no images. */
 export function Board({
   pieces = [],
   players = [],
@@ -429,7 +429,7 @@ export function Board({
     if (!activeColors.has(piece.color)) continue;
     const isAnimating = animating?.pieceId === piece.id;
     // Mid-animation the piece may already be logically captured/home/goal in
-    // state (server applies the full move atomically) — render it at its
+    // state (server applies the full move atomically): render it at its
     // in-transit step regardless so the box-by-box travel stays visible.
     if (!isAnimating && (piece.isInBase || piece.isInGoal || piece.step <= 0)) continue;
     const ck = piece.color as ColorKey;

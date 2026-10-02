@@ -32,7 +32,7 @@ import {
 } from '../styles/tw';
 
 // How often the room list and the "am I already seated?" check are polled.
-// Original: 1000 ms. Recommended: 5000 ms — at 1 s those two endpoints sent
+// Original: 1000 ms. Recommended: 5000 ms. At 1 s those two endpoints sent
 // 120 requests/min per user, close to the 300 requests/min per-IP limit.
 const ROOM_POLL_MS = 5_000;
 

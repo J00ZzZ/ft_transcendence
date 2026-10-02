@@ -23,7 +23,7 @@ root /usr/share/nginx/html;
 index index.html;
 
 # ═══════════════════════════════════════════════════════
-# SPA ROUTING — all non-file requests serve index.html
+# SPA ROUTING: all non-file requests serve index.html
 # so React Router handles the frontend navigation
 # ═══════════════════════════════════════════════════════
 location / {
@@ -31,7 +31,7 @@ location / {
 }
 
 # ═══════════════════════════════════════════════════════
-# LEADERBOARD API — GET-only, per-IP throttled. Exact match
+# LEADERBOARD API: GET-only, per-IP throttled. Exact match
 # wins over the generic /api/ prefix below.
 # ═══════════════════════════════════════════════════════
 location = /api/leaderboard {
@@ -48,7 +48,7 @@ location = /api/leaderboard {
 }
 
 # ═══════════════════════════════════════════════════════
-# AUTH API — per-IP throttled, tighter than the generic /api/
+# AUTH API: per-IP throttled, tighter than the generic /api/
 # prefix below. Exact match on /api/auth/login wins over the
 # broader /api/auth/ prefix, which wins over /api/.
 # ═══════════════════════════════════════════════════════
@@ -84,7 +84,7 @@ location /api/auth/ {
 }
 
 # ═══════════════════════════════════════════════════════
-# API PROXY — forwards /api/* requests to backend
+# API PROXY: forwards /api/* requests to backend
 # ═══════════════════════════════════════════════════════
 location /api/ {
     # The generic prefix had no limit at all: everything under /api/ that is
@@ -103,14 +103,14 @@ location /api/ {
     # sit idle for minutes between notifications. nginx's 60s default
     # proxy_read_timeout was cutting it mid-chunk (client sees
     # ERR_INCOMPLETE_CHUNKED_ENCODING) even though the connection was
-    # still healthy — match the timeout /socket.io/ already uses below,
+    # still healthy: match the timeout /socket.io/ already uses below,
     # and disable buffering so SSE events flush immediately.
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
     proxy_buffering off;
 }
 
-# Build health check — returns backend status through nginx
+# Build health check: returns backend status through nginx
 location = /api/health {
     set $backend_upstream http://backend:3000;
     proxy_pass $backend_upstream/health;
@@ -119,7 +119,7 @@ location = /api/health {
 }
 
 # ═══════════════════════════════════════════════════════
-# ENGINE WEBSOCKET PROXY — forwards Socket.IO traffic to the
+# ENGINE WEBSOCKET PROXY: forwards Socket.IO traffic to the
 # ludo-engine over the same secure origin (wss://<host>/socket.io/).
 # Gives the browser a same-origin, TLS path to the engine so it
 # never has to reach ludo-engine:3001 directly (blocked as mixed

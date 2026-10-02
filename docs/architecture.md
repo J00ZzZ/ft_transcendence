@@ -60,8 +60,15 @@ their official images with an init script that reads secrets before `exec`ing th
 real process (`backend/app/postgres_16_db/`, `backend/app/redis/`).
 
 > **Note:** The bot AI runs inside the `ludo-engine` process (`backend/app/ludo-engine/src/bot.ts`),
-> not in a container of its own. The engine accepts a `bot` role in the JWT and can auto-fill slots
-> with bot players.
+> not in a container of its own. Bot seats need no token: the backend writes them into the `match:*`
+> hash as `bot-<color>`, and the engine auto-fills those slots from that hash once a human joins.
+> The seat keeps `bot-<color>` as its identity (`username`), and the name the lobby gave it is the
+> shown label (`displayName`). That label travels end to end: the lobby's `botNames` in
+> `POST /api/match/create` → `player{n}_displayName` in the hash → the engine seat's `displayName` →
+> the client, which translates only the colour word. Detail:
+> [backend-match-module.md](backend/backend-match-module.md),
+> [ludo-engine-socket-system.md](ludo-engine/ludo-engine-socket-system.md),
+> [frontend-i18n-utilities-system.md](frontend/frontend-i18n-utilities-system.md).
 
 
 ---
@@ -548,11 +555,12 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │       └── socket/
 │   │   │           ├── server.ts             # SocketServer, event routing
 │   │   │           ├── socket-handlers.ts    # join_game, roll_dice, move_piece, …
-│   │   │           ├── join-manager.ts       # Seat assignment, bot seeding on join
+│   │   │           ├── join-manager.ts       # Seat assignment, bot seeding (identity + label)
 │   │   │           ├── bot-scheduler.ts      # One timer per game for bot turns
 │   │   │           ├── post-game.ts          # End-of-game flow → result-submitter
 │   │   │           ├── auth.ts               # JWT middleware, GameSocket type
 │   │   │           ├── auth.spec.ts          # vitest unit tests for token verification
+│   │   │           ├── join-manager.spec.ts  # vitest unit tests for the bot seat fill
 │   │   │           ├── event-publisher.ts    # Redis pub/sub → Socket.IO bridge
 │   │   │           ├── redis-broadcaster.ts  # Room-based state broadcasts
 │   │   │           └── result-submitter.ts   # POST /api/game/end to backend

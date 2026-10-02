@@ -79,7 +79,7 @@ export interface PlayerMeta {
   color: PlayerColor;    // Seat color
   status: 'active' | 'exited' | 'inactive' | 'disconnected';  // Player lifecycle state
   username: string;      // Immutable account name (bots: `bot-<color>`)
-  displayName?: string;  // Optional display name
+  displayName?: string;  // Shown name (bot seats: `bot-<color> (<assistant>)`)
   userId?: string;       // Immutable account id (avatar key); absent for bots/hotseat seats
   hasAvatarPhoto: boolean;  // Whether the account has an uploaded photo (from the backend's Redis cache)
   avatarStyle?: string;  // DiceBear style used when there is no photo
