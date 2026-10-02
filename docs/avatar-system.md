@@ -2,14 +2,14 @@
 
 ## Table of Contents
 
-- [Overview](#overview) — what the avatar system guarantees and how
-- [Files](#files) — every file in the pipeline and its role
-- [Storage & caching model](#storage--caching-model) — the four layers and which one is authoritative
-- [Core Logic / Flow](#core-logic--flow) — Mermaid diagrams for upload, delete, rendering and game seats
-- [Avatar system revamp policies](#avatar-system-revamp-policies) — rules the system depends on
-- [Failure modes & guarantees](#failure-modes--guarantees) — what happens when a piece is missing
-- [Verification](#verification) — how to check an avatar change end to end
-- [Known limitations](#known-limitations) — accepted trade-offs and follow-ups
+- [Overview](#overview): what the avatar system guarantees and how
+- [Files](#files): every file in the pipeline and its role
+- [Storage & caching model](#storage--caching-model): the four layers and which one is authoritative
+- [Core Logic / Flow](#core-logic--flow): Mermaid diagrams for upload, delete, rendering and game seats
+- [Avatar system revamp policies](#avatar-system-revamp-policies): rules the system depends on
+- [Failure modes & guarantees](#failure-modes--guarantees): what happens when a piece is missing
+- [Verification](#verification): how to check an avatar change end to end
+- [Known limitations](#known-limitations): accepted trade-offs and follow-ups
 
 
 ---
@@ -23,20 +23,19 @@ Every account has one avatar. It is either a **photo the user uploaded** or a **
 1. A photo must appear, change or disappear on **every open client without a reload**.
 2. A user with **no photo** must never cause a failed request (no 404s in the console).
 3. A client must never keep showing a **stale photo** after a re-upload.
-4. None of the above may depend on a **mutable identity** — display names are renameable.
+4. None of the above may depend on a **mutable identity**: display names are renameable.
 
 The design in one line: **Postgres stores the bytes; a small Redis record stores the facts (does a
 photo exist, which DiceBear style); the browser fetches the bytes over a URL it can revalidate; and a URL with a new version marker causes the browser to re-fetch when something changes.**
 
 Three properties make that work:
 
-- **The immutable user id is the key everywhere** — the route, the Redis record, the SSE event, the
+- **The immutable user id is the key everywhere**: the route, the Redis record, the SSE event, the
   engine's seat metadata and the client store. A display-name rename therefore cannot break a photo.
-- **The flag is known before the request is made** — so a user without a photo is rendered from
-  DiceBear and never fetched at all.
-- **A change stamps the URL** (`?v=<stamp>`) — because React re-rendering alone cannot force a
-  reload; a byte-identical URL can be answered from the browser's in-memory image cache with no
-  request at all.
+- **The flag is known before the request is made**: a user without a photo is rendered from DiceBear
+  and never fetched at all.
+- **A change stamps the URL** (`?v=<stamp>`): React re-rendering alone cannot force a reload; a
+  byte-identical URL can be answered from the browser's in-memory image cache with no request at all.
 
 
 ---
@@ -61,7 +60,7 @@ Three properties make that work:
 
 | File | Role |
 | --- | --- |
-| `backend/app/ludo-engine/src/redis.ts` | `getAvatarMeta(userId)` — reads `avatar:<userId>`; `createGame` defaults `hasAvatarPhoto: false`. |
+| `backend/app/ludo-engine/src/redis.ts` | `getAvatarMeta(userId)`: reads `avatar:<userId>`; `createGame` defaults `hasAvatarPhoto: false`. |
 | `backend/app/ludo-engine/src/types.ts` | `PlayerMeta` includes `userId`, `hasAvatarPhoto`, `avatarStyle`. |
 | `backend/app/ludo-engine/src/socket/join-manager.ts` | Fills those fields at join time (and `false` for bots). |
 | `backend/app/ludo-engine/src/engine.ts` | `emitLobbyUpdate` sends the real values in the lobby roster. |
@@ -87,12 +86,12 @@ The same avatar is represented in four places. Only the first is authoritative.
 
 | # | Layer | Holds | Authoritative? | Lifetime |
 | --- | --- | --- | --- | --- |
-| 1 | **Postgres** — `User.avatarPhoto` (bytes) + `avatarPhotoContentType` | the image itself | **Yes** | durable |
-| 2 | **Redis** — `avatar:<userId>` → `{ has, style, v }` | whether a photo exists, its DiceBear style, and a change stamp | No — a cache of Postgres | evictable (`allkeys-lru`, no AOF) |
-| 3 | **HTTP** — `GET /api/user/id/:userId/avatar` | the image response body, plus `Cache-Control: public, no-cache, no-transform` and an `ETag` | No | browser cache, **revalidated on every use** |
-| 4 | **Client memory** — `frontend/src/avatarCache.ts` | the last state the server announced per user, and which ids failed to load | No | this page session only |
+| 1 | **Postgres**: `User.avatarPhoto` (bytes) + `avatarPhotoContentType` | the image itself | **Yes** | durable |
+| 2 | **Redis**: `avatar:<userId>` → `{ has, style, v }` | whether a photo exists, its DiceBear style, and a change stamp | No: a cache of Postgres | evictable (`allkeys-lru`, no AOF) |
+| 3 | **HTTP**: `GET /api/user/id/:userId/avatar` | the image response body, plus `Cache-Control: public, no-cache, no-transform` and an `ETag` | No | browser cache, **revalidated on every use** |
+| 4 | **Client memory**: `frontend/src/avatarCache.ts` | the last state the server announced per user, and which ids failed to load | No | this page session only |
 
-Plus the **DiceBear fallback**, generated client-side from `username` + `avatarStyle` — it never
+Plus the **DiceBear fallback**, generated client-side from `username` + `avatarStyle`: it never
 touches the network.
 
 Why Redis exists at all: the **ludo engine has no database access**, so without a shared record it
@@ -129,10 +128,11 @@ reuse". `no-store`, which the `404` for a user with no photo uses, means "do not
 ## Avatar system policies
 
 1. **Postgres is written first; Redis is written second.** Writing Redis first could leave `has=1`
-   with no bytes behind it — a guaranteed 404.
+   with no bytes behind it: a guaranteed 404.
 2. **A missing Redis record means "no photo".** Consumers must not guess *maybe*.
 3. **Bots are never asked for a photo.** `UserAvatar` takes an explicit `isBot` guard regardless of
-   what the flags say.
+   what the flags say, and a bot seat renders the generated avatar seeded from the assistant name the
+   lobby gave it.
 4. **Nothing is keyed by a display name.** Avatars use `userId` everywhere.
 5. **A change adds a new version marker to the URL.** React becoming aware of the change alone cannot stop the browser from serving the image from its in-memory image
    cache.
@@ -253,13 +253,39 @@ sequenceDiagram
 ```
 
 The engine has no database access, so this read is its only source of the flag. A record that is
-missing or was evicted falls back to the generated avatar — never to a 404 — and the backend repairs the record the next time it reads that user (`syncFromUser` on `/me` or a public profile).
+missing or was evicted falls back to the generated avatar, never to a 404, and the backend repairs the record the next time it reads that user (`syncFromUser` on `/me` or a public profile).
+
+**Hotseat is the exception, and only for the host.** One socket drives every local seat and none of them
+has its own account, so `JoinManager` leaves `PlayerMeta.userId` undefined for those joins
+(`join-manager.ts`). Their pilot cards therefore render the generated avatar seeded from the name typed
+into the lobby, and they issue no photo request. The host's own seat is the one seat the client can still
+describe, because it is the seat this device joined the match with (`activeMatch.color`, always the first
+slot): `Game.tsx` reads the store's live `/me` facts for it (`user.id`, `user.hasAvatarPhoto`,
+`user.avatarStyle`), so the host keeps an uploaded photo there rather than a generated avatar, and seeds
+the fallback with the account username, the same seed the navbar and the lobby host row use. Every other
+local seat stays generated.
+
+The arena lobby (`Lobby.tsx`, `/gamelobby/table`) applies the same split before the match exists: the host
+seat renders the account avatar, and each local pilot seat (`Seat { type: 'player' }`) renders the
+generated DiceBear avatar seeded from the name typed into the roster, because no local seat has an account
+to key a photo on. Renaming that seat re-seeds its avatar, and it never issues an avatar request.
+
+**A bot seat takes the generated path too.** `autoStartIfReady` registers a PvE bot with
+`hasAvatarPhoto: false` and no `userId` (its identity stays `bot-<color>`), so every bot seat renders the
+generated avatar and issues no request. `avatarSeed()` seeds it with the assistant name the lobby assigned
+that seat (`bot-<color> (<assistant>)` -> `<assistant>`), so the lobby table, the arena and the results
+invoice draw the same bot.
+
+The same three fields are also copied onto each `LastResult.players` row by `Game.tsx`, so
+`ResultsModal` renders an opponent's photo as well; in hotseat the host's own row is stamped with the
+store's `/me` identity, which is what lets the invoice pick it out by `userId`. See
+[frontend/frontend-results-module.md](frontend/frontend-results-module.md) → Avatar Flags.
 
 ### 5. Why the URL has a version marker
 
 This is the subtlest part of the system, and the reason `?v=` exists.
 
-The photo URL is **stable** — `/api/user/id/{userId}/avatar`. The response is served
+The photo URL is **stable**: `/api/user/id/{userId}/avatar`. The response is served
 `Cache-Control: public, no-cache, no-transform`, which *should* mean "revalidate before reuse". But a
 byte-identical URL can also be answered from the browser's **in-memory image cache without any
 request being made at all**, in which case `no-cache` never gets the chance to revalidate and the
@@ -280,7 +306,7 @@ So whenever a change is known, the URL gains `?v=<stamp>`:
 | `Date.now()` in `Profile.tsx` | the uploader's own client, immediately and without SSE |
 
 On a **fresh page load** there is nothing cached for the bare URL, so the base URL is fetched and
-revalidated normally — the stamp is only needed once a change happens inside a session.
+revalidated normally: the stamp is only needed once a change happens inside a session.
 
 
 ---
@@ -295,7 +321,7 @@ revalidated normally — the stamp is only needed once a change happens inside a
 | The SSE event is missed (stream reset) | the old image until the next mount or reload | The bare URL still revalidates on load, so the client self-corrects. Only the *instant* update is lost. |
 | A stale `has: true` with no bytes behind it | one failed load, then the generated avatar | `onError` marks the id broken for the session, so it is not retried. |
 | A corrupt or mislabelled upload | `400 Bad Request` | Magic-byte validation runs before anything is written, so a file whose bytes do not match its declared type is never stored. A file with a valid signature that the browser cannot decode is stored, and the client falls back to the generated avatar. |
-| An image the browser cannot decode | the generated avatar | Same `onError` path as a 404 — the marker covers both. |
+| An image the browser cannot decode | the generated avatar | Same `onError` path as a 404: the marker covers both. |
 | Postgres is unavailable | the upload/delete fails with an error | Redis is only written after the Postgres write succeeds, so a `has: true` record with no stored photo cannot be created. |
 
 
@@ -325,12 +351,23 @@ docker exec redis sh -c 'redis-cli -p 6479 -a "$REDIS_PASSWORD" --no-auth-warnin
 
 Then in the browser, with DevTools open:
 
-1. Upload an avatar; **Network** must show `/api/user/id/…/avatar?v=…` returning `200` — **not**
+1. Upload an avatar; **Network** must show `/api/user/id/…/avatar?v=…` returning `200`, **not**
    `(memory cache)`.
 2. Reload the page; the photo is still correct and the bare URL is revalidated (`304`).
 3. Delete the avatar; it falls back to DiceBear with **no image request at all**.
 4. In a waiting room, watch the other player's seat update **without a reload**, and confirm the
    console has no avatar 404s.
+5. Play a two-player game against someone with a photo, then read the results invoice: that opponent's
+   row shows their photo, and every row without a photo keeps the generated avatar and requests nothing.
+6. Launch a hotseat game from an account with a photo: in the arena lobby every seat shows an avatar (the
+   host's uploaded photo on seat 0, a generated avatar on each named local pilot seat), the host's seat
+   falls back to the generated avatar **with no** request once the photo is deleted, and a rename
+   re-seeds that local pilot's avatar. Then in the game itself the host's own seat shows the photo, every
+   other local seat shows the generated avatar, and **Network** gets one avatar request (the host's); the
+   other seats have no account to key a photo on. The host's generated fallback is seeded from the account
+   username, like the navbar's own avatar.
+7. Start a PvE match from the table screen: every bot seat shows a generated avatar in the lobby roster
+   and in the arena's pilot cards, and **Network** shows no avatar request for them.
 
 
 ---
@@ -345,13 +382,13 @@ Then in the browser, with DevTools open:
 - **`PlayerMeta` stores the flag at join time.** A change made while players sit in the room arrives
   through the SSE event. A client that misses that event shows the old image until the next mount,
   when the plain URL is revalidated. Reading the records again in `emitLobbyUpdate` would reduce that
-  window.
-- **`ResultsModal` shows no photos for opponents.** The client-side `LastResult` does not include ids, so
-  opponents render the generated avatar.
+  window. The results invoice renders the same snapshot, so a change made after the game ended reaches
+  it through the SSE event as well.
 - **Uploads are checked by MIME and magic bytes, not decoded.** An unusual image with a valid
   signature can still fail to decode in the browser; the `broken` marker handles that case instead of
   retrying it.
 - **`PlayerMeta.username` lags a rename.** Avatars use `userId` and do not depend on it, but other
   checks that compare `playerMeta.username` with `user?.username` break after a rename. `displayName`
   is the name the UI shows: the client prefers it over `username`, and a bot seat takes it from the
-  match (`bot-<color> (<assistant>)`).
+  match (`bot-<color> (<assistant>)`). The results invoice resolves the viewer's own row by `userId`
+  first and falls back to the name only when a row carries no id, so it survives a rename.

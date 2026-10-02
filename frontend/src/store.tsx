@@ -106,13 +106,25 @@ function storedActiveMatch(): ActiveMatch {
   }
 }
 
+/** One invoice row: a seat plus the avatar facts the engine's roster reported for it.
+ *  Bots, hotseat seats and the lobby-seat fallback have no account, so they carry none. */
+export type ResultPlayer = {
+  color: PlayerColor;
+  username: string;
+  isBot: boolean;
+  piecesInGoal: number;
+  userId?: string;
+  hasAvatarPhoto?: boolean;
+  avatarStyle?: string | null;
+};
+
 /** Snapshot of a finished match's outcome: set from Game.tsx's `game_ended` handler so Results.tsx can render real data instead of mock podium rows. */
 export type LastResult = {
   winner: PlayerColor;
   resultDetail: string;
   mode: 'pvp' | 'pve' | 'hotseat';
   playerCount: number;
-  players: Array<{ color: PlayerColor; username: string; isBot: boolean; piecesInGoal: number }>;
+  players: ResultPlayer[];
   /** True when the match was abandoned/expired: a different Results card (no winner/podium). */
   abandoned?: boolean;
 } | null;

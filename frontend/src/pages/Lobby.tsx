@@ -347,6 +347,7 @@ export function Lobby() {
                                   username={user?.username ?? ''}
                                   userId={user?.id}
                                   hasAvatarPhoto={user?.hasAvatarPhoto ?? false}
+                                  avatarStyle={user?.avatarStyle}
                                   size={40}
                                   fallbackStyle={{
                                     width: 40,
@@ -432,8 +433,13 @@ export function Lobby() {
                                     minWidth: 0,
                                   }}
                                 >
-                                  <div
-                                    style={{
+                                  {/* A bot has no account: a generated avatar, seeded from the
+                                      assistant name this seat was assigned here. */}
+                                  <UserAvatar
+                                    username={seat.name}
+                                    isBot
+                                    size={38}
+                                    fallbackStyle={{
                                       width: 38,
                                       height: 38,
                                       borderRadius: 6,
@@ -445,11 +451,15 @@ export function Lobby() {
                                       placeItems: 'center',
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: '0.82rem',
+                                    }}
+                                    style={{
+                                      width: 38,
+                                      height: 38,
+                                      borderRadius: 6,
+                                      border: `1px solid ${hue}`,
                                       flex: 'none',
                                     }}
-                                  >
-                                    AI
-                                  </div>
+                                  />
                                   <div style={{ minWidth: 0 }}>
                                     <div
                                       style={{
@@ -539,8 +549,13 @@ export function Lobby() {
                                     minWidth: 0,
                                   }}
                                 >
-                                  <div
-                                    style={{
+                                  {/* Local hotseat pilots have no account, so the DiceBear
+                                      avatar is seeded from the name typed here. Only the
+                                      host's seat above can show an uploaded photo. */}
+                                  <UserAvatar
+                                    username={seat.name}
+                                    size={38}
+                                    fallbackStyle={{
                                       width: 38,
                                       height: 38,
                                       borderRadius: 6,
@@ -552,11 +567,15 @@ export function Lobby() {
                                       placeItems: 'center',
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: '0.82rem',
+                                    }}
+                                    style={{
+                                      width: 38,
+                                      height: 38,
+                                      borderRadius: 6,
+                                      border: `1px solid ${hue}`,
                                       flex: 'none',
                                     }}
-                                  >
-                                    P{i + 1}
-                                  </div>
+                                  />
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     {editingSeat === i ? (
                                       <input

@@ -2,14 +2,14 @@
 
 ## Table of Contents
 
-- [Overview](#overview) — Reusable UI (user interface) components used across pages
-- [Files](#files) — Source file inventory
-- [Key Types / Interfaces](#key-types--interfaces) — Component props and shared helpers
-- [Core Logic / Flow](#core-logic--flow) — Mermaid sequence diagrams for each component
-- [Logic Paths Summary](#logic-paths-summary) — Decision trees for rendering
-- [Tailwind Utilities (`styles/tw.ts`)](#tailwind-utilities-stylestwts) — The shared utility-class constants
-- [Implementation Notes](#implementation-notes) — Portals, compact mode, nav-label auto-sizing, avatar attributes, CJK (Chinese, Japanese and Korean) text sizing
-- [Dependencies](#dependencies) — Internal and external dependencies
+- [Overview](#overview): Reusable UI (user interface) components used across pages
+- [Files](#files): Source file inventory
+- [Key Types / Interfaces](#key-types--interfaces): Component props and shared helpers
+- [Core Logic / Flow](#core-logic--flow): Mermaid sequence diagrams for each component
+- [Logic Paths Summary](#logic-paths-summary): Decision trees for rendering
+- [Tailwind Utilities (`styles/tw.ts`)](#tailwind-utilities-stylestwts): The shared utility-class constants
+- [Implementation Notes](#implementation-notes): Portals, compact mode, nav-label auto-sizing, avatar attributes, CJK (Chinese, Japanese and Korean) text sizing
+- [Dependencies](#dependencies): Internal and external dependencies
 
 
 ---
@@ -20,13 +20,13 @@
 
 The shared components are reusable UI (user interface) building blocks used on several pages. They are:
 
-1. **RetroNavbar** — top navigation bar used by every page (logo, nav links, language selector, user menu).
-2. **RetroAuthLayout** — centered layout for the authentication pages (login, signup, 2FA, forgot/reset password).
-3. **Board / Die** — the Ludo board and the animated die.
-4. **UserAvatar** — avatar rendering.
-5. **OAuthButtons** — Google, GitHub and 42 provider buttons.
-6. **NotificationBell / NotificationToast** — the notification bell and toasts.
-7. **CyberModal / ResultsModal** — cyber-styled modal base and the post-game results overlay.
+1. **RetroNavbar**: top navigation bar used by every page (logo, nav links, language selector, user menu).
+2. **RetroAuthLayout**: centered layout for the authentication pages (login, signup, 2FA, forgot/reset password).
+3. **Board / Die**: the Ludo board and the animated die.
+4. **UserAvatar**: avatar rendering.
+5. **OAuthButtons**: Google, GitHub and 42 provider buttons.
+6. **NotificationBell / NotificationToast**: the notification bell and toasts.
+7. **CyberModal / ResultsModal**: cyber-styled modal base and the post-game results overlay.
 
 
 ---
@@ -37,13 +37,13 @@ The shared components are reusable UI (user interface) building blocks used on s
 
 | File | Role |
 |------|------|
-| `src/components/RetroNavbar.tsx` | Top navigation bar — logo, nav links, language selector, user menu, sign out (used by every page) |
-| `src/components/railButton.ts` | Shared rail-button styles — `railButtonStyle(active)` and `railHoverHandlers(active, edge)`, used by the navbar rail buttons |
-| `src/components/RetroAuthLayout.tsx` | Retro-styled authentication page container (`tag` + `children`), and `NeonCheck` — the terms tick glyph |
-| `src/components/Board.tsx` | Ludo board — tracks, bases, pieces, legal-move highlights |
-| `src/components/Die.tsx` | Dice component — face rendering with roll animation |
-| `src/components/UserAvatar.tsx` | Avatar image — keyed by the immutable `userId`; requests the photo only when the seat is not a bot and a photo is known to exist (payload flag or a live `avatar_changed` override), otherwise renders the DiceBear default. A failed load marks that id broken for the session so it is not retried; an optional `onPhotoError` callback runs when that happens, so a parent component can show a message (the Profile page uses it to show a warning in the user's language) |
-| `src/dicebear.ts` | DiceBear helper — generates an avatar data URI (Uniform Resource Identifier) (`avataaars`/`bottts`/`identicon`) |
+| `src/components/RetroNavbar.tsx` | Top navigation bar: logo, nav links, language selector, user menu, sign out (used by every page) |
+| `src/components/railButton.ts` | Shared rail-button styles: `railButtonStyle(active)` and `railHoverHandlers(active, edge)`, used by the navbar rail buttons |
+| `src/components/RetroAuthLayout.tsx` | Retro-styled authentication page container (`tag` + `children`), and `NeonCheck`: the terms tick glyph |
+| `src/components/Board.tsx` | Ludo board: tracks, bases, pieces, legal-move highlights |
+| `src/components/Die.tsx` | Dice component: face rendering with roll animation |
+| `src/components/UserAvatar.tsx` | Avatar image: keyed by the immutable `userId`; requests the photo only when the seat is not a bot and a photo is known to exist (payload flag or a live `avatar_changed` override), otherwise renders the DiceBear default. A failed load marks that id broken for the session so it is not retried; an optional `onPhotoError` callback runs when that happens, so a parent component can show a message (the Profile page uses it to show a warning in the user's language) |
+| `src/dicebear.ts` | DiceBear helper: generates an avatar data URI (Uniform Resource Identifier) (`avataaars`/`bottts`/`identicon`) |
 | `src/components/OAuthButtons.tsx` | OAuth provider buttons (42, GitHub, Google) |
 | `src/components/NotificationBell.tsx` | Bell icon, unread badge and dropdown |
 | `src/components/NotificationToast.tsx` | Toast notifications |
@@ -52,8 +52,8 @@ The shared components are reusable UI (user interface) building blocks used on s
 | `src/components/LegalModal.tsx` | Privacy Policy / Terms of Service popup, opened from Home's footer and from the Signup terms link |
 | `src/components/MarkdownViewer.tsx` | Renders the markdown legal documents |
 | `src/components/CyberModal.tsx` | Cyber-styled modal base (`CyberButton`, `CyberModal`) used for confirmations and dialogs |
-| `src/components/ResultsModal.tsx` | Post-game results overlay — podium, rank badges, outcome title, return-to-lobby |
-| `src/avatarCache.ts` | Avatar state store, keyed by immutable user id — live `avatar_changed` overrides (`{has, style}`), a remount stamp per user, and a `broken` set so a failed photo is not retried |
+| `src/components/ResultsModal.tsx` | Post-game results overlay: podium, rank badges, outcome title, return-to-lobby |
+| `src/avatarCache.ts` | Avatar state store, keyed by immutable user id: live `avatar_changed` overrides (`{has, style}`), a remount stamp per user, and a `broken` set so a failed photo is not retried |
 
 
 ---
@@ -277,7 +277,7 @@ Per-constant notes:
 ## Implementation Notes
 
 - **Overlays rendered through a portal.** `NotificationBell`'s dropdown and `RetroNavbar`'s account popover both render into `<body>`. A high `z-index` cannot escape an ancestor's stacking context (the sticky sidebar's `position: sticky` creates one, which traps even very large z-indices), so the overlays render outside it. Their position comes from the trigger's current `getBoundingClientRect()` instead of CSS anchoring.
-- **Avatars are keyed by the immutable user id, and a version marker is appended when the URL changes.** `UserAvatar` takes `userId` (the photo key) and keeps `username` only as the DiceBear seed and alt text, so a display-name rename can never invalidate an avatar URL. It requests `/api/user/id/<userId>/avatar` only when the seat is not a bot **and** a photo is known to exist — from the payload's `hasAvatarPhoto` or from a live `avatar_changed` override in `avatarCache.ts`. Anything else renders the DiceBear default, so a user without a photo never causes a 404 request. **A change also appends `?v=<stamp>`**, because React re-rendering is not enough on its own: a byte-identical image URL can be served from the browser's in-memory image cache without any request, so `no-cache` never gets the chance to revalidate. The stamp value comes from the SSE event (or `Date.now()` for the uploader's own client, so its own view needs no SSE). A failed load records that id in the store's `broken` set, so the session stops retrying it. `ResultsModal` passes no id for opponents (the client-side `LastResult` does not include one), so they render the generated avatar. The full pipeline — storage, the shared Redis record, caching and freshness — is described in [`avatar-system.md`](../avatar-system.md).
+- **Avatars are keyed by the immutable user id, and a version marker is appended when the URL changes.** `UserAvatar` takes `userId` (the photo key) and keeps `username` only as the DiceBear seed and alt text, so a display-name rename can never invalidate an avatar URL. It requests `/api/user/id/<userId>/avatar` only when the seat is not a bot **and** a photo is known to exist: the payload's `hasAvatarPhoto` or a live `avatar_changed` override in `avatarCache.ts`. Anything else renders the DiceBear default, so a user without a photo never causes a 404 request. **A change also appends `?v=<stamp>`**, because React re-rendering is not enough on its own: a byte-identical image URL can be served from the browser's in-memory image cache without any request, so `no-cache` never gets the chance to revalidate. The stamp value comes from the SSE event (or `Date.now()` for the uploader's own client, so its own view needs no SSE). A failed load records that id in the store's `broken` set, so the session stops retrying it. `ResultsModal` passes each row's own `userId`, `hasAvatarPhoto`, and `avatarStyle` from `LastResult` (carried from the engine's roster), so an opponent with a photo is shown with it, a bot or a non-host hotseat seat renders the generated avatar, and no row requests a URL that would 404. In hotseat, `Game.tsx` stamps the store's `/me` id onto the host's own seat (the colour that device joined the match with), so the host's row is the one local seat that keeps a photo. The viewer's own row keeps the store's live `/me` flag instead, because the profile page writes it on upload or delete. **The arena lobby's seat roster and the game's pilot cards use the same three-field contract**: the host's own seat passes the store's `/me` facts (photo, style), while each local hotseat pilot seat passes only its typed-in name and a bot seat passes its assistant-name label, so those seats render the generated avatar and request nothing. The full pipeline (storage, the shared Redis record, caching and freshness) is described in [`avatar-system.md`](../avatar-system.md).
 - **`DeleteAccountModal` is a two-step dialog.** Accounts created through a provider have no password, so they set one first, because deletion always requires the password. They then confirm with that password and an acknowledgement checkbox. On success the store's `logout()` clears the session and the user lands on `/login`.
 - **CJK label sizing (`RetroNavbar` account popover).** CJK (Chinese, Japanese and Korean) glyphs fill the em box, while Latin letters take up roughly half of it, so Latin labels use a smaller px value and look the same size.
 - **RetroNavbar compact mode.** Below Tailwind's `xl` breakpoint (1280px) the sidebar collapses to an icon-only rail. The labels are hidden from JavaScript rather than by CSS, because parts of the bar are plain inline styles. Every page that renders the bar uses the same threshold with `w-[88px] xl:w-[270px]`.

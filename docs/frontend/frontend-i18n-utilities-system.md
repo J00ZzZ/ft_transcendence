@@ -2,11 +2,11 @@
 
 ## Table of Contents
 
-- [Overview](#overview) — Internationalization, audio, bot-name and legal-page support files
-- [Files](#files) — Source file inventory
-- [Key Types / Interfaces](#key-types--interfaces) — Language codes and engine shapes
-- [Core Logic / Flow](#core-logic--flow) — Language selection and legal documents
-- [Dependencies](#dependencies) — Internal and external dependencies
+- [Overview](#overview): Internationalization, audio, name and colour labels, legal pages
+- [Files](#files): Source file inventory
+- [Key Types / Interfaces](#key-types--interfaces): Language codes and engine shapes
+- [Core Logic / Flow](#core-logic--flow): Language selection and legal documents
+- [Dependencies](#dependencies): Internal and external dependencies
 
 
 ---
@@ -17,11 +17,11 @@
 
 Supporting modules shared by every screen:
 
-1. **i18n** — `i18next` + `react-i18next` with three languages: English (`en`), Malay (`ms`), French (`fr`). The choice persists in `localStorage` under the key `lr.lang`. If the saved value is unknown or missing, the default language `en` is used.
-2. **Audio** — `RetroAudioEngine`, a Web Audio synthesizer for UI beeps and game sounds (dice, moves, captures, ignition). The Game page calls it through `retroAudio`; muting is toggled with `toggleMute()`.
-3. **Bot names**: `localizedBotName()` maps the engine's `bot-<color>` user ids to a translated "bot-<color>" string using the `common.bot` label and the `lobby.color*` i18n keys. A trailing "(assistant)" name the lobby assigned the seat is kept as sent, so French renders "bot-red (Siri)" as "bot-rouge (Siri)".
-4. **Legal pages** — `LegalPage` renders the Privacy Policy and Terms of Service (public routes `/privacy` and `/terms`) from markdown files bundled with Vite's `?raw` imports, one variant per language.
-5. **Entry point** — `main.tsx` mounts `<App />` in `StrictMode` and imports the CSS plus `./i18n` so translations are ready before the first render.
+1. **i18n**: `i18next` + `react-i18next` with three languages: English (`en`), Malay (`ms`), French (`fr`). The choice persists in `localStorage` under the key `lr.lang`. If the saved value is unknown or missing, the default language `en` is used.
+2. **Audio**: `RetroAudioEngine`, a Web Audio synthesizer for UI beeps and game sounds (dice, moves, captures, ignition). The Game page calls it through `retroAudio`; muting is toggled with `toggleMute()`.
+3. **Bot names and seat colours**: `localizedBotName()` maps the engine's `bot-<color>` user ids to a translated "bot-<color>" string using the `common.bot` label and the `lobby.color*` i18n keys. A trailing "(assistant)" name the lobby assigned the seat is kept as sent, so French renders "bot-red (Siri)" as "bot-rouge (Siri)". The same file exports `localizedColor(t, color)`: the bare colour word ("Red" / "Rouge" / "Merah") that the in-game labels use when a seat has no name, as in the turn label and the capture log. The file also exports `avatarSeed()`: it reduces a bot label to the assistant name the lobby assigned that seat, so the generated bot avatar is locale-independent and identical in the lobby table, the arena and the results invoice.
+4. **Legal pages**: `LegalPage` renders the Privacy Policy and Terms of Service (public routes `/privacy` and `/terms`) from markdown files bundled with Vite's `?raw` imports, one variant per language.
+5. **Entry point**: `main.tsx` mounts `<App />` in `StrictMode` and imports the CSS plus `./i18n` so translations are ready before the first render.
 
 The brand name is translated instead of hardcoded: `homeExtended.brandTitle` (the Home hero title, with the `'42` suffix) and `authExtra.brandTitle` (the Login header) render `RETRO LUDO` in English, `LUDO RÉTRO` in French and `LUDO RETRO` in Malay. The browser tab title in `index.html` stays static at `RETRO LUDO '42`, since it sits outside the locale sheets.
 
@@ -34,14 +34,14 @@ The brand name is translated instead of hardcoded: `homeExtended.brandTitle` (th
 
 | File | Role |
 |------|------|
-| `src/main.tsx` | Entry point — mounts `App` in `StrictMode`, imports CSS and `i18n` |
-| `src/i18n.ts` | `i18next` setup — `en` / `ms` / `fr` resources, `lr.lang` localStorage persistence, `en` fallback |
+| `src/main.tsx` | Entry point: mounts `App` in `StrictMode`, imports CSS and `i18n` |
+| `src/i18n.ts` | `i18next` setup: `en` / `ms` / `fr` resources, `lr.lang` localStorage persistence, `en` fallback |
 | `src/locales/en.ts` | English translation namespace |
 | `src/locales/fr.ts` | French translation namespace |
 | `src/locales/ms.ts` | Malay translation namespace |
-| `src/utils/audio.ts` | `RetroAudioEngine` — Web Audio UI beeps and game sounds, volume + mute |
-| `src/utils/botName.ts` | `localizedBotName()`: `bot-<color>` (with an optional "(assistant)" suffix) to a translated bot name |
-| `src/pages/LegalPage.tsx` | Privacy / Terms pages (`/privacy`, `/terms`) — markdown viewer per language |
+| `src/utils/audio.ts` | `RetroAudioEngine`: Web Audio UI beeps and game sounds, volume + mute |
+| `src/utils/botName.ts` | `localizedBotName()`: `bot-<color>` (with an optional "(assistant)" suffix) to a translated bot name; `localizedColor()`: a `PlayerColor` to its translated colour word; `avatarSeed()`: a seat name to a locale-independent generated-avatar seed |
+| `src/pages/LegalPage.tsx` | Privacy / Terms pages (`/privacy`, `/terms`): markdown viewer per language |
 
 
 ---

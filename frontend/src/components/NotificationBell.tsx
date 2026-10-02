@@ -163,7 +163,11 @@ function renderNotificationBody(
       const labels = items
         .map((i) => t(`notifications.profileItem${i.charAt(0).toUpperCase()}${i.slice(1)}`))
         .join(', ');
-      return <span>{t('notifications.profileUpdatedText', { item: labels || t('notifications.unknown') })}</span>;
+      return (
+        <span>
+          {t('notifications.profileUpdatedText', { item: labels || t('notifications.unknown') })}
+        </span>
+      );
     }
     case 'display_name_changed': {
       const oldName = payload.oldDisplayName ? String(payload.oldDisplayName) : from;

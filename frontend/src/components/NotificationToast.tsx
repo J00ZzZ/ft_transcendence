@@ -153,7 +153,9 @@ function getToastInfo(
         badgeColor: 'var(--accent-cyan, #00f0ff)',
         badgeBg: 'rgba(0, 240, 255, 0.18)',
         fromUser: null,
-        actionMessage: t('notifications.profileUpdatedText', { item: labels || t('notifications.unknown') }),
+        actionMessage: t('notifications.profileUpdatedText', {
+          item: labels || t('notifications.unknown'),
+        }),
       };
     }
     case 'display_name_changed': {

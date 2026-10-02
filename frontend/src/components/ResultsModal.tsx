@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { UserAvatar } from './UserAvatar';
 import { useApp, type LastResult } from '../store';
 import { retroAudio } from '../utils/audio';
-import { localizedBotName } from '../utils/botName';
+import { avatarSeed, localizedBotName } from '../utils/botName';
 import '../styles/retrowave.css';
 import {
   RETRO_BTN,
@@ -67,8 +67,11 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
     !result.abandoned &&
     (Boolean(result.winner) || result.players.some((p) => p.piecesInGoal >= 4));
 
-  // Find current player's color or fallback to first human/player
+  // Find current player's color or fallback to first human/player. The id first:
+  // `players[].username` is the engine's seat label (a display name or a lobby
+  // name), so a rename can make the name comparison pick the wrong seat.
   const myPlayer =
+    result.players.find((p) => !p.isBot && !!user?.id && p.userId === user.id) ??
     result.players.find((p) => !p.isBot && p.username === user?.username) ??
     result.players.find((p) => !p.isBot) ??
     (result.players.length > 0 ? result.players[0] : undefined);
@@ -194,21 +197,26 @@ export function ResultsModal({ result, onReturnToLobby, onClose }: ResultsModalP
                   {ranked.map((p, index) => {
                     const isWinner = index === 0 && hasRealWinner;
                     const isMe = p.color === myColor;
+                    // Only when the id matched: the name and first-human fallbacks
+                    // can land on another seat, which must not reuse our photo.
+                    const mySeat = isMe && !!user?.id && p.userId === user.id;
                     const pName = isMe ? t('common.you') : localizedBotName(t, p.username);
 
                     return (
                       <li key={p.color} className={PAYERS_LI}>
                         <div className={PAYER_IMAGE_CONTAINER}>
                           <UserAvatar
-                            username={p.username}
-                            // Only our own seat has an id: LastResult.players carries no ids, so
-                            // opponents and bots render the generated avatar rather than requesting a
-                            // photo that may not exist.
-                            userId={!p.isBot && isMe ? user?.id : undefined}
+                            // Bots carry their raw label, so the seed is the assistant
+                            // name: one bot keeps one avatar in the lobby and the arena.
+                            username={avatarSeed(p.username)}
+                            // Seat facts from the engine's roster; our own seat uses the store's
+                            // live /me values. See docs/frontend/frontend-results-module.md.
+                            userId={mySeat ? user.id : p.userId}
                             isBot={p.isBot}
                             hasAvatarPhoto={
-                              p.isBot || !isMe ? false : (user?.hasAvatarPhoto ?? false)
+                              mySeat ? (user.hasAvatarPhoto ?? false) : (p.hasAvatarPhoto ?? false)
                             }
+                            avatarStyle={p.avatarStyle}
                             size={40}
                             fallbackStyle={{
                               width: 40,

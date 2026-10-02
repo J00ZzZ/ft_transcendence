@@ -99,6 +99,15 @@ sequenceDiagram
     Lobby->>Lobby: Render mode/seat setup, bot controls, start button
 ```
 
+**The seat roster shows an avatar on every occupied seat.** The host's own seat renders `UserAvatar` with
+the store's `/me` facts, so it shows the uploaded photo when one exists and the generated avatar
+otherwise. Each `type: 'player'` seat is a *local* hotseat pilot: it has no account, so it renders the
+generated DiceBear avatar seeded from the name typed for it here (renaming the seat re-seeds the
+avatar), and it issues no photo request at all. A `type: 'bot'` seat takes that same generated path,
+seeded from the assistant name (`BOT_POOL`) this roster assigned it, which is the seed the arena and the
+results invoice reuse. This is the lobby half of the same rule the game board follows; see
+[avatar-system.md](../avatar-system.md) → 4. Game seats.
+
 ### 2. Start Game Flow
 
 The lobby (`/gamelobby`) sets up the seats and then hands off to the table screen
@@ -135,9 +144,9 @@ sequenceDiagram
   ├── useRoute() → query (mode preselect)
   ├── useApp() → playerCount, seats, settings, user
   ├── Render seat grid for seats[0..playerCount)
-  │   ├── type = 'you' → host seat
-  │   ├── type = 'bot' → bot name + remove button
-  │   ├── type = 'player' → named player seat
+  │   ├── type = 'you' → host seat (account avatar: uploaded photo, else generated)
+  │   ├── type = 'bot' → bot name + remove button + generated avatar (assistant-name seed)
+  │   ├── type = 'player' → named local pilot seat + generated avatar seeded from the name
   │   └── type = 'empty' → "+ Add" card
   └── Render Start button (enabled when a valid setup is chosen)
 ```
@@ -194,3 +203,4 @@ For hotseat and PvE, the created game is exactly the occupied seats (the host is
 | `store.tsx` | `useApp` for mode, seats and game actions |
 | `router.tsx` | `navigate('/game')` on start |
 | `theme.ts` | `BOT_POOL` constant, inline styles |
+| `components/UserAvatar.tsx` | Seat avatar: the host's uploaded photo when one exists, otherwise the generated DiceBear avatar seeded from the seat name (local hotseat pilots have no account, so they only ever get the generated one) |
