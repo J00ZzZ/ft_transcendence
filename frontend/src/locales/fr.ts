@@ -888,7 +888,7 @@ export const fr = {
     viewGlobalLadder: 'VOIR LE CLASSEMENT MONDIAL →',
     audioActive: '// AUDIO : ACTIF [MUET]',
     audioStandby: '// AUDIO : EN ATTENTE [JOUER]',
-    // Cyber Sound Deck — « Chiptune » reste non traduit dans toutes les langues.
+    // Cyber Sound Deck: « Chiptune » reste non traduit dans toutes les langues.
     chiptuneDeckTitle: '◖ CONSOLE CYBER-SON ◗',
     chiptuneToggleTitle: "Cliquez pour activer/désactiver l'audio Chiptune",
     chiptuneLiveStereo: 'STEREO LIVE',

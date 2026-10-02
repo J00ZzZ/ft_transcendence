@@ -35,7 +35,7 @@ Seeding is a **manual** step — run `npm run db:seed` (or `npm run db:reset` fo
 
 | File | Role |
 |------|------|
-| `prisma/seed.ts` | Main seed — 28-player roster, blank `bossku` account, Redis leaderboard sync, game history |
+| `prisma/seed.ts` | Main seed — 28-player roster, blank `bossku` account, Redis leaderboard sync, game history, base friendship graph |
 | `prisma/seed_friends.ts` | Dense accepted-friendship graph (up to 8 links per user; 10+ for the two target accounts) |
 | `prisma/seed_user_profile.ts` | Stats, achievements, match history and friendships for the two demo accounts (`harleyhxng` / `harleynghxedu`) |
 | `prisma/sync_leaderboard.ts` | Standalone Redis leaderboard sync script |
@@ -98,7 +98,7 @@ Sample game history is created for a subset of the roster so profile history pag
 
 ### Friendships
 
-`seed_friends.ts` builds a connected social graph — accepted friendships plus pending incoming requests — so the Friends pages and notification flows have realistic data.
+`seed.ts` builds the base social graph — pending incoming requests, accepted friendships and one blocked pair — so the Friends pages and notification flows have realistic data. `seed_friends.ts` can then add a denser, all-accepted friendship graph on top.
 
 
 ---
@@ -144,7 +144,7 @@ The seed scripts are safe to re-run. The main script:
 ```
 user.deleteMany({ where: { username: { in: SEED_PLAYERS.map(p => p.username) } } })
 game.deleteMany({ where: { participants: { none: {} } } })
-friendShip.deleteMany({})
+friendship.deleteMany({})
 ```
 
 Cascading deletes (User → Account / GameParticipant / Friendship / Notification) keep re-runs clean, so `npx prisma db seed` multiple times produces the same state without duplicate-key errors. Redis sorted sets are reset (`DEL leaderboard:global|ranked|casual`) before re-adding.

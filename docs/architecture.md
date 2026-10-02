@@ -491,6 +491,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   ├── friends/              # Friend system (requests, accept/decline, block, invites)
 │   │   │   ├── friends.controller.ts # friend + game-invite routes
 │   │   │   ├── friends.service.ts    # friendship rules + online enrichment
+│   │   │   ├── friendship-pair.ts    # pure pair predicates shared with match + presence
 │   │   │   └── friends.module.ts
 │   │   ├── match/                # Matchmaking & game lifecycle (split services)
 │   │   │   ├── match.controller.ts        # match/game HTTP routes
@@ -500,6 +501,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │   ├── match.query.service.ts     # read-only open-rooms / my-rooms queries
 │   │   │   ├── match.postgame.service.ts  # POST /api/game/end handling
 │   │   │   ├── seat-finalization.ts       # terminal-seat lookup from engine state
+│   │   │   ├── dto/invite-friend.dto.ts   # required-UUID body for the game-invite route
 │   │   │   └── match.module.ts
 │   │   ├── leaderboard/          # Rankings (Redis sorted sets, Postgres backfill when empty)
 │   │   │   ├── leaderboard.controller.ts     # GET /api/leaderboard

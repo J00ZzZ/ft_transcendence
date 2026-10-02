@@ -114,7 +114,7 @@ model Account {
   @@index([userId])
 }
 
-// ─── Game (historical results only — matchmaking lives in Redis) ─────────────
+// ─── Game (historical results only: matchmaking lives in Redis) ─────────────
 
 model Game {
   id         String     @id

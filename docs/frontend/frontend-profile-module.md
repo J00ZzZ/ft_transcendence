@@ -17,7 +17,7 @@
 
 The Profile page (`/profile`) shows a user's public profile with statistics, recent match history and a friends panel. It is a full-screen route (rendered directly by the router); the page renders its own `RetroNavbar`.
 
-1. **Profile header** — username, status indicator, avatar initials, rating and the date the account was created.
+1. **Profile header** — the player's display name plus their username (shown so others can add them by username), a status indicator, avatar initials, rating and the date the account was created.
 2. **Stats grid** — wins, losses, win rate, best streak.
 3. **Recent matches** — each game with the other human players' names, the result (victory, defeat or draw), pieces in goal and the date. A game against bots lists only you.
 4. **Friends panel** — friends with their online status and their rating; shown only on your own profile.

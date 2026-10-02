@@ -35,10 +35,16 @@ The database uses PostgreSQL 16 with Prisma ORM (Prisma 7, `@prisma/adapter-pg`)
 
 ### FriendshipStatus
 
+A directional friendship state. Each `Friendship` row stores two of these — one per
+side of the pair (`user1Status` / `user2Status`) — so a block on one side can never
+be silently rewritten from the other.
+
 ```prisma
 enum FriendshipStatus {
+  none
   pending
   accepted
+  declined
   blocked
 }
 ```
@@ -133,7 +139,7 @@ data, and disconnect/reconnect counters.
 | `createdAt` | DateTime | Auto | Account creation timestamp |
 | `updatedAt` | DateTime | Auto | Last update timestamp |
 
-**Relations:** `accounts`, `notifications`, `achievement` (1:1), `gameParticipants`, `sentFriendships`, `receivedFriendships`
+**Relations:** `accounts`, `notifications`, `achievement` (1:1), `gameParticipants`, `friendshipsAsUser1`, `friendshipsAsUser2`
 
 
 ---
@@ -247,15 +253,32 @@ Modules that must tell humans from bots:
 
 ### Friendship
 
+One row per **unordered user pair** (a "superset" row), so a pair has a single
+record whatever direction a request was made from. Each direction carries its own
+status (`user1Status` = user1's action toward user2), so a block on one side can
+never be silently rewritten from the other.
+
 | Field | Type | Attributes | Description |
 |-------|------|------------|-------------|
-| `id` | String | UUID, PK | Unique identifier |
-| `userId` | String | FK | Sender/initiator |
-| `friendId` | String | FK | Target user |
-| `status` | FriendshipStatus | Default: pending | pending/accepted/blocked |
-| `createdAt` | DateTime | Auto | When created |
+| `id` | String | PK | Unique identifier |
+| `pairKey` | String | Unique | Sorted `"min:max"` id pair — enforces one row per pair |
+| `user1Id` | String | FK | First user of the sorted pair |
+| `user2Id` | String | FK | Second user of the sorted pair |
+| `user1Status` | FriendshipStatus | Default: none | User1's action toward user2 |
+| `user2Status` | FriendshipStatus | Default: none | User2's action toward user1 |
+| `user1StatusAt` | DateTime? | | When user1's status changed (TTL / cooldown base) |
+| `user2StatusAt` | DateTime? | | When user2's status changed (TTL / cooldown base) |
+| `requestCount` | Int | Default: 0 | Re-request bookkeeping |
+| `lastRequestAt` | DateTime? | | When the last request was sent (24 h pending TTL) |
+| `createdAt` | DateTime | Auto | When the pair row was created |
+| `updatedAt` | DateTime | Auto | Last change |
 
-**Relations:** `user` (SentFriendships), `friend` (ReceivedFriendships)
+**Relations:** `user1` (FriendshipUser1), `user2` (FriendshipUser2)
+
+> A live `pending` expires after 24 h and a `declined` direction stops blocking
+> re-requests after a 1 h cooldown; both are applied lazily on read by the pure
+> helpers in `backend/src/friends/friendship-pair.ts` (see
+> [backend-friends-module.md](./backend-friends-module.md)).
 
 
 ---
@@ -270,7 +293,7 @@ Persisted notifications backing the SSE stream and the bell dropdown.
 |-------|------|------------|-------------|
 | `id` | String | UUID, PK | Unique identifier |
 | `userId` | String | FK | Recipient |
-| `type` | String | | `friend_request` \| `friend_accepted` \| `game_invite` \| `achievement` |
+| `type` | String | | `friend_request` \| `friend_accepted` \| `friend_declined` \| `friend_removed` \| `game_invite` \| `achievement` \| `match_finished` \| `match_cancelled` \| `profile_updated` \| `display_name_changed` \| `friend_online` \| `friend_offline` \| `avatar_changed` |
 | `payload` | Json | | Flexible per-type data |
 | `read` | Boolean | Default: false | Read state |
 | `createdAt` | DateTime | Auto | When created |
@@ -290,8 +313,8 @@ erDiagram
     User ||--o{ Account : "OAuth links"
     User ||--o{ Notification : "receives"
     User ||--o{ GameParticipant : "plays"
-    User ||--o{ Friendship : "initiates (userId)"
-    User ||--o{ Friendship : "targets (friendId)"
+    User ||--o{ Friendship : "user1 (user1Id)"
+    User ||--o{ Friendship : "user2 (user2Id)"
     Game ||--o{ GameParticipant : "includes"
 
     User {
@@ -362,10 +385,17 @@ erDiagram
     }
     Friendship {
         string id PK "Unique ID"
-        string userId FK "Who sent the request"
-        string friendId FK "Who received it"
-        FriendshipStatus status "pending / accepted / blocked"
-        datetime createdAt "When it was made"
+        string pairKey UK "Sorted min:max id pair"
+        string user1Id FK "First user of the pair"
+        string user2Id FK "Second user of the pair"
+        FriendshipStatus user1Status "User1's action toward user2"
+        FriendshipStatus user2Status "User2's action toward user1"
+        datetime user1StatusAt "When user1's status changed"
+        datetime user2StatusAt "When user2's status changed"
+        int requestCount "Re-request counter"
+        datetime lastRequestAt "When last request was sent"
+        datetime createdAt "When the pair row was made"
+        datetime updatedAt "Last change"
     }
     Notification {
         string id PK "Unique ID"
@@ -395,5 +425,7 @@ erDiagram
 | Game | `inviteCode` | Unique | Fast invite code lookup |
 | GameParticipant | `(game_id, user_id)` | Unique | Prevent duplicate entries |
 | GameParticipant | `(game_id, color)` | Unique | Prevent duplicate colors |
-| Friendship | `(userId, friendId)` | Unique | Prevent duplicate friendships |
+| Friendship | `pairKey` | Unique | One row per unordered user pair |
+| Friendship | `(user1Id, user1Status)` | Index | Fast lookup of a user's user1-direction rows |
+| Friendship | `(user2Id, user2Status)` | Index | Fast lookup of a user's user2-direction rows |
 | Notification | `(userId, read)` | Index | Fast unread-lookup per user |

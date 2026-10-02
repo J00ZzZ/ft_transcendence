@@ -88,7 +88,8 @@ An error response has one of two shapes:
 | `FRIEND_REQUEST_SELF` | 400 | Cannot send a request to yourself |
 | `FRIEND_ALREADY` | 400 | Already friends |
 | `FRIEND_REQUEST_PENDING` | 400 | Request already pending |
-| `FRIEND_BLOCKED` | 403 | Cannot send — user is blocked |
+| `FRIEND_BLOCKED` | 403 | A block exists between the two users (send / accept / invite) |
+| `FRIEND_REQUEST_COOLDOWN` | 400 | Cannot re-request — the sender was declined less than 1 h ago |
 | `FRIEND_REQUEST_NOT_FOUND` | 404 | Friend request not found |
 | `FRIEND_NOT_FOUND` | 404 | Friendship not found |
 | `FRIEND_BLOCK_SELF` | 400 | Cannot block yourself |
@@ -1363,10 +1364,11 @@ Invite a friend into a WAITING PvP room.
 }
 ```
 
-**Errors:** 404 `MATCH_GAME_NOT_FOUND` if the room is gone; 403 `MATCH_PVP_ONLY_INVITE` for a non-PvP
-room; 403 `MATCH_ALREADY_STARTED` once the room has left WAITING; 403 `MATCH_NOT_PLAYER` if the caller
-holds no seat; 403 `NOT_FRIENDS_WITH_USER` when the target is not a friend; 403 `MATCH_ROOM_FULL` if
-no seat is left for the friend.
+**Errors:** 400 validation if `friendId` is missing or not a UUID; 404 `MATCH_GAME_NOT_FOUND` if the
+room is gone; 403 `MATCH_PVP_ONLY_INVITE` for a non-PvP room; 403 `MATCH_ALREADY_STARTED` once the
+room has left WAITING; 403 `MATCH_NOT_PLAYER` if the caller holds no seat; 403 `FRIEND_BLOCKED` when a
+block exists between the caller and the target; 403 `NOT_FRIENDS_WITH_USER` when the target is not a
+friend; 403 `MATCH_ROOM_FULL` if no seat is left for the friend.
 
 
 ---
@@ -1742,7 +1744,7 @@ Send a friend request.
 **Body:** None  
 **Response:** Returns the full friendship object with user and friend details.
 
-**Errors:** 400 `FRIEND_ALREADY` / `FRIEND_REQUEST_PENDING` / `FRIEND_BLOCKED`; 403 `NOT_FRIENDS_WITH_USER`; 404 `USER_NOT_FOUND`.
+**Errors:** 400 `FRIEND_REQUEST_SELF` / `FRIEND_ALREADY` / `FRIEND_REQUEST_PENDING` / `FRIEND_REQUEST_COOLDOWN`; 403 `FRIEND_BLOCKED`; 404 `USER_NOT_FOUND`.
 
 
 ---
@@ -1760,7 +1762,8 @@ Accept a friend request.
 **Body:** None  
 **Response:** Returns the updated friendship object with user and friend details.
 
-**Errors:** 404 if request not found, 403 if not addressed to current user.
+**Errors:** 404 `FRIEND_REQUEST_NOT_FOUND` when the pair row does not exist or the caller has no live
+inbound request; 403 `FRIEND_BLOCKED` when either side has blocked the other.
 
 
 ---
@@ -1778,7 +1781,8 @@ Decline a friend request.
 **Body:** None  
 **Response:** `{ "message": "Friend request declined" }`
 
-**Errors:** 404 if request not found.
+**Errors:** 404 `FRIEND_REQUEST_NOT_FOUND` when the pair row does not exist or the caller has no live
+inbound request.
 
 
 ---

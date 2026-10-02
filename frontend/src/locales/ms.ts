@@ -886,7 +886,7 @@ export const ms = {
     viewGlobalLadder: 'LIHAT CARTA GLOBAL →',
     audioActive: '// AUDIO: AKTIF [SENYAP]',
     audioStandby: '// AUDIO: STANDBY [MAIN]',
-    // Cyber Sound Deck — "Chiptune" kekal tidak diterjemah dalam semua bahasa.
+    // Cyber Sound Deck: "Chiptune" kekal tidak diterjemah dalam semua bahasa.
     chiptuneDeckTitle: '◖ DEK CYBER-SOUND ◗',
     chiptuneToggleTitle: 'Klik untuk togol Audio Chiptune',
     chiptuneLiveStereo: 'STEREO LIVE',

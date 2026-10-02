@@ -15,7 +15,7 @@ OAUTH_VARS     = GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL \
 TUNNEL_VARS    = NGROK_AUTHTOKEN NGROK_DOMAIN NGROK_FRONTEND_URL \
                  NGROK_GOOGLE_CALLBACK_URL NGROK_GITHUB_CALLBACK_URL NGROK_FORTYTWO_CALLBACK_URL
 # Everything the preflight requires: core secrets/DB/URLs + OAuth apps. These
-# are validated (and never auto-generated — a real .env is copied from a
+# are validated (and never auto-generated: a real .env is copied from a
 # teammate). SMTP_CREDENTIALS counts too: without it mail only gets logged, but
 # an empty value still means the .env was copied incompletely. LAN_IP is the
 # only key left out of the list (`make env` writes it itself).
@@ -128,7 +128,7 @@ ngrok-auth:
 	if [ -z "$$token" ]; then echo "❌  ngrok authtoken missing — set NGROK_AUTHTOKEN in .env"; exit 1; fi; \
 	ngrok config add-authtoken "$$token" >/dev/null && echo "🔑  ngrok authtoken configured"
 
-# Tunnels nginx's TLS listener (127.0.0.1:8443) — the address is given as
+# Tunnels nginx's TLS listener (127.0.0.1:8443): the address is given as
 # https:// so ngrok speaks TLS to the local backend instead of forwarding
 # plain HTTP at it. ngrok doesn't verify the upstream cert by default (that's
 # opt-in via --upstream-tls-verify), so the self-signed cert isn't a problem.
@@ -144,7 +144,7 @@ tunnel-url:
 
 # One command: build + start the stack (detached), then open the public tunnel.
 # Stack runs in the background; ngrok stays in the foreground (Ctrl-C stops the
-# tunnel, containers keep running — use `make stop-tunnel` to stop everything).
+# tunnel, containers keep running: use `make stop-tunnel` to stop everything).
 tunnel_up: all tunnel
 
 dev-tunnel:

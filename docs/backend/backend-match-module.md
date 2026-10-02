@@ -70,7 +70,7 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 }
 ```
 
-### InviteFriendBody
+### InviteFriendDto
 
 ```typescript
 {
@@ -119,7 +119,7 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 | `POST` | `/api/game/:id/started` | engine key | Engine callback — mark game started |
 
 > **Invite body validation:** `POST /api/game/:id/invite` takes an
-> `InviteFriendBody` (`{ friendId }`). `friendId` is validated as a required UUID
+> `InviteFriendDto` (`{ friendId }`). `friendId` is validated as a required UUID
 > by the global `ValidationPipe`, so an empty or malformed body is rejected at the
 > boundary instead of silently skipping the friendship check. The handler then
 > requires one friendship pair row where both directions are `accepted` and

@@ -283,10 +283,9 @@ export class FriendsService {
     return updated;
   }
 
-  // Decline a pending request addressed to userId and notify the sender. The
-  // caller's own direction stores the decline (which starts the sender's 1h
-  // cooldown); the sender's pending request is withdrawn.
-  // Used by POST /api/friends/decline/:requestId.
+  // Decline a pending request addressed to userId: store the decline in the
+  // caller's own direction (starting the sender's 1h cooldown), withdraw the
+  // sender's pending request, and notify them. POST /api/friends/decline/:requestId.
   async declineFriendRequest(requestId: string, userId: string) {
     const pair = await this.prisma.db.friendship.findUnique({ where: { id: requestId } });
     const now = Date.now();

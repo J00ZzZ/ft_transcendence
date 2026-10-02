@@ -41,10 +41,9 @@ function tunnelAwareGuard(localStrategy: string, tunnelStrategy: string, provide
         return false;
       }
 
-      // "Add a sign-in method" intent: with a valid access-token cookie, sign
-      // a short-lived oauth-link token into the provider `state` so the
-      // callback links the provider to the logged-in user. No cookie = login.
-      // An invalid/expired access token means a normal login.
+      // Valid access-token cookie: sign an oauth-link token into the provider
+      // `state` so the callback links the provider to the logged-in user. No
+      // cookie, or an invalid/expired token, means a normal login.
       const accessToken: unknown = req.cookies['token'];
       const userId = this.auth.verifyAccessToken(
         typeof accessToken === 'string' ? accessToken : undefined,

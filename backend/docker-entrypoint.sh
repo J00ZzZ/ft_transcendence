@@ -14,7 +14,7 @@ for v in DATABASE_URL JWT_SECRET ENGINE_JWT_SECRET OAUTH_STATE_SECRET; do
 done
 
 # Initialize database schema with Prisma db push
-# Note: Not using migrate deploy — this project uses db push (no migration history)
+# Note: Not using migrate deploy: this project uses db push (no migration history)
 echo "🔧 Pushing Prisma schema to database..."
 npx prisma db push --accept-data-loss
 

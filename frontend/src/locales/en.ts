@@ -887,7 +887,7 @@ export const en = {
     viewGlobalLadder: 'VIEW GLOBAL LADDER →',
     audioActive: '// AUDIO: ACTIVE [MUTE]',
     audioStandby: '// AUDIO: STANDBY [PLAY]',
-    // Cyber Sound Deck — "Chiptune" stays untranslated in all languages.
+    // Cyber Sound Deck: "Chiptune" stays untranslated in all languages.
     chiptuneDeckTitle: '◖ CYBERSOUND DECK ◗',
     chiptuneToggleTitle: 'Click to toggle Chiptune Audio',
     chiptuneLiveStereo: 'LIVE STEREO',

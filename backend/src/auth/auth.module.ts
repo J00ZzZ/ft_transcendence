@@ -28,11 +28,9 @@ import { AvatarMetaModule } from '../avatar/avatar-meta.module';
     PassportModule,
     JwtModule.register({
       secret: requireSecret('JWT_SECRET'),
-      // Access tokens are now short-lived; the refresh token (SessionService)
-      // keeps the user signed in for 7 days by minting new access tokens.
-      // Every session token is stamped with our issuer and the API audience,
-      // and every jwt.verify() defaults to requiring both, so a token signed
-      // with the same key for another purpose is not a session.
+      // Session tokens are short-lived (15m); SessionService refresh tokens
+      // (7 days) mint new ones. Every token carries our issuer plus the API
+      // audience, and every jwt.verify() requires both.
       signOptions: {
         expiresIn: '15m',
         issuer: TOKEN_ISSUER,
