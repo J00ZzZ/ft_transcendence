@@ -75,7 +75,7 @@ flowchart TD
     A["User clicks 'Forgot password'"] --> B["ForgotPassword page (/forgot-password)"]
     B --> C["POST /api/auth/forgot-password (email)"]
     C --> D["Backend emails a one-time reset link"]
-    D --> E["User opens /reset-password?token=..."]
+    D --> E["User opens /reset-password#token=..."]
     E --> F["ResetPassword page — new password + confirm"]
     F --> G["POST /api/auth/reset-password (token, password)"]
     G --> H["Redirect to /login?reset=1"]
@@ -124,14 +124,14 @@ Step one of password reset.
 
 Step two of password reset.
 
-- Reached from the emailed link: `?token=<resetToken>`.
+- Reached from the emailed link: `/reset-password#token=<resetToken>`. The token travels in the URL **fragment**, not the query string, so it is never sent to the server.
 - New password + confirm password fields.
 - Validates password against the same policy as signup (12+ chars, upper, lower, number, special).
 - Calls `POST /api/auth/reset-password` with `token` and `password`.
 - On success, navigates to `/login?reset=1`.
-- If no `token` query param, shows an "invalid reset link" error.
+- If the fragment carries no `token`, shows an "invalid reset link" error.
 
-**Route params:** the `token` query parameter holds the 64-character hexadecimal reset token from the email.
+**URL fragment:** the `token` fragment parameter holds the 64-character hexadecimal reset token from the email. The page reads it on the first render, strips it with `history.replaceState`, and then sends it in the body of `POST /api/auth/reset-password`.
 
 
 ---
@@ -204,7 +204,7 @@ export function passwordError(pw: string): string | null {
 ## Page Notes
 
 - **ForgotPassword** collects an email and asks the backend to send a reset link. The confirmation screen always appears: the backend never reveals whether the address is registered, and neither does the page.
-- **ResetPassword** is reached from the emailed link, which includes `?token=<resetToken>`. It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`. Redeeming the link also marks the address as verified, so an account that had not verified yet can sign in afterwards.
+- **ResetPassword** is reached from the emailed link, which carries the token in the URL fragment (`/reset-password#token=<resetToken>`). It validates the new password against the same policy as signup (`validatePassword.ts`); on success it sends the user to `/login`. Redeeming the link also marks the address as verified, so an account that had not verified yet can sign in afterwards.
 - **TwoFactor** is reached in two ways, both with `?token=<pendingToken>`: from `Login.tsx` after the password step succeeds, or from the backend's OAuth callback after it emails the code.
 
 

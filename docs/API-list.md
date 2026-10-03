@@ -146,7 +146,7 @@ An error response has one of two shapes:
 
 2. **[Auth — Profile & Password](#2-auth--profile--password)** — Password reset, profile read/update, change password, delete account
    - [`POST /api/auth/forgot-password`](#post-apiauthforgot-password) — Request a password-reset link by email
-   - [`POST /api/auth/reset-password`](#post-apiauthresetpassword) — Set a new password using the token from the reset email
+   - [`POST /api/auth/reset-password`](#post-apiauthresetpassword) — Set a new password using the token from the reset email (sent in the body, not the URL)
    - [`GET /api/auth/profile`](#get-apiauthprofile) — Get your full profile (email, linked OAuth providers, has password)
    - [`PATCH /api/auth/profile`](#patch-apiauthprofile) — Update your username, display name, or email
    - [`PATCH /api/auth/profile/password`](#patch-apiauthprofilepassword) — Change your password while logged in
@@ -575,6 +575,8 @@ Email a password-reset link. Response is identical whether or not the email is r
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
 Redeem a reset token and set a new password. Redeeming the emailed link also marks the address as verified, so an account that had not verified yet can sign in afterwards.
+
+The emailed link points at the SPA (`/reset-password#token=…`), so the token travels in the **request body** and never in a URL. A URL fragment is not sent to the server, which keeps the token out of the proxy access and error logs, out of browser history, and safe from mail clients that prefetch links.
 
 **Headers:** None  
 **Body:**

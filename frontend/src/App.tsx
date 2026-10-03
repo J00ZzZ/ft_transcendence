@@ -53,7 +53,7 @@ const PUBLIC_ROUTES = new Set([
 /** Routes reached by an emailed account action rather than by browsing. A
  * signed-in user must still see them: most such arrivals are recognizable from
  * the query string, but the router cannot see a URL fragment. */
-const ACCOUNT_ACTION_ROUTES = new Set(['/verify-email']);
+const ACCOUNT_ACTION_ROUTES = new Set(['/verify-email', '/reset-password']);
 
 function Screen() {
   const { path, query } = useRoute();

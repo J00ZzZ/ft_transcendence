@@ -28,7 +28,7 @@ Verified against the current repo: `compose.yaml`, `nginx/conf/nginx.conf`, `ngi
 - [Rate limiting](#rate-limiting): the nginx per-address zones, the address each listener trusts, and the API throttler
 - [Sessions and authentication](#sessions-and-authentication): cookie shape, token lifetimes, rotation and revocation, bcrypt, 2FA
 - [Emailed link tokens](#emailed-link-tokens): what the app emails, each token's lifetime, and the single-use rule
-- [Verification links cannot reach a log](#verification-links-cannot-reach-a-log): why a verification token never lands in a proxy access log
+- [Emailed links cannot reach a log](#emailed-links-cannot-reach-a-log): why an emailed token never reaches a proxy access log
 - [Game engine boundary](#game-engine-boundary): how a socket proves it may join a game, and what the engine refuses
 - [Input validation and uploads](#input-validation-and-uploads): body validation, avatar signature checks, parameterized queries
 - [Data stores, secrets and configuration](#data-stores-secrets-and-configuration): where secrets live, what Redis holds, no browser credential
@@ -259,25 +259,33 @@ into the user row.
 ---
 
 
-## Verification links cannot reach a log
+## Emailed links cannot reach a log
 
-Emailed verification links point at the SPA with the token in the **URL fragment**, as in
-`https://<host>/verify-email#token=<64 hex characters>`. A fragment is never sent to the server, so
-it cannot appear in the nginx access log, the nginx error log, browser history or a `Referer`
+Every emailed link points at the SPA with the token in the **URL fragment**: as in
+`https://<host>/verify-email#token=<64 hex characters>` and
+`https://<host>/reset-password#token=<64 hex characters>`. A fragment is never sent to the server,
+so it cannot appear in the nginx access log, the nginx error log, browser history or a `Referer`
 header.
 
 The SPA reads the fragment on first render, removes it with `history.replaceState` before the
-request is made, and sends the token in the body of `POST /api/auth/verify-email`. The body is not
-logged. The response is one of `signup`, `change`, `conflict` or `invalid`, so the page can route
-without any secret coming back. There is no `GET` variant of the route: a link minted by an older
-build fails instead of falling back to the loggable shape.
+request is made, and sends the token in the body of the matching `POST` route. The body is not
+logged.
 
-**Mitigates:** single-use verification tokens being recorded in plaintext by the reverse proxy,
-where anyone with access to the logs (or to a log-forwarding destination) could redeem another
-user's link.
+The fragment also closes a second channel that a query string leaves open: nginx sends
+`Referrer-Policy: strict-origin-when-cross-origin`, which still puts the full URL, query string
+included, in the `Referer` of same-origin subresource requests, so a token in the query string
+would be re-logged on every asset and `/api` request the page makes. A fragment is never part of a
+`Referer`.
 
-The password-reset link is not converted yet: it still carries its token in the query string, so it
-reaches the same logs. See [Not yet addressed](#not-yet-addressed).
+- `POST /api/auth/verify-email` answers with one of `signup`, `change`, `conflict` or `invalid`, so
+  the page can route without any secret coming back. There is no `GET` variant of the route: a link
+  minted by an older build fails instead of falling back to a URL the proxy logs.
+- `POST /api/auth/reset-password` takes the token and the new password in the body, and revokes the
+  account's live sessions when the reset succeeds.
+
+**Mitigates:** single-use verification and reset tokens being recorded in plaintext by the reverse
+proxy, where anyone with access to the logs (or to a log-forwarding destination) could redeem
+another user's link.
 
 
 ---
@@ -378,7 +386,6 @@ They are listed so that this doc does not overstate the current state.
 
 | Area | Current state | Why it matters |
 |---|---|---|
-| Password-reset link | the link carries its token in the query string (`/reset-password?token=...`) | the same leak that was closed for verification links: the reverse proxy logs the token, so a log reader could redeem another user's reset link |
 | Content Security Policy | `script-src 'self' 'unsafe-inline'`, with wildcard `img-src` and `connect-src` | inline script is allowed, so the policy does not stop an injected inline payload |
 | Engine socket | Socket.IO CORS defaults to `origin: '*'`; no event rate limit; the default 1 MB `maxHttpBufferSize` | a foreign origin can open a socket (it still needs a valid match token to join a game), and a connected socket can send large or rapid events |
 | Login lockout | throttling is per client address | attempts spread over many addresses are not slowed per account |

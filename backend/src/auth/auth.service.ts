@@ -301,9 +301,12 @@ export class AuthService implements OnModuleDestroy {
     // password_hash) sign in through their provider instead.
     if (user?.password_hash) {
       const token = await this.twoFactor.createResetToken(user.id);
+      // As with the verification links, the token goes in the URL *fragment*,
+      // which is never sent to the server, so it cannot reach a log. The SPA
+      // strips it from history, then POSTs it in the body.
       await this.mail.sendPasswordReset(
         email,
-        `${baseUrl}/reset-password?token=${token}`,
+        `${baseUrl}/reset-password#token=${token}`,
         user.language,
         user.username,
       );

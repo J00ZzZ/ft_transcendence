@@ -79,7 +79,7 @@ const PUBLIC_ROUTES = new Set([
 /** Routes reached by an emailed account action rather than by browsing. A
  * signed-in user must still see them: most such arrivals are recognizable from
  * the query string, but the router cannot see a URL fragment. */
-const ACCOUNT_ACTION_ROUTES = new Set(['/verify-email'])
+const ACCOUNT_ACTION_ROUTES = new Set(['/verify-email', '/reset-password'])
 ```
 
 
@@ -211,7 +211,7 @@ useEffect([authReady, known, user, isPublic, hasNotice])
   ├── user && isPublic && !hasNotice → navigate('/home')
   └── else → render route component
 
-hasNotice = ACCOUNT_ACTION_ROUTES.has(path)   // /verify-email: token is in the fragment
+hasNotice = ACCOUNT_ACTION_ROUTES.has(path)   // /verify-email, /reset-password: token is in the fragment
          || ?verified / ?reset / ?error / ?token present in the query string
 ```
 
@@ -222,7 +222,7 @@ hasNotice = ACCOUNT_ACTION_ROUTES.has(path)   // /verify-email: token is in the 
 
 ### Account-action notices
 
-Account-action arrivals (`?verified=...`, `?reset=...`, `?error=...`, `?token=...`) are tied to one account action, not to the signed-in session, so a signed-in user must still see them instead of being sent to `/home`. `Screen` therefore treats any route carrying one of those query keys as exempt from the "signed-in users leave public routes" redirect — for example, verifying (or resetting) account B while account A happens to be signed in in the same browser.
+Account-action arrivals (`?verified=...`, `?reset=...`, `?error=...`, `?token=...`) are tied to one account action, not to the signed-in session, so a signed-in user must still see them instead of being sent to `/home`. `Screen` therefore treats any route carrying one of those query keys as exempt from the "signed-in users leave public routes" redirect: verifying (or resetting) account B while account A is signed in still shows the page. Routes whose token travels in the URL fragment (`/verify-email`, `/reset-password`) carry no query key for the guard to see, so `ACCOUNT_ACTION_ROUTES` lists them explicitly.
 
 
 ---

@@ -174,14 +174,17 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `GET` | `/api/auth/42` | None | Redirect to 42 OAuth |
 | `GET` | `/api/auth/42/callback` | None | 42 OAuth callback |
 
-**Emailed links:** both the signup link and the email-change link point at the SPA,
-with the token in the URL **fragment** (`https://<host>/verify-email#token=<64-hex>`).
-A fragment is never sent to the server, so the token cannot land in nginx's access
-**or error** log, in browser history, or in a `Referer` header. `VerifyEmail.tsx`
-reads the fragment, strips it with `history.replaceState`, then `POST`s the token in
-the body to `POST /api/auth/verify-email`, which returns `{ result }` for the SPA to
-route on. There is no `GET` variant: links minted before this change 404 by design
-(see `security-review.md` F-04).
+**Emailed links:** the signup, email-change and password-reset links all point at the
+SPA with the token in the URL **fragment**
+(`https://<host>/verify-email#token=<64-hex>`,
+`https://<host>/reset-password#token=<64-hex>`). A fragment is never sent to the
+server, so the token cannot reach nginx's access **or error** log, in browser
+history, or in a `Referer` header. `VerifyEmail.tsx` and `ResetPassword.tsx` read
+the fragment, strip it with `history.replaceState`, then `POST` the token in the
+body: `POST /api/auth/verify-email` returns `{ result }` for the SPA to route on,
+and `POST /api/auth/reset-password` takes the token with the new password. There is
+no `GET` variant: links minted before this change 404 by design (see
+`security-review.md` F-04 and F-21).
 
 **Display-name rules** (`PATCH /api/auth/profile`): the name must satisfy
 `VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`, be unique
