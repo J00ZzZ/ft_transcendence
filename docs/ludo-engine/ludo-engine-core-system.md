@@ -79,7 +79,7 @@ export interface PlayerMeta {
   color: PlayerColor;    // Seat color
   status: 'active' | 'exited' | 'inactive' | 'disconnected';  // Player lifecycle state
   username: string;      // Immutable account name (bots: `bot-<color>`)
-  displayName?: string;  // Optional display name
+  displayName?: string;  // Shown name (bot seats: `bot-<color> (<assistant>)`)
   userId?: string;       // Immutable account id (avatar key); absent for bots/hotseat seats
   hasAvatarPhoto: boolean;  // Whether the account has an uploaded photo (from the backend's Redis cache)
   avatarStyle?: string;  // DiceBear style used when there is no photo
@@ -262,7 +262,7 @@ sequenceDiagram
 
     Player->>Engine: Click a piece to move it
     Engine->>Engine: Check the move is legal
-    Engine->>Engine: Move the piece; any opponent piece on that cell goes back to base
+    Engine->>Engine: Move the piece. Any opponent piece on that cell goes back to base
     Engine->>Engine: Did all 4 pieces reach home?
     alt Yes — player wins
         Engine-->>Player: game_ended (winner)
@@ -384,3 +384,4 @@ Module-level constants in the engine's support files — edit at the top of each
 | `REDIS_PASSWORD` | (from secrets) | RedisGameStore |
 | `BACKEND_URL` | `http://backend:3000` | ResultSubmitter |
 | `ENGINE_API_KEY` | (from secrets) | ResultSubmitter |
+| `ENGINE_JWT_SECRET` | (from secrets) | `socket/auth.ts` — verifies the handshake match tokens |

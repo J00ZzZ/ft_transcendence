@@ -30,7 +30,7 @@ export function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // A link with no token is unusable — send them to request a fresh one.
+  // A link with no token is unusable: send them to request a fresh one.
   if (!token) {
     return (
       <RetroAuthLayout tag={t('auth.linkProblemTag')}>

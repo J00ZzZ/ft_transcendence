@@ -1,9 +1,9 @@
-# Conditions d'Utilisation — ft-Transcendence (RetroLudo '42)
+# Conditions d'Utilisation — ft-Transcendence (Ludo Rétro '42)
 
 **Date d'entrée en vigueur :** 2026-08-26
-**Responsable :** Team Pace 24, développeurs de ft-Transcendence (RetroLudo '42) (les « Team »)
+**Responsable :** Team Pace 24, développeurs de ft-Transcendence (Ludo Rétro '42) (les « Team »)
 
-Ces Conditions d'Utilisation (les « Conditions ») régissent votre utilisation de l'application web ft-Transcendence (RetroLudo '42) (« l'App »). En créant un compte ou en utilisant l'App, vous acceptez d'être lié(e) par ces Conditions. Si vous n'acceptez pas ces Conditions, veuillez ne pas utiliser l'App.
+Ces Conditions d'Utilisation (les « Conditions ») régissent votre utilisation de l'application web ft-Transcendence (Ludo Rétro '42) (« l'App »). En créant un compte ou en utilisant l'App, vous acceptez d'être lié(e) par ces Conditions. Si vous n'acceptez pas ces Conditions, veuillez ne pas utiliser l'App.
 
 
 ---
@@ -68,7 +68,7 @@ Vous acceptez **ne pas** :
 
 ## 5. Propriété intellectuelle
 
-- L'App, y compris son logiciel, sa conception et sa marque, est fournie dans le cadre d'un projet étudiant de l'école 42. L'App est diffusée sous licence **GPL-3.0** (voir le fichier `LICENSE` du projet).
+- L'App, y compris son logiciel, sa conception et sa marque, est fournie dans le cadre d'un projet étudiant de l'école 42. L'App est diffusée sous licence **GPL-3.0**.
 - Rien dans ces Conditions ne vous transfère aucune propriété de l'App, de sa technologie sous-jacente ou de son code source.
 
 

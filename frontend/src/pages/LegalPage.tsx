@@ -83,7 +83,7 @@ export function LegalPage({ initialDoc = 'privacy' }: LegalPageProps) {
                     navigate('/home');
                   }}
                 >
-                  ← {t('common.back', 'BACK')}
+                  ← {t('common.back')}
                 </button>
                 <h1 className={`${HERO_TITLE} m-0 text-lg sm:text-xl`}>
                   {activeDoc === 'privacy'

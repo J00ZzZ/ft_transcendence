@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '../generated/prisma/client';
 import type { GameType, PlayerColor } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { pairKey } from '../src/friends/friendship-pair';
 
 loadEnv({ path: join(__dirname, '..', '..', '.env') });
 
@@ -242,44 +243,58 @@ async function main() {
 
     // Friendships for harleyhxng
     await prisma.friendship.deleteMany({
-      where: { OR: [{ userId: harleyhxng.id }, { friendId: harleyhxng.id }] },
+      where: { OR: [{ user1Id: harleyhxng.id }, { user2Id: harleyhxng.id }] },
     });
-    const f1 = [];
-    if (alice)
+    const f1: Array<{
+      id: string;
+      pairKey: string;
+      user1Id: string;
+      user2Id: string;
+      user1Status: 'accepted' | 'pending';
+      user2Status: 'none' | 'accepted';
+      user1StatusAt: Date;
+      user2StatusAt: Date | null;
+      requestCount: number;
+      lastRequestAt: Date | null;
+      createdAt: Date;
+    }> = [];
+    const accepted1 = (a: string, b: string) => {
+      const at = new Date();
       f1.push({
         id: randomUUID(),
-        userId: harleyhxng.id,
-        friendId: alice.id,
-        status: 'accepted' as const,
+        pairKey: pairKey(a, b),
+        user1Id: a,
+        user2Id: b,
+        user1Status: 'accepted',
+        user2Status: 'accepted',
+        user1StatusAt: at,
+        user2StatusAt: at,
+        requestCount: 0,
+        lastRequestAt: null,
+        createdAt: at,
       });
-    if (bob)
+    };
+    const pending1 = (from: string, to: string) => {
+      const at = new Date();
       f1.push({
         id: randomUUID(),
-        userId: harleyhxng.id,
-        friendId: bob.id,
-        status: 'accepted' as const,
+        pairKey: pairKey(from, to),
+        user1Id: from,
+        user2Id: to,
+        user1Status: 'pending',
+        user2Status: 'none',
+        user1StatusAt: at,
+        user2StatusAt: null,
+        requestCount: 1,
+        lastRequestAt: at,
+        createdAt: at,
       });
-    if (eve)
-      f1.push({
-        id: randomUUID(),
-        userId: harleyhxng.id,
-        friendId: eve.id,
-        status: 'accepted' as const,
-      });
-    if (harleynghxedu)
-      f1.push({
-        id: randomUUID(),
-        userId: harleyhxng.id,
-        friendId: harleynghxedu.id,
-        status: 'accepted' as const,
-      });
-    if (carol)
-      f1.push({
-        id: randomUUID(),
-        userId: carol.id,
-        friendId: harleyhxng.id,
-        status: 'pending' as const,
-      });
+    };
+    if (alice) accepted1(harleyhxng.id, alice.id);
+    if (bob) accepted1(harleyhxng.id, bob.id);
+    if (eve) accepted1(harleyhxng.id, eve.id);
+    if (harleynghxedu) accepted1(harleyhxng.id, harleynghxedu.id);
+    if (carol) pending1(carol.id, harleyhxng.id);
     await prisma.friendship.createMany({ data: f1 });
   }
 
@@ -422,37 +437,57 @@ async function main() {
 
     // Friendships for harleynghxedu
     await prisma.friendship.deleteMany({
-      where: { OR: [{ userId: harleynghxedu.id }, { friendId: harleynghxedu.id }] },
+      where: { OR: [{ user1Id: harleynghxedu.id }, { user2Id: harleynghxedu.id }] },
     });
-    const f2 = [];
-    if (alice)
+    const f2: Array<{
+      id: string;
+      pairKey: string;
+      user1Id: string;
+      user2Id: string;
+      user1Status: 'accepted' | 'pending';
+      user2Status: 'none' | 'accepted';
+      user1StatusAt: Date;
+      user2StatusAt: Date | null;
+      requestCount: number;
+      lastRequestAt: Date | null;
+      createdAt: Date;
+    }> = [];
+    const accepted2 = (a: string, b: string) => {
+      const at = new Date();
       f2.push({
         id: randomUUID(),
-        userId: harleynghxedu.id,
-        friendId: alice.id,
-        status: 'accepted' as const,
+        pairKey: pairKey(a, b),
+        user1Id: a,
+        user2Id: b,
+        user1Status: 'accepted',
+        user2Status: 'accepted',
+        user1StatusAt: at,
+        user2StatusAt: at,
+        requestCount: 0,
+        lastRequestAt: null,
+        createdAt: at,
       });
-    if (dave)
+    };
+    const pending2 = (from: string, to: string) => {
+      const at = new Date();
       f2.push({
         id: randomUUID(),
-        userId: harleynghxedu.id,
-        friendId: dave.id,
-        status: 'accepted' as const,
+        pairKey: pairKey(from, to),
+        user1Id: from,
+        user2Id: to,
+        user1Status: 'pending',
+        user2Status: 'none',
+        user1StatusAt: at,
+        user2StatusAt: null,
+        requestCount: 1,
+        lastRequestAt: at,
+        createdAt: at,
       });
-    if (harleyhxng)
-      f2.push({
-        id: randomUUID(),
-        userId: harleynghxedu.id,
-        friendId: harleyhxng.id,
-        status: 'accepted' as const,
-      });
-    if (bob)
-      f2.push({
-        id: randomUUID(),
-        userId: bob.id,
-        friendId: harleynghxedu.id,
-        status: 'pending' as const,
-      });
+    };
+    if (alice) accepted2(harleynghxedu.id, alice.id);
+    if (dave) accepted2(harleynghxedu.id, dave.id);
+    if (harleyhxng) accepted2(harleynghxedu.id, harleyhxng.id);
+    if (bob) pending2(bob.id, harleynghxedu.id);
     await prisma.friendship.createMany({ data: f2 });
   }
 

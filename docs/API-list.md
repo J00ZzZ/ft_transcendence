@@ -49,7 +49,11 @@ An error response has one of two shapes:
 | `AUTH_NOT_AUTHENTICATED` | 401 | No valid session |
 | `AUTH_SESSION_EXPIRED` | 401 | Session expired — log in again |
 | `AUTH_DISPLAY_NAME_TAKEN` | 409 | Display name already taken |
+| `AUTH_DISPLAY_NAME_RESERVED` | 400 | Display name cannot start with `bot-` (reserved for bots) |
 | `AUTH_CURRENT_PASSWORD_INCORRECT` | 401 | Current password wrong |
+| `AUTH_EMAIL_CHANGE_SET_PASSWORD` | 400 | Set a password before changing email (OAuth-only account) |
+| `AUTH_EMAIL_CHANGE_RATE_LIMITED` | 429 | Too many email-change requests (max 3/hour per user) |
+| `NO_PENDING_EMAIL_CHANGE` | 400 | No pending email change to resend |
 | `AUTH_DELETE_CONFIRM_REQUIRED` | 400 | Deletion not confirmed |
 | `AUTH_DELETE_SET_PASSWORD` | 403 | Set a password before deleting |
 | `AUTH_PROVIDER_LINKED` | 409 | Provider linked to another user |
@@ -84,7 +88,8 @@ An error response has one of two shapes:
 | `FRIEND_REQUEST_SELF` | 400 | Cannot send a request to yourself |
 | `FRIEND_ALREADY` | 400 | Already friends |
 | `FRIEND_REQUEST_PENDING` | 400 | Request already pending |
-| `FRIEND_BLOCKED` | 403 | Cannot send — user is blocked |
+| `FRIEND_BLOCKED` | 403 | A block exists between the two users (send / accept / invite) |
+| `FRIEND_REQUEST_COOLDOWN` | 400 | Cannot re-request — the sender was declined less than 1 h ago |
 | `FRIEND_REQUEST_NOT_FOUND` | 404 | Friend request not found |
 | `FRIEND_NOT_FOUND` | 404 | Friendship not found |
 | `FRIEND_BLOCK_SELF` | 400 | Cannot block yourself |
@@ -299,11 +304,36 @@ Create a new user account and send a verification email. This call sets no sessi
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Redeem an emailed verification link. Redirects to the SPA with a query param on success.
+Redeem an emailed link. The token is checked as a signup verification token (`verify:`, Redis) first, then as an email-change confirmation token (`emailchange:`, Redis). Redirects to the SPA:
+
+- signup → `<origin>/login?verified=1`
+- email change → `<origin>/profile?emailChanged=1`
+- commit-time conflict (address taken meanwhile) → `<origin>/profile?error=email-taken`
+- unknown/expired → `<origin>/login?error=invalid-verification-link`
 
 **Headers:** None  
 **Query:** `token` — the 64-char hex token from the email link  
-**Response:** 302 redirect to `<request-origin>/login?verified=1` or `<request-origin>/login?error=invalid-verification-link`. The origin is taken from the request that arrived, so a tunnel visitor is sent back to the tunnel host.
+**Response:** 302 redirect to the frontend URL for the request's mode: `NGROK_FRONTEND_URL` (tunnel), `https://<LAN_IP>:<HTTPS_PORT>` (LAN), or `FRONTEND_URL` (local).
+
+
+---
+---
+
+
+#### `POST /api/auth/resend-verification`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Public. Resends a signup verification link if the address exists and is still unverified; the response is identical either way (no account enumeration). Throttled 3/hour.
+
+**Headers:** None  
+**Body:**
+
+```json
+{ "email": "user@example.com" }
+```
+
+**Response:** `200 { "message": "If that address needs verification, a new link is on its way." }`
 
 
 ---
@@ -391,6 +421,27 @@ Redeem a 2FA code emailed during login. Sets session cookies on success.
 ```
 
 **Errors:** 401 `AUTH_CODE_INVALID` if the code is invalid/expired or there were too many attempts; 400 `VALIDATION_CODE_FORMAT` if the code is not 6 digits.
+
+
+---
+---
+
+
+#### `POST /api/auth/2fa/resend`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Re-issue the 2FA login code for a live challenge (same `pendingToken`; the previous code is invalidated). The `pendingToken` is the credential: no session required. Throttled per-IP, plus a per-user cap of **3 resends per hour**.
+
+**Headers:** None  
+**Body:**
+
+```json
+{ "pendingToken": "string (64-char hex)" }
+```
+
+**Response:** `200 { "code": "AUTH_CODE_RESENT", "message": "A new code is on its way." }`  
+**Errors:** `400 AUTH_CODE_EXPIRED` if the challenge lapsed; `429 AUTH_CODE_RESEND_LOCKED` if the per-user resend cap is hit.
 
 
 ---
@@ -577,21 +628,53 @@ Return the full profile for the logged-in user (used by the Edit-Profile card).
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Update the logged-in user's profile (display name / username, email, etc.).
+Update the logged-in user's profile (display name, email, 2FA toggle, OAuth link/unlink). **Email changes are verify-then-commit**: the new address is *not* applied until the emailed link is opened; the current address stays active meanwhile.
 
 **Headers:** 🔒 (requires `token` cookie)  
 **Body:** (any subset of the editable fields, validated by `UpdateProfileDto`)
 
 ```json
 {
-  "username": "new_username",
   "displayName": "New Display Name",
-  "email": "new@example.com"
+  "email": "new@example.com",
+  "currentPassword": "required with an email change (password accounts)",
+  "twoFactorEnabled": true,
+  "oauthToAdd": "google",
+  "oauthToRemove": "github"
 }
-
 ```
 
-**Response:** the updated profile / success message. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` or `VALIDATION_DISPLAY_NAME_CHARS`.
+- Changing the email requires the account to have a password **and** `currentPassword`; OAuth-only accounts get `400 AUTH_EMAIL_CHANGE_SET_PASSWORD`, a wrong password `401 AUTH_CURRENT_PASSWORD_INCORRECT`.
+- Rate-limited to **3 email changes/hour** per user → `429 AUTH_EMAIL_CHANGE_RATE_LIMITED`.
+
+**Response:**
+
+```json
+{
+  "user": { "id": "…", "username": "…", "displayName": "…", "email": "current@example.com", "hasPassword": true, "providers": ["google"] },
+  "emailChangePending": true,
+  "pendingEmail": "new@example.com",
+  "oauthRedirectUrl": null
+}
+```
+
+`user.email` stays the **current** address while a change is pending. A bad `displayName` returns 400 with `VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`; a name that impersonates a bot (starts with `bot-`) returns `400 AUTH_DISPLAY_NAME_RESERVED`.
+
+
+---
+---
+
+
+#### `POST /api/auth/profile/resend-email-change`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Resend the pending email-change confirmation link. Rotates the token (invalidating the previous link) and re-emails the pending address. Throttled 5/hour.
+
+**Headers:** 🔒 (requires `token` cookie)  
+**Body:** none  
+**Response:** `200 { "pendingEmail": "new@example.com" }`  
+**Errors:** `400 NO_PENDING_EMAIL_CHANGE` when there is no pending change.
 
 
 ---
@@ -1039,6 +1122,7 @@ Create a PvP invite game with a shareable code.
 **Notes:**
 - Share `inviteCode` via chat/friend list.
 - Recipient joins via `POST /api/match/join/:code`.
+- Follows the same create-or-reuse path as `POST /api/match/create`: if you already sit in one of your own `WAITING` PvP rooms, that room (and its existing invite code) is handed back instead of a second room being created.
 
 
 ---
@@ -1070,7 +1154,9 @@ Join a PvP game by invite code.
 
 ```
 
-**Errors:** 404 `MATCH_INVITE_INVALID` when no WAITING room carries that code (not found, expired, or already started); 403 `MATCH_ROOM_FULL` if the last seat was taken between the lookup and the assignment; 400 `MATCH_OWN_INVITE` when you are the host.
+**Errors:** 404 `MATCH_INVITE_INVALID` when no WAITING room carries that code (not found or expired); 403 `MATCH_ROOM_FULL` if the last seat was taken between the lookup and the assignment; 400 `MATCH_OWN_INVITE` when you are the host; 403 `MATCH_ALREADY_STARTED` when the room's game already started (the stored hash is `ACTIVE`, or the engine's ready-check already flipped the game state out of `waiting`) or when your own seat in that room has been finalized (`MATCH_SEAT_EXPIRED`).
+
+If the caller already holds a seat in that room, the rejoin rules apply and their **existing** seat and colour are returned instead of a new slot being allocated.
 
 
 ---
@@ -1132,6 +1218,7 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
   "playerCount": 2,
   "botCount": 0,
   "botColors": ["red", "green"],
+  "botNames": ["Siri", "Alexa"],
   "seatColors": ["yellow", "blue"]
 }
 
@@ -1156,6 +1243,9 @@ Unified match creation — supports PvP, PvE, and hotseat modes.
 - `mode` is **required** and must be `pvp`, `pve`, or `hotseat` (no silent fallback).
 - `playerCount` accepts 2-4; `botCount` must be 0 to `playerCount-1`. Bots are only allowed in PvE games.
 - `botColors` / `seatColors` (optional string arrays) can override the default slot colors. Seat `color` is otherwise assigned by the server.
+- `botNames` (optional string array) is index-aligned with `botColors`. Each entry is the name the lobby gave that bot: the backend stores it as `player{n}_displayName` in the form `bot-<color> (<assistant>)`, so every client shows the lobby's own assistant name. An entry that is missing, blank or unusable is dropped, and the seat then shows its plain `bot-<color>` id. The stored label is not translated, so clients re-localize the colour word with the `lobby.color*` keys and keep the assistant name as sent.
+- **Reuse:** creating a `pvp` room while you already sit in one of your own still-`WAITING` PvP rooms hands that room back — the response carries its `gameId`, `inviteCode` and your existing seat colour, and nothing in the stored room is modified. A room whose game has already started (engine state is anything but `waiting`, or your seat in it is finalized) is never reused: a fresh room is created instead, so a player who left a live game can start or join another one while their old seat stays ghosted.
+- `pve`/`hotseat` always create a fresh room (they start `ACTIVE` and are never reused).
 
 
 ---
@@ -1276,10 +1366,11 @@ Invite a friend into a WAITING PvP room.
 }
 ```
 
-**Errors:** 404 `MATCH_GAME_NOT_FOUND` if the room is gone; 403 `MATCH_PVP_ONLY_INVITE` for a non-PvP
-room; 403 `MATCH_ALREADY_STARTED` once the room has left WAITING; 403 `MATCH_NOT_PLAYER` if the caller
-holds no seat; 403 `NOT_FRIENDS_WITH_USER` when the target is not a friend; 403 `MATCH_ROOM_FULL` if
-no seat is left for the friend.
+**Errors:** 400 validation if `friendId` is missing or not a UUID; 404 `MATCH_GAME_NOT_FOUND` if the
+room is gone; 403 `MATCH_PVP_ONLY_INVITE` for a non-PvP room; 403 `MATCH_ALREADY_STARTED` once the
+room has left WAITING; 403 `MATCH_NOT_PLAYER` if the caller holds no seat; 403 `FRIEND_BLOCKED` when a
+block exists between the caller and the target; 403 `NOT_FRIENDS_WITH_USER` when the target is not a
+friend; 403 `MATCH_ROOM_FULL` if no seat is left for the friend.
 
 
 ---
@@ -1297,10 +1388,22 @@ no seat is left for the friend.
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
 
-List open (WAITING PvP) rooms that can be joined.
+List the PvP rooms the caller may enter. The list is computed **per caller**:
+
+- **Join rows** (`mySeat: false`) — PvP rooms stored as `WAITING` whose engine game has not started and
+  which are not full.
+- **Rejoin rows** (`mySeat: true`) — rooms the caller holds a seat in, **including games that have
+  already started**: their seat is kept for the 45 s grace window after they leave the table
+  ("RETURN TO LOBBY"), so they can come back to it. Such a row is returned even when the room is full,
+  and stops being returned once the engine finalizes that seat.
+
+A started room is therefore hidden from everybody except the players who still hold a reclaimable seat
+in it, and `ABORTED`/`ENDED` rooms are never returned. The engine state, not just the stored hash,
+decides whether a game has started (see `isEngineGameStarted` in `backend-match-module.md`).
 
 **Headers:** 🔒 (requires `token` cookie)  
-**Response:** Array of joinable room summaries.
+**Response:** Array of room summaries — `id`, `roomCode`, `hostId`, `host`, `hostUsername`,
+`hasAvatarPhoto`, `seats`, `maxSeats`, `mode`, and `mySeat`.
 
 
 ---
@@ -1311,10 +1414,11 @@ List open (WAITING PvP) rooms that can be joined.
 
 **Source:** `backend/src/match/match.controller.ts` — MatchModule
 
-List rooms (WAITING/ACTIVE) the current user is seated in — used to rejoin after a refresh. An
-ACTIVE room whose seat the engine has **finalized** (grace expired / End Game — `PlayerMeta.status`
-is `exited`) is filtered out via `isSeatFinalized()`, so a departed player is not offered a REJOIN
-MATCH button they can no longer use.
+List rooms (WAITING/ACTIVE) the current user is seated in — used to rejoin after a refresh. A room
+whose seat the engine has **finalized** (grace expired / End Game — `PlayerMeta.status` is `exited`)
+is filtered out via `isSeatFinalized()`, so a departed player is not offered a REJOIN MATCH button they
+can no longer use. The seat is checked whatever the stored hash status says: a room whose hash still
+reads `WAITING` can have live engine state behind it.
 
 **Headers:** 🔒 (requires `token` cookie)  
 **Response:** Array of the user's room summaries.
@@ -1352,7 +1456,9 @@ only when the room has one.
 
 **Errors:** 404 if game not found, 403 `MATCH_NOT_PLAYER` if the caller holds no seat, and 403
 `MATCH_SEAT_EXPIRED` when the seat has been finalized (the engine parked every piece at `step = -1`),
-so no fresh token is minted for a seat that can never move again.
+so no fresh token is minted for a seat that can never move again. The seat is checked regardless of the
+stored hash status (`isSeatFinalized` in `backend-match-module.md`), so a hash that was rewritten back
+to `WAITING` cannot resurrect a dead seat.
 
 
 ---
@@ -1640,7 +1746,7 @@ Send a friend request.
 **Body:** None  
 **Response:** Returns the full friendship object with user and friend details.
 
-**Errors:** 400 `FRIEND_ALREADY` / `FRIEND_REQUEST_PENDING` / `FRIEND_BLOCKED`; 403 `NOT_FRIENDS_WITH_USER`; 404 `USER_NOT_FOUND`.
+**Errors:** 400 `FRIEND_REQUEST_SELF` / `FRIEND_ALREADY` / `FRIEND_REQUEST_PENDING` / `FRIEND_REQUEST_COOLDOWN`; 403 `FRIEND_BLOCKED`; 404 `USER_NOT_FOUND`.
 
 
 ---
@@ -1658,7 +1764,8 @@ Accept a friend request.
 **Body:** None  
 **Response:** Returns the updated friendship object with user and friend details.
 
-**Errors:** 404 if request not found, 403 if not addressed to current user.
+**Errors:** 404 `FRIEND_REQUEST_NOT_FOUND` when the pair row does not exist or the caller has no live
+inbound request; 403 `FRIEND_BLOCKED` when either side has blocked the other.
 
 
 ---
@@ -1676,7 +1783,8 @@ Decline a friend request.
 **Body:** None  
 **Response:** `{ "message": "Friend request declined" }`
 
-**Errors:** 404 if request not found.
+**Errors:** 404 `FRIEND_REQUEST_NOT_FOUND` when the pair row does not exist or the caller has no live
+inbound request.
 
 
 ---
@@ -2136,12 +2244,15 @@ JWT payload structure:
   "displayName": "string",
   "role": "player1" | "player",
   "color": "red",
-  "mode": "pvp" | "pve" | "hotseat"
+  "mode": "pvp" | "pve" | "hotseat",
+  "aud": "ludo-engine"
 }
 
 ```
 
 `mode` is signed only on tokens minted by the creation endpoints (`/api/match/create`, `/api/match/pvp/invite`, `/api/match/pve`); the join-by-code and rejoin tokens omit it, and the engine treats a missing `mode` as a PvP seat. The engine reads the account id from `playerId` (it also accepts `sub` or `userId` if present). `username` is omitted for bot seats.
+
+Every token is signed with the engine-dedicated `ENGINE_JWT_SECRET` (not the session `JWT_SECRET`) and carries `aud: "ludo-engine"`; the engine rejects a token signed with any other key or missing the audience, so a session access token cannot be replayed as a match token.
 
 **Health endpoint on the engine:** `GET http://localhost:3001/health` returns `{ "status": "ok", "uptime": 12345.67 }`.
 
@@ -2390,7 +2501,7 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 
 - **Auth:** All auth endpoints use httpOnly cookies. Set by login, 2FA verify, OAuth completion, and refresh; cleared by logout. No `Authorization: Bearer` header is used.
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
-- **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`.
+- **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`. The shown name comes from our own `player{n}_displayName` entry when the creator sent a `botNames` value: it reads `bot-<color> (<assistant>)`, and the client re-localizes the colour word.
 - **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
-- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `login` (5/minute), `2fa/verify` (5/minute), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
+- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `resend-verification` (3/hour), `login` (5/minute), `2fa/verify` (5/minute), `2fa/resend` (5/hour, plus 3/hour per user), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
 - **Client IP:** `main.ts` trusts internal hops only (`trust proxy`), so the address behind those limits is the client's own and a client-sent `X-Forwarded-For` cannot spoof it.

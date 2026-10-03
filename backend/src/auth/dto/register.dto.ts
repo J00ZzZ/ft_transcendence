@@ -1,4 +1,12 @@
-import { IsString, MinLength, MaxLength, IsEmail, Matches } from 'class-validator';
+import {
+  IsString,
+  MinLength,
+  MaxLength,
+  IsEmail,
+  Matches,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
 import { PASSWORD_MIN, PASSWORD_MAX, PASSWORD_REGEX, PASSWORD_MESSAGE } from './password.rules';
 
 export class RegisterDto {
@@ -19,4 +27,9 @@ export class RegisterDto {
   @MaxLength(PASSWORD_MAX)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_MESSAGE })
   password!: string;
+
+  // UI language for transactional email (en/fr/ms); defaults to 'en'.
+  @IsOptional()
+  @IsIn(['en', 'fr', 'ms'])
+  language?: string;
 }

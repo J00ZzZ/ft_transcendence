@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   OnModuleDestroy,
@@ -9,18 +11,21 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'node:crypto';
 import Redis from 'ioredis';
 import { PrismaService } from '../prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtPayload } from './jwt-payload';
+import { AUTH, OAUTH_LINK_AUDIENCE, OAUTH_LINK_TTL } from './auth.constants';
 import { MailService } from './mail.service';
 import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
 import { requireSecret, secret } from '../secrets';
 import { NotificationService } from '../notification/notification.service';
 import { AvatarMetaService } from '../avatar/avatar-meta.service';
+import { isReservedBotName } from '../common/botname-enforce';
 
 const SALT_ROUNDS = 10;
 // Also where the SPA lives; /api on the same origin reaches the backend
@@ -47,6 +52,37 @@ const formatVerifiedAt = (date: Date) =>
     timeStyle: 'short',
   }).format(date);
 
+// The canonical user object every auth response returns (login, 2FA verify,
+// refresh, /me, PATCH profile). The SPA stores it wholesale, so a partial shape
+// reads there as "missing"/"off": an absent email faked an email change.
+export interface PublicUser {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string | null;
+  emailVerified: boolean;
+  pendingEmail: string | null;
+  hasPassword: boolean;
+  twoFactorEnabled: boolean;
+  avatarStyle: string;
+  hasAvatarPhoto: boolean;
+  providers: string[];
+}
+
+// The User columns publicUser() reads. Structural, so a full Prisma row from
+// findUnique/update satisfies it without the generated model type.
+type UserRow = {
+  id: string;
+  username: string;
+  displayName: string;
+  email: string | null;
+  emailVerified: Date | null;
+  password_hash: string | null;
+  twoFactorEnabled: boolean;
+  avatarStyle: string;
+  avatarPhotoContentType: string | null;
+};
+
 // login()'s outcomes: an unverified address, a 2FA challenge, or a session.
 // The explicit union lets the controller narrow on the variant it receives.
 type LoginResult =
@@ -56,7 +92,7 @@ type LoginResult =
       twoFactorRequired: false;
       accessToken: string;
       refreshToken: string;
-      user: { id: string; username: string; displayName: string };
+      user: PublicUser;
     };
 
 @Injectable()
@@ -92,18 +128,28 @@ export class AuthService implements OnModuleDestroy {
     await this.redis.quit();
   }
 
+  // Random 4-digit suffix (1000–9999) appended to every new username.
+  private randomSuffix(): string {
+    return randomInt(1000, 10_000).toString();
+  }
+
+  // Per-user rolling-hour cap on email-address changes (Redis INCR, TTL = window).
+  private async enforceEmailChangeLimit(userId: string): Promise<void> {
+    const key = `emailchange:rl:${userId}`;
+    const count = await this.redis.incr(key);
+    if (count === 1) await this.redis.expire(key, 60 * 60);
+    if (count > AUTH.maxEmailChangesPerHour) {
+      throw new HttpException(
+        { code: 'AUTH_EMAIL_CHANGE_RATE_LIMITED', message: 'Too many email change requests' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
   // Create a local (password) account: check username/email are free, hash
   // the password, create the User + Achievement rows, and email a signup
   // verification link. Called by auth.controller.ts POST /register.
   async register(dto: RegisterDto, baseUrl: string = BASE_URL) {
-    const existing = await this.prisma.db.user.findUnique({ where: { username: dto.username } });
-    if (existing) {
-      throw new ConflictException({
-        code: 'AUTH_USERNAME_TAKEN',
-        message: 'Username is already taken',
-      });
-    }
-
     const email = dto.email ? normalizeEmail(dto.email) : dto.email;
     if (email) {
       const emailTaken = await this.prisma.db.user.findUnique({ where: { email } });
@@ -115,13 +161,20 @@ export class AuthService implements OnModuleDestroy {
       }
     }
 
+    // Every new username ends with a random 4-digit number to prevent any username collision.
+    let username = `${dto.username}${this.randomSuffix()}`;
+    while (await this.prisma.db.user.findUnique({ where: { username } })) {
+      username = `${dto.username}${this.randomSuffix()}`;
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const user = await this.prisma.db.user.create({
       data: {
         id: crypto.randomUUID(),
-        username: dto.username,
-        displayName: dto.username,
+        username,
+        displayName: username,
         email,
+        language: dto.language ?? 'en',
         password_hash: passwordHash,
         achievement: { create: { id: crypto.randomUUID() } },
       },
@@ -133,21 +186,62 @@ export class AuthService implements OnModuleDestroy {
 
     // No session yet, the account activates via the emailed link.
     const token = await this.twoFactor.createVerifyToken(user.id);
-    await this.mail.sendVerification(email, `${baseUrl}/api/auth/verify-email?token=${token}`);
-    return { message: 'Account created : check your email to verify your address.' };
+    await this.mail.sendVerification(
+      email,
+      `${baseUrl}/api/auth/verify-email?token=${token}`,
+      user.language,
+      user.username,
+    );
+    return {
+      code: 'AUTH_ACCOUNT_CREATED',
+      message: 'Account created : check your email to verify your address.',
+      username,
+    };
   }
 
   // Redeems a signup verification link. Returns false for unknown/expired tokens.
-  async verifyEmail(token: string): Promise<boolean> {
+  // Redeem an emailed link. Returns which kind it was so the controller can
+  // redirect appropriately; 'invalid' for unknown/expired tokens.
+  async verifyEmail(token: string): Promise<'signup' | 'change' | 'conflict' | 'invalid'> {
+    // 1. Signup link (Redis `verify:` token) → mark the current address verified.
     const userId = await this.twoFactor.consumeVerifyToken(token);
-    if (!userId) return false;
-    const emailVerifiedAt = new Date();
-    const user = await this.prisma.db.user.update({
-      where: { id: userId },
-      data: { emailVerified: emailVerifiedAt },
+    if (userId) {
+      const emailVerifiedAt = new Date();
+      const user = await this.prisma.db.user.update({
+        where: { id: userId },
+        data: { emailVerified: emailVerifiedAt },
+      });
+      console.log(`Email verified for ${user.username} at ${formatVerifiedAt(emailVerifiedAt)}`);
+      return 'signup';
+    }
+
+    // 2. Email-change link (Redis `emailchange:<hash>`, single-use) → commit the
+    //    staged address. An unknown/expired/consumed token simply isn't there.
+    const change = await this.twoFactor.consumeEmailChangeToken(token);
+    if (!change) return 'invalid';
+
+    const user = await this.prisma.db.user.findUnique({ where: { id: change.userId } });
+    if (!user) return 'invalid';
+
+    // Commit-time conflict: the address may have been taken meanwhile. The
+    // consume above already dropped the staged keys, so nothing is left behind.
+    const taken = await this.prisma.db.user.findUnique({ where: { email: change.newEmail } });
+    if (taken && taken.id !== user.id) {
+      await this.mail
+        .sendEmailChangeExpired(user.email ?? '', user.language, user.username)
+        .catch(() => {});
+      return 'conflict';
+    }
+
+    // Commit: apply the new address and mark it verified (the link proves inbox control).
+    await this.prisma.db.user.update({
+      where: { id: user.id },
+      data: { email: change.newEmail, emailVerified: new Date() },
     });
-    console.log(`Email verified for ${user.username} at ${formatVerifiedAt(emailVerifiedAt)}`);
-    return true;
+    await this.notifications
+      .notify(user.id, 'profile_updated', { items: ['email'] })
+      .catch(() => {});
+    return 'change';
   }
 
   // Factor one of password login: match identifier (username or email) and
@@ -187,7 +281,12 @@ export class AuthService implements OnModuleDestroy {
         ...(await this.issueSession(user.id, user.username)),
       };
     }
-    const { pendingToken } = await this.startTwoFactor(user.id, user.email ?? '');
+    const { pendingToken } = await this.startTwoFactor(
+      user.id,
+      user.email ?? '',
+      user.username,
+      user.language,
+    );
     return { twoFactorRequired: true as const, pendingToken };
   }
 
@@ -200,9 +299,17 @@ export class AuthService implements OnModuleDestroy {
     // password_hash) sign in through their provider instead.
     if (user?.password_hash) {
       const token = await this.twoFactor.createResetToken(user.id);
-      await this.mail.sendPasswordReset(email, `${baseUrl}/reset-password?token=${token}`);
+      await this.mail.sendPasswordReset(
+        email,
+        `${baseUrl}/reset-password?token=${token}`,
+        user.language,
+        user.username,
+      );
     }
-    return { message: 'If that email is registered, a reset link is on its way.' };
+    return {
+      code: 'AUTH_RESET_LINK_SENT',
+      message: 'If that email is registered, a reset link is on its way.',
+    };
   }
 
   // Step two: redeem the link's token and set the new password.
@@ -234,14 +341,97 @@ export class AuthService implements OnModuleDestroy {
       .notify(userId, 'profile_updated', { items: ['password'] })
       .catch(() => {});
 
-    return { message: 'Password updated : you can log in with it now.' };
+    return {
+      code: 'AUTH_PASSWORD_RESET',
+      message: 'Password updated : you can log in with it now.',
+    };
+  }
+
+  // Resend a signup verification link. Always resolves the same way (no account
+  // enumeration); only sends when the address exists and is unverified.
+  async resendSignupVerification(
+    rawEmail: string,
+    baseUrl: string,
+  ): Promise<{ code: string; message: string }> {
+    const email = normalizeEmail(rawEmail);
+    const user = await this.prisma.db.user.findUnique({ where: { email } });
+    if (user?.emailVerified === null && user.email) {
+      const token = await this.twoFactor.createVerifyToken(user.id);
+      await this.mail
+        .sendVerification(
+          user.email,
+          `${baseUrl}/api/auth/verify-email?token=${token}`,
+          user.language,
+          user.username,
+        )
+        .catch(() => {});
+    }
+    return {
+      code: 'AUTH_VERIFICATION_RESENT',
+      message: 'If that address needs verification, a new link is on its way.',
+    };
+  }
+
+  // Resend the pending email-change link: rotates the token (invalidating the
+  // previous link) and re-emails the pending address.
+  async resendEmailChange(
+    userId: string,
+    baseUrl: string = BASE_URL,
+  ): Promise<{ pendingEmail: string }> {
+    const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    const pending = await this.twoFactor.peekEmailChange(userId);
+    if (!pending) {
+      throw new BadRequestException({
+        code: 'NO_PENDING_EMAIL_CHANGE',
+        message: 'There is no pending email change to resend',
+      });
+    }
+    const token = await this.twoFactor.createEmailChangeToken(userId, pending.newEmail);
+    await this.mail
+      .sendEmailChange(
+        pending.newEmail,
+        `${baseUrl}/api/auth/verify-email?token=${token}`,
+        user.language,
+        user.username,
+      )
+      .catch(() => {});
+    return { pendingEmail: pending.newEmail };
   }
 
   // Factor two: email a one-time code, hand back the challenge reference.
-  async startTwoFactor(userId: string, email: string) {
+  async startTwoFactor(userId: string, email: string, username?: string, lang = 'en') {
     const { pendingToken, code } = await this.twoFactor.startChallenge(userId);
-    await this.mail.send2faCode(email, code);
+    await this.mail.send2faCode(email, code, lang, username);
     return { pending: true as const, pendingToken };
+  }
+
+  // Re-issue the 2FA login code for a live challenge (same pendingToken).
+  async resendTwoFactor(pendingToken: string): Promise<{ code: string; message: string }> {
+    const result = await this.twoFactor.resendChallenge(pendingToken);
+    if (result === 'expired') {
+      throw new BadRequestException({
+        code: 'AUTH_CODE_EXPIRED',
+        message: 'This code has expired: log in again to get a new one.',
+      });
+    }
+    if (result === 'locked') {
+      throw new HttpException(
+        { code: 'AUTH_CODE_RESEND_LOCKED', message: 'Too many code requests: try again later.' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    const user = await this.prisma.db.user.findUnique({
+      where: { id: result.userId },
+      select: { email: true, username: true, language: true },
+    });
+    if (user?.email) {
+      await this.mail
+        .send2faCode(user.email, result.code, user.language, user.username)
+        .catch(() => {});
+    }
+    return { code: 'AUTH_CODE_RESENT', message: 'A new code is on its way.' };
   }
 
   // Factor two of 2FA login: check the emailed code against the pending
@@ -276,15 +466,10 @@ export class AuthService implements OnModuleDestroy {
   async issueSession(userId: string, username: string) {
     const accessToken = this.signAccess(userId, username);
     const refreshToken = await this.session.issue(userId);
-    const user = await this.prisma.db.user.findUnique({
-      where: { id: userId },
-      select: { displayName: true },
-    });
-    return {
-      accessToken,
-      refreshToken,
-      user: { id: userId, username, displayName: user?.displayName ?? username },
-    };
+    const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
+    if (!user)
+      throw new UnauthorizedException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    return { accessToken, refreshToken, user: await this.publicUser(user) };
   }
 
   // Trade a refresh token for a new access token, rotating the refresh token
@@ -310,13 +495,34 @@ export class AuthService implements OnModuleDestroy {
     return {
       accessToken: this.signAccess(user.id, user.username),
       refreshToken: rotated.newToken,
-      user: { id: user.id, username: user.username, displayName: user.displayName },
+      user: await this.publicUser(user),
     };
   }
 
   // Revoke the given refresh token : logout on this device.
   async logout(refreshToken?: string) {
     if (refreshToken) await this.session.revoke(refreshToken);
+  }
+
+  // Build the canonical user payload shared by every auth response (PublicUser).
+  private async publicUser(user: UserRow): Promise<PublicUser> {
+    const accounts = await this.prisma.db.account.findMany({
+      where: { userId: user.id },
+      select: { provider: true },
+    });
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      email: user.email,
+      emailVerified: user.emailVerified !== null,
+      pendingEmail: (await this.twoFactor.peekEmailChange(user.id))?.newEmail ?? null,
+      hasPassword: !!user.password_hash,
+      twoFactorEnabled: user.twoFactorEnabled,
+      avatarStyle: user.avatarStyle,
+      hasAvatarPhoto: user.avatarPhotoContentType !== null,
+      providers: accounts.map((a) => a.provider),
+    };
   }
 
   // Full profile for the Edit-Profile card (incl. linked OAuth providers).
@@ -329,22 +535,7 @@ export class AuthService implements OnModuleDestroy {
     // loads, so the cached flag follows the stored row at no extra query cost.
     this.avatarMeta.syncFromUser(user);
 
-    const accounts = await this.prisma.db.account.findMany({
-      where: { userId },
-      select: { provider: true },
-    });
-    return {
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        email: user.email,
-        hasPassword: !!user.password_hash,
-        avatarStyle: user.avatarStyle,
-        hasAvatarPhoto: user.avatarPhotoContentType !== null,
-        providers: accounts.map((a) => a.provider),
-      },
-    };
+    return { user: await this.publicUser(user) };
   }
 
   // Validates a short-lived access-token JWT (the `token` cookie). Returns the
@@ -353,8 +544,9 @@ export class AuthService implements OnModuleDestroy {
   verifyAccessToken(token: string | undefined): string | null {
     if (!token) return null;
     try {
-      const payload = this.jwt.verify<{ sub?: string }>(token);
-      return payload.sub ?? null;
+      // Issuer/audience/algorithm are enforced by JwtModule's verifyOptions.
+      const payload = this.jwt.verify<{ sub?: unknown }>(token);
+      return typeof payload.sub === 'string' && payload.sub ? payload.sub : null;
     } catch {
       return null;
     }
@@ -388,10 +580,13 @@ export class AuthService implements OnModuleDestroy {
     dto: {
       displayName?: string;
       email?: string;
+      currentPassword?: string;
       twoFactorEnabled?: boolean;
+      language?: string;
       oauthToAdd?: string;
       oauthToRemove?: string;
     },
+    baseUrl: string = BASE_URL,
   ) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
     if (!user)
@@ -400,10 +595,18 @@ export class AuthService implements OnModuleDestroy {
     const data: Record<string, unknown> = {};
     let emailChanged = false;
     let newEmail: string | undefined;
+    let changeToken: string | undefined;
     // Items actually changed in this request : feeds the profile_updated toast.
     const changedItems: string[] = [];
 
     if (dto.displayName !== undefined && dto.displayName !== user.displayName) {
+      // No masquerading as a bot.
+      if (isReservedBotName(dto.displayName)) {
+        throw new BadRequestException({
+          code: 'AUTH_DISPLAY_NAME_RESERVED',
+          message: 'Display name cannot start with "bot-"',
+        });
+      }
       const taken = await this.prisma.db.user.findUnique({
         where: { displayName: dto.displayName },
       });
@@ -417,7 +620,25 @@ export class AuthService implements OnModuleDestroy {
 
     if (dto.email !== undefined) {
       const email = normalizeEmail(dto.email);
-      if (email !== user.email) {
+      const pendingEmail = (await this.twoFactor.peekEmailChange(userId))?.newEmail;
+      if (email !== user.email && email !== pendingEmail) {
+        // A password is required to change the address; OAuth-only accounts must
+        // set one first (mirrors deleteAccount).
+        if (!user.password_hash) {
+          throw new BadRequestException({
+            code: 'AUTH_EMAIL_CHANGE_SET_PASSWORD',
+            message: 'Set a password before changing your email',
+          });
+        }
+        const passwordOk = await bcrypt.compare(dto.currentPassword ?? '', user.password_hash);
+        if (!passwordOk) {
+          throw new UnauthorizedException({
+            code: 'AUTH_CURRENT_PASSWORD_INCORRECT',
+            message: 'Current password is incorrect',
+          });
+        }
+        // Per-user cap on address changes (separate from the route-level throttle).
+        await this.enforceEmailChangeLimit(userId);
         const emailTaken = await this.prisma.db.user.findUnique({ where: { email } });
         if (emailTaken) {
           throw new ConflictException({
@@ -425,9 +646,10 @@ export class AuthService implements OnModuleDestroy {
             message: 'Email already registered. Use a different email',
           });
         }
-        data.email = email;
-        // New address must be re-confirmed before it can be used to log in.
-        data.emailVerified = null;
+        // Stage the change (verify-then-commit): the row email is NOT touched
+        // yet. The token + pending payload live in Redis with a 15-min TTL; the
+        // reverse pointer is what the expiry listener watches.
+        changeToken = await this.twoFactor.createEmailChangeToken(userId, email);
         emailChanged = true;
         newEmail = email;
       }
@@ -435,6 +657,10 @@ export class AuthService implements OnModuleDestroy {
 
     if (dto.twoFactorEnabled !== undefined) {
       data.twoFactorEnabled = dto.twoFactorEnabled;
+    }
+
+    if (dto.language !== undefined) {
+      data.language = dto.language;
     }
 
     // OAuth: remove a linked sign-in method (lockout-guarded).
@@ -459,13 +685,24 @@ export class AuthService implements OnModuleDestroy {
         ? await this.prisma.db.user.update({ where: { id: userId }, data })
         : user;
 
-    // Email change → auto-send a fresh verification link (reuse register's path).
-    if (emailChanged && newEmail) {
-      const token = await this.twoFactor.createVerifyToken(userId);
-      await this.mail.sendVerification(
-        newEmail,
-        `${BASE_URL}/api/auth/verify-email?token=${token}`,
-      );
+    // Email change → email the confirmation link to the NEW address + a heads-up
+    // to the old one. On send failure, roll back the pending fields.
+    if (emailChanged && newEmail && changeToken) {
+      try {
+        await this.mail.sendEmailChange(
+          newEmail,
+          `${baseUrl}/api/auth/verify-email?token=${changeToken}`,
+          user.language,
+          user.username,
+        );
+        await this.mail
+          .sendEmailChangeNotice(user.email ?? '', newEmail, user.language, user.username)
+          .catch(() => {});
+      } catch (err) {
+        // Mail never went out : drop the staged Redis change (best-effort).
+        await this.twoFactor.clearEmailChange(userId).catch(() => {});
+        throw err;
+      }
     }
 
     // Profile-change notifications
@@ -494,21 +731,12 @@ export class AuthService implements OnModuleDestroy {
         .catch(() => {});
     }
 
-    const accounts = await this.prisma.db.account.findMany({
-      where: { userId },
-      select: { provider: true },
-    });
-
+    // Same canonical user shape as every other auth response (email stays the
+    // current address while a change is pending).
     return {
-      user: {
-        id: updated.id,
-        username: updated.username,
-        displayName: updated.displayName,
-        email: updated.email,
-        hasPassword: !!updated.password_hash,
-        providers: accounts.map((a) => a.provider),
-      },
-      emailVerificationSent: emailChanged,
+      user: await this.publicUser(updated),
+      emailChangePending: emailChanged,
+      pendingEmail: newEmail,
       oauthRedirectUrl,
     };
   }
@@ -598,7 +826,7 @@ export class AuthService implements OnModuleDestroy {
     //    leaderboard entry is already removed by clearUserRedisState above.
     await this.prisma.db.user.delete({ where: { id: userId } });
 
-    return { message: 'Account permanently deleted' };
+    return { code: 'AUTH_ACCOUNT_DELETED', message: 'Account permanently deleted' };
   }
 
   // Mark every WAITING/ACTIVE match the user is seated in as ABORTED (1h TTL).
@@ -760,9 +988,17 @@ export class AuthService implements OnModuleDestroy {
   }
 
   // Signed 10-minute token carried in the OAuth `state` when a logged-in
-  // user wants to ADD a provider sign-in method.
+  // user wants to ADD a provider sign-in method. It travels in a URL, so it
+  // gets its own key and audience: it can never pass as a session token.
   createOAuthLinkToken(userId: string, provider: string): string {
-    return this.jwt.sign({ sub: userId, p: provider, purpose: 'oauth-link' }, { expiresIn: '10m' });
+    return this.jwt.sign(
+      { sub: userId, p: provider, purpose: 'oauth-link' },
+      {
+        secret: requireSecret('OAUTH_STATE_SECRET'),
+        audience: OAUTH_LINK_AUDIENCE,
+        expiresIn: OAUTH_LINK_TTL,
+      },
+    );
   }
 
   // Verify a `state` token from the provider callback. Returns the userId
@@ -784,9 +1020,12 @@ export class AuthService implements OnModuleDestroy {
   private resolveOAuthLink(state: unknown, provider: string): string | undefined {
     if (typeof state !== 'string' || !state) return undefined;
     try {
-      const payload = this.jwt.verify<{ sub?: string; p?: string; purpose?: string }>(state);
+      const payload = this.jwt.verify<{ sub?: unknown; p?: string; purpose?: string }>(state, {
+        secret: requireSecret('OAUTH_STATE_SECRET'),
+        audience: OAUTH_LINK_AUDIENCE,
+      });
       if (payload.purpose !== 'oauth-link' || payload.p !== provider) return undefined;
-      return payload.sub;
+      return typeof payload.sub === 'string' && payload.sub ? payload.sub : undefined;
     } catch {
       return undefined;
     }
@@ -822,10 +1061,10 @@ export class AuthService implements OnModuleDestroy {
 
   // Turning usernames into unique seeds
   private async generateUniqueUsername(seed: string) {
-    const base = seed.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20) || 'user';
-    let candidate = base;
+    const base = seed.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16) || 'user';
+    let candidate = `${base}${this.randomSuffix()}`;
     while (await this.prisma.db.user.findUnique({ where: { username: candidate } })) {
-      candidate = `${base}_${this.randomChars(5)}`;
+      candidate = `${base}${this.randomSuffix()}`;
     }
     return candidate;
   }

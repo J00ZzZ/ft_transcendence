@@ -39,10 +39,13 @@ colors, mark ready, and trigger the start.
 
 ### Lobby data
 
-The **match metadata hash** (`match:{gameId}`) tracks seats — `player1_id`,
-`player1_color`, `status`, `gameType`, etc. Readiness is NOT stored there: the
-roster and ready flags live in the engine GameState (`state.players` +
-`state.readyPlayers`), which `emitLobbyUpdate` broadcasts to clients.
+The **match metadata hash** (`match:{gameId}`) tracks seats: `player1_id`,
+`player1_color`, `player{n}_displayName`, `status`, `gameType`, etc.
+`player{n}_displayName` is the shown name, and for a bot seat the backend writes
+it as `bot-<color> (<assistant>)` from the lobby's `botNames`, while the seat
+keeps its `bot-<color>` id. Readiness is NOT stored there: the roster and ready
+flags live in the engine GameState (`state.players` + `state.readyPlayers`),
+which `emitLobbyUpdate` broadcasts to clients.
 
 Beside the per-slot fields the hash holds one account record per seat,
 `seatUser_<color>`. It is written when the seat is taken, kept in step when a
@@ -94,9 +97,14 @@ left.
 |-------|------------------------|------------------|---------------|
 | Player leaves a waiting room | `reserveMatchSeat()` sets `player<N>_left`; the id and colour stay | seat parked as `inactive` | seat hidden |
 | Player leaves a live game via End Game | `clearMatchSeat()` deletes `player<N>_id`, `player<N>_color`, `player<N>_left` and `seatUser_<color>` | seat parked as `exited` | seat shows as gone |
+| Player drops a live game (page closed, or "RETURN TO LOBBY") | the seat row is left untouched, so the id and colour stay reserved | `disconnected` for the 45 s grace window, then `exited` with every piece parked at `step = -1` | seat greyed out, then gone |
 | Backend abort (`POST /api/game/:id/abort`) | the match is marked `ABORTED`; individual seats are not cleared | — | room drops out of the listings |
 | Player rejoins | the backend's `joinMatch` userId lookup finds the reserved slot and returns the same colour | seat back to `active` | seat returns |
 | Idle-abort timer fires | the room is gone | — | room closed |
+
+A rejoin only works inside the grace window: once the seat is `exited` the backend's `isSeatFinalized` gate rejects the request with `MATCH_SEAT_EXPIRED` and never mints a token for that seat again. The seat itself stays in the room as a ghost (pieces at `step = -1`, skipped by the validator, never holding the turn).
+
+The backend also hides a room from the moment its game starts: `GET /api/games/rooms` and `GET /api/games/mine` read the engine state (`isEngineGameStarted`) and only advertise a started room back to a player who still holds a reclaimable seat in it (the `mySeat` flag), so a departed player is neither offered a dead seat nor shown a room they can no longer enter.
 
 Both seat methods skip the host's seat (`player1_color`), and both write `idleSince` to
 restart the room's idle-abort timer. The `player<N>_left` flag is what keeps the

@@ -163,7 +163,11 @@ function renderNotificationBody(
       const labels = items
         .map((i) => t(`notifications.profileItem${i.charAt(0).toUpperCase()}${i.slice(1)}`))
         .join(', ');
-      return <span>{t('notifications.profileUpdatedText', { item: labels || '—' })}</span>;
+      return (
+        <span>
+          {t('notifications.profileUpdatedText', { item: labels || t('notifications.unknown') })}
+        </span>
+      );
     }
     case 'display_name_changed': {
       const oldName = payload.oldDisplayName ? String(payload.oldDisplayName) : from;
@@ -214,7 +218,7 @@ export function NotificationBell({
   onMarkAllRead: () => void;
   placement?: 'bottom-right' | 'right';
   fullWidth?: boolean;
-  /** Icon-only trigger (no text pill) — used by RetroNavbar's collapsed sidebar rail. */
+  /** Icon-only trigger (no text pill): used by RetroNavbar's collapsed sidebar rail. */
   compact?: boolean;
   containerStyle?: CSSProperties;
   buttonStyle?: CSSProperties;
@@ -277,7 +281,7 @@ export function NotificationBell({
     try {
       retroAudio.playUiBeep(open ? 480 : 720, 0.05);
     } catch {
-      // Audio can be blocked before a user gesture — never fail the UI for it.
+      // Audio can be blocked before a user gesture: never fail the UI for it.
     }
     setOpen(!open);
   };
@@ -289,7 +293,7 @@ export function NotificationBell({
     try {
       retroAudio.playUiBeep(640, 0.05);
     } catch {
-      // Audio can be blocked before a user gesture — never fail the UI for it.
+      // Audio can be blocked before a user gesture: never fail the UI for it.
     }
 
     const p = parseNotificationPayload(n.payload);
@@ -507,7 +511,7 @@ export function NotificationBell({
         </button>
       )}
 
-      {/* Retro Dropdown Window Frame — portaled to <body>, see useLayoutEffect above */}
+      {/* Retro Dropdown Window Frame: portaled to <body>, see useLayoutEffect above */}
       {createPortal(
         <div ref={dropdownRef} style={dropdownStyle}>
           {/* Window Header */}

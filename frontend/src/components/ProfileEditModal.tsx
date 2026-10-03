@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getApi, patchApi, translateErrorCode } from '../api';
+import { getApi, patchApi, postApi, translateErrorCode } from '../api';
 import { passwordError } from '../validatePassword';
+import { isValidEmail } from '../validateEmail';
 import { useApp } from '../store';
 import { DeleteAccountModal } from './DeleteAccountModal';
 import { RETRO_BTN } from '../styles/tw';
@@ -19,11 +20,32 @@ interface ProfileResp {
     email?: string | null;
     providers?: Providers;
     hasPassword?: boolean;
+    emailVerified?: boolean;
+    pendingEmail?: string | null;
+    twoFactorEnabled?: boolean;
   };
-  emailVerificationSent?: boolean;
+  emailChangePending?: boolean;
+  pendingEmail?: string | null;
   oauthRedirectUrl?: string;
   message?: string;
 }
+
+type ErrorField = 'displayName' | 'email' | 'password' | 'oauth' | 'form';
+
+// Which field a backend error code belongs under.
+const ERROR_FIELD: Record<string, ErrorField> = {
+  AUTH_DISPLAY_NAME_RESERVED: 'displayName',
+  AUTH_DISPLAY_NAME_TAKEN: 'displayName',
+  AUTH_EMAIL_TAKEN: 'email',
+  AUTH_EMAIL_CHANGE_SET_PASSWORD: 'email',
+  AUTH_EMAIL_CHANGE_RATE_LIMITED: 'email',
+  VALIDATION_EMAIL_FORMAT: 'email',
+  NO_PENDING_EMAIL_CHANGE: 'email',
+  AUTH_CURRENT_PASSWORD_INCORRECT: 'password',
+  AUTH_KEEP_ONE_SIGNIN: 'oauth',
+  AUTH_PROVIDER_LINKED: 'oauth',
+  AUTH_PROVIDER_NOT_LINKED: 'oauth',
+};
 
 function fieldLabel(style: CSSProperties): CSSProperties {
   return {
@@ -58,7 +80,14 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
   const [username] = useState(user?.username ?? '');
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [email, setEmail] = useState('');
+  // Baselines taken from the server, so "unchanged" is judged against what the
+  // profile really holds (the session user may be missing fields).
+  const [initialEmail, setInitialEmail] = useState<string | null>(null);
+  const [initialDisplayName, setInitialDisplayName] = useState<string | null>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  // Server value of the toggle; null until the profile load returns. Save only
+  // sends the field when it differs, so a stale default cannot flip it off.
+  const [initialTwoFactor, setInitialTwoFactor] = useState<boolean | null>(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -68,6 +97,15 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState<ErrorField>('form');
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [emailPassword, setEmailPassword] = useState('');
+
+  // Error text rendered under the field it belongs to (falls back to the first field).
+  const errorFor = (fields: ErrorField[]) =>
+    error && fields.includes(errorField) ? (
+      <div style={{ fontSize: '0.7rem', color: '#ff0055', margin: '-4px 0 10px' }}>{error}</div>
+    ) : null;
 
   // Load the full profile (linked providers + email) on open.
   useEffect(() => {
@@ -76,11 +114,17 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       .catch(() => null)
       .then((data) => {
         if (cancelled || !data?.user) return;
-        setDisplayName(data.user.displayName ?? data.user.username);
-        setEmail(data.user.email ?? '');
+        const loadedName = data.user.displayName ?? data.user.username;
+        const loadedEmail = data.user.email ?? '';
+        setDisplayName(loadedName);
+        setInitialDisplayName(loadedName);
+        setEmail(loadedEmail);
+        setInitialEmail(loadedEmail);
+        setPendingEmail(data.user.pendingEmail ?? null);
         setProviders(data.user.providers ?? []);
         setHasPassword(!!data.user.hasPassword);
-        setTwoFactorEnabled(!!(data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled);
+        setTwoFactorEnabled(!!data.user.twoFactorEnabled);
+        setInitialTwoFactor(!!data.user.twoFactorEnabled);
       })
       .catch(() => undefined);
     return () => {
@@ -88,25 +132,70 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
+  // Judged against the loaded baseline (falling back to the session user). A user
+  // object without `email` must not read as "address cleared, one typed since" :
+  // that faked an email change and blocked unrelated saves such as the 2FA toggle.
+  const emailBaseline = initialEmail ?? user?.email ?? null;
+  const emailChanging = emailBaseline !== null && !!email.trim() && email.trim() !== emailBaseline;
+  const displayNameBaseline = initialDisplayName ?? user?.displayName ?? user?.username ?? '';
+
   const handleSave = async () => {
     setBusy(true);
     setError('');
     setNotice('');
-    const body: Record<string, unknown> = {};
-    if (displayName.trim() && displayName.trim() !== (user?.displayName ?? user?.username))
-      body.displayName = displayName.trim();
-    if (email.trim()) body.email = email.trim();
-    body.twoFactorEnabled = twoFactorEnabled;
     const isPasswordChange = !!(currentPassword || newPassword || confirmPassword);
+    const emailValue = email.trim();
+    // Mirror the backend's @IsEmail() gate so a malformed address fails inline
+    // (localized) instead of round-tripping to a 400. The server re-checks.
+    if (emailValue && !isValidEmail(emailValue)) {
+      setBusy(false);
+      setErrorField('email');
+      setError(t('profileEdit.emailInvalid'));
+      return;
+    }
+    // Strict two-step: never change the password and the email in one save: the
+    // email change relies on a password already being active.
+    if (isPasswordChange && emailChanging) {
+      setBusy(false);
+      setErrorField('email');
+      setError(t('profileEdit.emailChangeSeparateSave'));
+      return;
+    }
+    const body: Record<string, unknown> = {};
+    if (displayName.trim() && displayName.trim() !== displayNameBaseline)
+      body.displayName = displayName.trim();
+    if (emailChanging) {
+      if (!hasPassword) {
+        setBusy(false);
+        setErrorField('email');
+        setError(t('profileEdit.emailSetPasswordFirst'));
+        return;
+      }
+      if (!emailPassword) {
+        setBusy(false);
+        setErrorField('email');
+        setError(t('profileEdit.emailPasswordRequired'));
+        return;
+      }
+      body.email = emailValue;
+      body.currentPassword = emailPassword;
+    }
+    // Send the toggle only when it changed and the real value is known, so an
+    // unrelated save cannot write a stale state over it.
+    if (initialTwoFactor !== null && twoFactorEnabled !== initialTwoFactor) {
+      body.twoFactorEnabled = twoFactorEnabled;
+    }
     if (isPasswordChange) {
       const pwErr = newPassword ? passwordError(newPassword) : t('profileEdit.newPasswordRequired');
       if (pwErr) {
         setBusy(false);
+        setErrorField('password');
         setError(pwErr);
         return;
       }
       if (newPassword !== confirmPassword) {
         setBusy(false);
+        setErrorField('password');
         setError(t('profileEdit.passwordMismatch'));
         return;
       }
@@ -116,10 +205,23 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       if (data.user) {
         setUser(data.user);
         setProviders(data.user.providers ?? []);
-        setTwoFactorEnabled(!!(data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled);
-        if (!data.user.email && email.trim()) setEmail(email.trim());
+        // Trust the returned value and keep the baseline in step with it.
+        if (data.user.twoFactorEnabled !== undefined) {
+          setTwoFactorEnabled(data.user.twoFactorEnabled);
+          setInitialTwoFactor(data.user.twoFactorEnabled);
+        }
+        // The email is NOT applied until confirmed: keep showing the current one.
+        setEmail(data.user.email ?? '');
+        setPendingEmail(data.user.pendingEmail ?? data.pendingEmail ?? null);
+        // Re-baseline on what the server now holds, so the next save does not
+        // resend a field the user left untouched.
+        if (data.user.email !== undefined) setInitialEmail(data.user.email ?? '');
+        if (data.user.displayName !== undefined) setInitialDisplayName(data.user.displayName);
       }
-      if (data.emailVerificationSent) setNotice(t('profileEdit.emailVerificationSent'));
+      if (data.emailChangePending) {
+        setNotice(t('profileEdit.emailChangePending'));
+        setEmailPassword('');
+      }
       if (data.message) setNotice(data.message);
       if (isPasswordChange) {
         const pwBody: Record<string, string> = { newPassword };
@@ -130,7 +232,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
         );
         const notice = translateErrorCode(pwResp.code) ?? pwResp.message;
         if (notice) setNotice(notice);
-        // Password change keeps the CURRENT session alive — stay signed in.
+        // Password change keeps the CURRENT session alive: stay signed in.
         setHasPassword(true);
         setCurrentPassword('');
         setNewPassword('');
@@ -142,18 +244,32 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       setNewPassword('');
       setConfirmPassword('');
     } catch (e) {
-      const msg = (e as { message?: string } | null | undefined)?.message ?? '';
-      setError(
-        /last sign-in|keep at least one/i.test(msg)
-          ? t('profileEdit.lastMethod')
-          : /linked to another user/i.test(msg)
-            ? t('profileEdit.providerTaken')
-            : /email.*(?:already|registered)/i.test(msg)
-              ? t('profileEdit.emailTaken')
-              : /display name.*(?:taken|already)/i.test(msg)
-                ? t('profileEdit.displayNameTaken')
-                : t('profileEdit.genericError'),
+      const err = e as { code?: string; message?: string } | null | undefined;
+      // `request()` (api.ts) already localizes a coded error into `message`, so
+      // prefer the code map, then the message, then a generic fallback.
+      setErrorField(ERROR_FIELD[err?.code ?? ''] ?? 'form');
+      setError(translateErrorCode(err?.code) ?? err?.message ?? t('profileEdit.genericError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Resend the pending email-change confirmation link.
+  const resendEmailChange = async () => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const data = await postApi<{ pendingEmail?: string }>(
+        '/api/auth/profile/resend-email-change',
+        {},
       );
+      if (data.pendingEmail) setPendingEmail(data.pendingEmail);
+      setNotice(t('profileEdit.emailResent'));
+    } catch (e) {
+      const err = e as { code?: string; message?: string } | null | undefined;
+      setErrorField('email');
+      setError(translateErrorCode(err?.code) ?? err?.message ?? t('profileEdit.genericError'));
     } finally {
       setBusy(false);
     }
@@ -172,12 +288,9 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
       await patchApi<ProfileResp>('/api/auth/profile', { oauthToRemove: provider });
       setProviders((p) => p.filter((x) => x !== provider));
     } catch (e) {
-      const msg = (e as { message?: string } | null | undefined)?.message ?? '';
-      setError(
-        /last sign-in|keep at least one/i.test(msg)
-          ? t('profileEdit.lastMethod')
-          : t('profileEdit.genericError'),
-      );
+      const err = e as { code?: string; message?: string } | null | undefined;
+      setErrorField('oauth');
+      setError(translateErrorCode(err?.code) ?? err?.message ?? t('profileEdit.genericError'));
     } finally {
       setBusy(false);
     }
@@ -195,7 +308,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
   };
   const panel: CSSProperties = {
     width: 'min(92vw, 560px)',
-    maxHeight: '88vh',
+    maxHeight: '94vh',
     overflowY: 'auto',
     borderRadius: 10,
     background: 'var(--bg-card)',
@@ -235,7 +348,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             style={{ padding: '3px 9px', fontSize: '0.66rem', color: 'var(--text-muted)' }}
           >
-            {t('profileEdit.close')}
+            {t('common.close')}
           </button>
         </div>
 
@@ -280,6 +393,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder={t('profileEdit.displayNamePlaceholder')}
           />
+          {errorFor(['displayName', 'form'])}
 
           <label style={fieldLabel({ color: 'var(--text-muted)' })}>{t('profileEdit.email')}</label>
           <input
@@ -289,6 +403,57 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder={t('profileEdit.emailPlaceholder')}
           />
+          {emailChanging && hasPassword && (
+            <>
+              <label style={fieldLabel({ color: 'var(--text-muted)' })}>
+                {t('profileEdit.currentPassword')}
+              </label>
+              <input
+                style={inputStyle()}
+                type="password"
+                value={emailPassword}
+                onChange={(e) => setEmailPassword(e.target.value)}
+                placeholder={t('profileEdit.currentPasswordPlaceholder')}
+                autoComplete="current-password"
+              />
+            </>
+          )}
+          {emailChanging && !hasPassword && (
+            <div
+              style={{
+                fontSize: '0.64rem',
+                color: '#ff0055',
+                marginBottom: 12,
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {t('profileEdit.emailSetPasswordFirst')}
+            </div>
+          )}
+          {pendingEmail && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: '0.66rem',
+                  color: 'var(--accent-cyan)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {t('profileEdit.emailChangePendingTo', { email: pendingEmail })}
+              </span>
+              <button
+                type="button"
+                className={RETRO_BTN}
+                disabled={busy}
+                onClick={() => void resendEmailChange()}
+                style={{ padding: '2px 8px', fontSize: '0.62rem', color: 'var(--accent-cyan)' }}
+              >
+                {t('profileEdit.resend')}
+              </button>
+            </div>
+          )}
+          {errorFor(['email'])}
 
           <div
             style={{
@@ -373,6 +538,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
               placeholder={t('profileEdit.confirmPasswordPlaceholder')}
               autoComplete="new-password"
             />
+            {errorFor(['password'])}
             <div
               style={{
                 fontSize: '0.64rem',
@@ -446,6 +612,7 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
                 </div>
               );
             })}
+            {errorFor(['oauth'])}
           </div>
 
           {notice && (
@@ -453,10 +620,6 @@ export function ProfileEditModal({ onClose }: { onClose: () => void }) {
               {notice}
             </div>
           )}
-          {error && (
-            <div style={{ fontSize: '0.7rem', color: '#ff0055', margin: '4px 0 8px' }}>{error}</div>
-          )}
-
           <button
             className={RETRO_BTN}
             type="submit"

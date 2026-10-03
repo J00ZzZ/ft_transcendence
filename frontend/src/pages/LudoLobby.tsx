@@ -4,6 +4,7 @@ import { getApi, postApi } from '../api';
 import { UserAvatar } from '../components/UserAvatar';
 import { RetroNavbar } from '../components/RetroNavbar';
 import type { PlayerColor } from '../game/types';
+import { useFitTextSize } from '../hooks/useFitTextSize';
 import { navigate } from '../router';
 import { useApp } from '../store';
 import { COL } from '../theme';
@@ -31,7 +32,7 @@ import {
 } from '../styles/tw';
 
 // How often the room list and the "am I already seated?" check are polled.
-// Original: 1000 ms. Recommended: 5000 ms — at 1 s those two endpoints sent
+// Original: 1000 ms. Recommended: 5000 ms. At 1 s those two endpoints sent
 // 120 requests/min per user, close to the 300 requests/min per-IP limit.
 const ROOM_POLL_MS = 5_000;
 
@@ -46,6 +47,8 @@ type Room = {
   seats: number;
   maxSeats: number;
   mode: 'classic' | 'duel';
+  /** True when the viewer holds a seat in this room, so the row is a REJOIN row. */
+  mySeat?: boolean;
 };
 
 type MatchResult = {
@@ -96,6 +99,14 @@ export function LudoLobby() {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // PASS #04 room-code field is a fixed-width box, so scale its text down to fit:
+  // the Malay placeholder ("MASUKKAN KOD") is longer than the EN/FR ones and was
+  // overflowing the input.
+  const { ref: roomCodeInputRef, fontSize: roomCodeFontSize } = useFitTextSize(
+    [t('ludoLobbyPasses.enterCodePlaceholder'), roomCodeInput],
+    { maxFontSize: 16, reserve: 4 },
+  );
 
   const fetchRooms = () => {
     getApi<Room[]>('/api/games/rooms')
@@ -158,7 +169,7 @@ export function LudoLobby() {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
     const ownRoom = (rooms ?? []).find(
-      (r) => r.hostUsername === user?.username && r.roomCode === trimmed,
+      (r) => r.roomCode === trimmed && (r.mySeat ?? r.hostUsername === user?.username),
     );
     if (ownRoom) {
       await rejoinRoom(ownRoom);
@@ -282,7 +293,7 @@ export function LudoLobby() {
                     border: hasActiveGame
                       ? '1px solid var(--accent-yellow)'
                       : '1px dashed rgba(255,255,255,0.2)',
-                    color: hasActiveGame ? 'var(--accent-yellow)' : 'var(--text-muted)',
+                    color: hasActiveGame ? 'var(--accent-yellow)' : 'var(--text-soft)',
                   }}
                 >
                   {t('ludoLobbyExtra.activeRoomLabel', {
@@ -381,8 +392,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -472,8 +483,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -561,8 +572,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -650,8 +661,8 @@ export function LudoLobby() {
                       <div
                         style={{
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-muted)',
+                          fontSize: 'calc(0.86rem + 1pt)',
+                          color: 'var(--text-soft)',
                           lineHeight: 1.45,
                         }}
                       >
@@ -671,6 +682,7 @@ export function LudoLobby() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
+                      ref={roomCodeInputRef}
                       value={roomCodeInput}
                       onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => {
@@ -692,7 +704,7 @@ export function LudoLobby() {
                         borderRadius: 6,
                         color: '#ffe600',
                         padding: '0 14px',
-                        fontSize: '1rem',
+                        fontSize: roomCodeFontSize,
                         fontWeight: 'bold',
                         fontFamily: 'var(--font-mono)',
                         letterSpacing: '2px',
@@ -828,15 +840,15 @@ export function LudoLobby() {
                           style={{
                             padding: '28px 0',
                             textAlign: 'center',
-                            color: 'var(--text-muted)',
-                            fontSize: '0.78rem',
+                            color: 'var(--text-soft)',
+                            fontSize: 'calc(0.78rem + 1pt)',
                           }}
                         >
                           {t('ludoLobbyPasses.noOpenRooms')}
                         </div>
                       ) : (
                         filteredRooms.map((room) => {
-                          const isOwn = room.hostUsername === user?.username;
+                          const isMySeat = room.mySeat ?? room.hostUsername === user?.username;
                           const full = room.seats >= room.maxSeats;
                           const hue = hueForHost(room.host);
                           return (
@@ -849,7 +861,7 @@ export function LudoLobby() {
                                 padding: '12px 14px',
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
                                 alignItems: 'center',
-                                background: isOwn ? 'rgba(255, 0, 127, 0.12)' : 'transparent',
+                                background: isMySeat ? 'rgba(255, 0, 127, 0.12)' : 'transparent',
                               }}
                             >
                               <div
@@ -897,7 +909,7 @@ export function LudoLobby() {
                                   >
                                     {room.host}
                                   </div>
-                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                                  <div style={{ color: 'var(--text-soft)', fontSize: '0.65rem' }}>
                                     {room.maxSeats}P • {room.mode}
                                   </div>
                                 </div>
@@ -919,20 +931,20 @@ export function LudoLobby() {
                                 <button
                                   className={RETRO_BTN}
                                   onClick={() => {
-                                    if (isOwn) void rejoinRoom(room);
+                                    if (isMySeat) void rejoinRoom(room);
                                     else void joinRoom(room);
                                   }}
-                                  disabled={(!isOwn && full) || joiningRoomId === room.id}
+                                  disabled={(!isMySeat && full) || joiningRoomId === room.id}
                                   style={{
                                     padding: '5px 12px',
                                     fontSize: '0.7rem',
-                                    background: isOwn ? 'var(--accent-pink)' : undefined,
+                                    background: isMySeat ? 'var(--accent-pink)' : undefined,
                                     opacity:
-                                      (!isOwn && full) || joiningRoomId === room.id ? 0.4 : 1,
-                                    cursor: !isOwn && full ? 'not-allowed' : 'pointer',
+                                      (!isMySeat && full) || joiningRoomId === room.id ? 0.4 : 1,
+                                    cursor: !isMySeat && full ? 'not-allowed' : 'pointer',
                                   }}
                                 >
-                                  {isOwn
+                                  {isMySeat
                                     ? joiningRoomId === room.id
                                       ? '...'
                                       : t('lobbyBrowser.rejoinBtn')

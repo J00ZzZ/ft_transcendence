@@ -28,8 +28,8 @@ achievement system, and the whole interface is available in multiple languages.
 - **Docker** and **Docker Compose** (the only runtime requirement).
 - **make** (to use the provided build commands).
 - A `.env` file at the repo root (see [Configuration (.env)](#configuration-env) below). The stack refuses to start if required values are missing.
-- OAuth client IDs and secrets for Google, GitHub, and 42 — **optional**. Local sign-up and login work without them.
-- At least one free port: `8443` (HTTPS) was chosen for our project.
+- OAuth client IDs and secrets for Google, GitHub, and 42, plus the six ngrok tunnel values. The providers themselves are not needed to sign up or log in locally, but every one of these keys is validated by `make env` and read at backend boot, so the stack does not start without them. See [Configuration (.env)](#configuration-env).
+- Free host ports: `8443` (HTTPS, published on every interface) and `8444` (loopback-only, where the ngrok agent reaches nginx in tunnel mode). `make dev` additionally uses `8080`.
 
 ### Running
 
@@ -78,11 +78,11 @@ make dev
 | `http://localhost:3000`   | Backend API (direct, host-only)                                 | default | Loopback-only publish; JWT/2FA/bcrypt, throttling, no CORS headers (same-origin via nginx only)                             |
 | `http://localhost:5555`   | Prisma Studio (database browser)                                | default | Loopback-only publish; no app-level auth — interactive host use only                                                        |
 | `wss://<host>/socket.io/` | Game engine connection (same-origin through nginx / Vite proxy) | default | Same-origin `wss` only; engine verifies the Socket.IO handshake JWT before joining rooms                                    |
-| `https://derived-sassy-amniotic.ngrok-free.dev` | Ngrok tunnel (online multiplayer) | tunnel | Public entry exposed via ngrok — same nginx TLS/security setup as `localhost:8443`. Fixed URL provided by ngrok |
+| `https://derived-sassy-amniotic.ngrok-free.dev` | Ngrok tunnel (online multiplayer) | tunnel | Public entry exposed via ngrok → the dedicated loopback `:444` listener (host `127.0.0.1:8444`), which resolves the real client IP from `X-Forwarded-For`; same TLS/security/routing as `localhost:8443`. Fixed URL provided by ngrok |
 
 **Security Hardening measures taken**
 
-- **`8443` (nginx)** is the only intentionally public-facing port (published on all host interfaces). It runs **TLS 1.2/1.3 only** with a self-signed cert and **no plain-HTTP listener**, sets HSTS + security headers + a CSP, disables `server_tokens`, denies hidden-file access, and applies per-IP rate limits (login `5r/m`, auth `60r/m`, refresh `30r/m`, leaderboard `30r/m`) in front of the API.
+- **`8443` (nginx)** is the only intentionally public-facing port (published on all host interfaces); the tunnel listener's `127.0.0.1:8444` is loopback-only. It runs **TLS 1.2/1.3 only** with a self-signed cert and **no plain-HTTP listener**, sets HSTS + security headers + a CSP, disables `server_tokens`, denies hidden-file access, and applies per-IP rate limits (login `5r/m`, auth `60r/m`, refresh `30r/m`, leaderboard `30r/m`, generic `/api/` `600r/m`) in front of the API. The tunnel adds a second, loopback-only listener on `8444` that trusts `X-Forwarded-For`, so per-visitor throttling survives ngrok.
 - **`8080` (Vite)** is active only under the `dev` compose profile (`make dev`). It serves the SPA and proxies `/api` and `/socket.io` without TLS. Disabled in production.
 - **`3000` (backend)** is published loopback-only; clients reach it exclusively through nginx's `/api` proxy. Backend hardening: JWT auth in httpOnly cookies, bcrypt password hashes, class-validator on DTOs, and NestJS rate throttling. CORS is intentionally not enabled — every call the SPA makes is same-origin through nginx, so the backend emits no cross-origin headers.
 - **Avatar uploads** are validated before they are stored. The 2 MB limit is enforced by the upload middleware, and the client refuses a file whose declared MIME type is not PNG, JPEG, GIF or WebP. The server then compares the leading bytes of the file against the signature of the declared type (`89 50 4E 47 0D 0A 1A 0A` for PNG, `FF D8 FF` for JPEG, `47 49 46 38` for GIF, `52 49 46 46…57 45 42 50` for WebP), because the MIME type is only what the client claims. A file whose declared type does not match its bytes is rejected before anything is written. The check reads the signature bytes only and does not decode the image, so a file cut off after its signature is stored, and the client falls back to the generated avatar when the browser cannot decode it. Accepted bytes are stored in Postgres in a `Bytes` column through Prisma, and Prisma reads them back as raw bytes and sends them to the browser with the stored `Content-Type`. The database does not run or open the file; it only stores the bytes.
@@ -91,11 +91,23 @@ make dev
 - **Infrastructure ports not listed** — all published loopback-only; cross-container traffic rides the private `transcendence_network`:
   - **Postgres** (`127.0.0.1:5432`) — requires credentials.
   - **Redis** (`127.0.0.1:6479`) — requires a password.
-  - **Engine** (`127.0.0.1:3001`) — additionally gated by JWT token verification: the Socket.IO handshake JWT (game-scoped, with role/color, signed with `JWT_SECRET` and verified in constant time) must be valid before a socket can join a room, so a loopback connection alone is not enough to interact with any game.
+  - **Engine** (`127.0.0.1:3001`) is additionally gated by JWT token verification: the Socket.IO handshake JWT (game-scoped, with role/color, signed with the engine-dedicated `ENGINE_JWT_SECRET` and carrying an `aud: ludo-engine` claim, verified in constant time) must be valid before a socket can join a room, so a loopback connection alone is not enough to interact with any game.
+- **`4040` (ngrok agent)** is ngrok's own local API and inspector, bound to loopback and open only while `make tunnel` runs. `make tunnel-url` reads the public tunnel URL from it, and it is the only place the agent is reachable on this host.
 
 ### Configuration (.env)
 
 All config lives in the root `.env` (`KEY=VALUE` per line), loaded into containers via compose's `env_file:`. It is gitignored and shared between the team only (via Discord) — `.env.example` is a template we used. `make` validates it and **fails early** if `.env` is missing or any required field is empty. OAuth credentials are added manually from the provider consoles (Google, GitHub, 42).
+
+`make env` runs before every `make build` / `make all` and requires every key in `.env.example` to be non-empty, with one exception: `LAN_IP` (written automatically with this machine's current address). `SMTP_CREDENTIALS` is required too — the backend only logs verification emails when it is absent, but an empty value means the `.env` was copied incompletely. The ngrok tunnel keys are part of that check, and the backend also reads `NGROK_FRONTEND_URL` plus the three `NGROK_*_CALLBACK_URL` values at boot, so they cannot be left empty even if no tunnel is ever started.
+
+Two keys name host ports the stack publishes:
+
+| Key | Default | Port it opens |
+| --- | --- | --- |
+| `HTTPS_PORT` | `8443` | nginx's direct TLS listener, published on every interface (`8443 → 443` in `compose.yaml`) and printed by `make all` / `make lan` |
+| `NGROK_PORT` | `8444` | nginx's tunnel listener, published loopback-only (`127.0.0.1:8444 → 444` in `compose.yaml`), which `make tunnel` points the ngrok agent at |
+
+Both publishes are hardcoded in `compose.yaml` and belong to no compose profile, so `8444` is bound in every mode, tunnel running or not, and the stack will not start if either port is already taken. Changing the two keys in `.env` moves the address host scripts use (`make tunnel`, the printed LAN URL), not the publish itself. While a tunnel runs, the ngrok agent also binds `127.0.0.1:4040` for its own local API, which is where `make tunnel-url` reads the public URL from.
 
 ## Team Information
 
@@ -187,7 +199,7 @@ schema is applied with `prisma db push` on every boot, so a fresh database is bu
 
 ## Database Schema
 
-![Database schema](frontend/public/Schema_Team-Submit.png)
+![Database schema](docs/images/Schema_Team-Submit.png)
 
 ## Modules
 
@@ -255,11 +267,11 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 
 #### Overview
 
-| Document                                       | Responsibility                                                                              |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [docs/architecture.md](docs/architecture.md)   | System topology, services, request paths, data layer, secrets, make targets, file structure |
-| [docs/API-list.md](docs/API-list.md)           | Complete HTTP + WebSocket API reference                                                     |
-| [docs/avatar-system.md](docs/avatar-system.md) | Avatar storage, Redis metadata, caching and freshness, seat rendering                       |
+| Document                                       | Responsibility                                                                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)   | System topology, services, request paths, data layer, security & threat model, secrets, make targets, file structure |
+| [docs/API-list.md](docs/API-list.md)           | Complete HTTP + WebSocket API reference                                                                              |
+| [docs/avatar-system.md](docs/avatar-system.md) | Avatar storage, Redis metadata, caching and freshness, seat rendering                                                |
 
 #### Deployment
 

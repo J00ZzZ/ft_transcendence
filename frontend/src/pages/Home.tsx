@@ -68,7 +68,7 @@ const STATUS_STYLE: Record<string, { label: string; color: string; border: strin
 };
 
 export function Home() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useApp();
   const [legalModalDoc, setLegalModalDoc] = useState<LegalDocType | null>(null);
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
@@ -178,6 +178,13 @@ export function Home() {
     };
   }, [launchToLobby]);
 
+  // **1b. HERO MARQUEE // Held in a ref so a language switch only swaps the
+  // text: the canvas effect below keeps running (no starfield reshuffle).
+  const heroMarqueeRef = useRef(t('homeExtended.heroMarquee'));
+  useEffect(() => {
+    heroMarqueeRef.current = t('homeExtended.heroMarquee');
+  }, [t, i18n.language]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -205,7 +212,6 @@ export function Home() {
         { label: 'YELLOW', color: '#ffe600', x: 490, y: 360 },
         { label: 'BLUE', color: '#00f0ff', x: 635, y: 350 },
       ],
-      marquee: '[ TRANSCENDENCE // CYBER LUDO ]',
       marqueeColor: '#00f0ff',
     };
 
@@ -331,7 +337,7 @@ export function Home() {
       ctx.fillStyle = cfg.marqueeColor;
       ctx.shadowColor = cfg.marqueeColor;
       ctx.shadowBlur = 11;
-      ctx.fillText(cfg.marquee, 360, 28);
+      ctx.fillText(heroMarqueeRef.current, 360, 28);
       ctx.shadowBlur = 0;
       ctx.restore();
 
@@ -384,10 +390,10 @@ export function Home() {
               style={{ marginTop: 0, padding: '20px 24px 18px', marginBottom: 24 }}
             >
               <h1 className={HERO_TITLE} style={{ marginBottom: 6 }}>
-                RETROLUDO '42
+                {t('homeExtended.brandTitle')}
               </h1>
               <p className={HERO_SUBTITLE}>
-                {t('home.greeting', { name: displayName.toUpperCase() })} // PACE 24
+                {t('home.greeting', { name: displayName.toUpperCase() })}
               </p>
 
               <div className={BADGE_BAR} style={{ marginTop: 14, gap: 10 }}>
@@ -432,7 +438,7 @@ export function Home() {
                         : undefined
                     }
                     onClick={launchToLobby}
-                    title="Click or press Spacebar to enter Ludo Lobby"
+                    title={t('home.enterLobbyTooltip')}
                   >
                     <canvas id="arcadeCanvas" ref={canvasRef} width={720} height={400} />
 
@@ -499,9 +505,9 @@ export function Home() {
                           retroAudio.playUiBeep(650, 0.05);
                           navigate('/friends');
                         }}
-                        title={`${pendingRequestsCount} pending friend request${pendingRequestsCount > 1 ? 's' : ''} - Click to review`}
+                        title={t('home.pendingRequestsTooltip', { count: pendingRequestsCount })}
                       >
-                        {pendingRequestsCount} NEW
+                        {pendingRequestsCount} {t('home.newBadge')}
                       </button>
                     )}
                   </div>
@@ -729,9 +735,7 @@ export function Home() {
 
             {/* Footer */}
             <footer className={RETRO_FOOTER}>
-              <p>
-                © 1942-2026 RETROLUDO '42 // 42KL // ALL RIGHTS RESERVED // WEB AUDIO & CANV-ARCADE
-              </p>
+              <p>{t('home.footerLegal')}</p>
               <div
                 style={{
                   display: 'flex',

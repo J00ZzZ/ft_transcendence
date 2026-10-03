@@ -1,9 +1,9 @@
-# Dasar Privasi — ft-Transcendence (RetroLudo '42)
+# Dasar Privasi — ft-Transcendence (Ludo Retro '42)
 
 **Tarikh berkuat kuasa:** 2026-08-26
-**Penguasa:** Team Pace 24, pembangawa ft-Transcendence (RetroLudo '42) (kami, "Tim")
+**Penguasa:** Team Pace 24, pembangawa ft-Transcendence (Ludo Retro '42) (kami, "Tim")
 
-Dasar Privasi ini menjelaskan bagaimana aplikasi web ft-Transcendence (RetroLudo '42) ("Apl", "kami", "kami") mengumpulkan, menggunakan, menggenapi, dan melindungi data peribadi anda. Ia disediakan mengikut **Akta Perlindungan Data Peribadi Malaysia 2010 ("PDPA")** dan prinsip-prinsip panduannya: Umum, Notis dan Pilihan, Penggenapan, Keselamatan, Penyimpanan, Integriti Data, dan Akses.
+Dasar Privasi ini menjelaskan bagaimana aplikasi web ft-Transcendence (Ludo Retro '42) ("Apl", "kami", "kami") mengumpulkan, menggunakan, menggenapi, dan melindungi data peribadi anda. Ia disediakan mengikut **Akta Perlindungan Data Peribadi Malaysia 2010 ("PDPA")** dan prinsip-prinsip panduannya: Umum, Notis dan Pilihan, Penggenapan, Keselamatan, Penyimpanan, Integriti Data, dan Akses.
 
 
 ---
@@ -24,7 +24,7 @@ Apl ini hanya mengumpulkan data yang diperlukan untuk menyediakan permainan dan 
 | Sosial | senarai rakan, permintaan rakan, senarai blok, jemputan permainan | dijana oleh aktiviti anda dalam apl |
 | Teknikal | kehadiran/status dalam talian, keutamaan notifikasi | dijana oleh penggunaan Apl |
 
-Kami **tidak** mengumpulkan butiran kad pembayaran, data lokasi, atau sebarang data daripada kanak-kanak di bawah umur 13 tahun. Apl ini adalah permainan dan tidak melakukan profil automatik melebihi menampilkan statistik permainan yang anda sudah lihat.
+Kami **tidak** mengumpulkan butiran kad pembayaran atau data lokasi. Apl ini adalah permainan dan tidak melakukan profil automatik melebihi menampilkan statistik permainan yang anda sudah lihat.
 
 
 ---

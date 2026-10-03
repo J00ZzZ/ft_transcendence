@@ -2,13 +2,13 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Board } from '../components/Board';
 import { Die } from '../components/Die';
-import { localizedBotName } from '../utils/botName';
+import { avatarSeed, localizedBotName, localizedColor } from '../utils/botName';
 import { applyEvent, initialView } from '../game/reducer';
-import type { PlayerColor } from '../game/types';
+import type { PlayerColor, PlayerMeta } from '../game/types';
 import { navigate } from '../router';
 import { connectSocket } from '../socket';
 import { getApi, postApi } from '../api';
-import { useApp } from '../store';
+import { useApp, type ResultPlayer } from '../store';
 import { SEAT_COLORS } from '../theme';
 import { UserAvatar } from '../components/UserAvatar';
 import { CyberButton, CyberModal } from '../components/CyberModal';
@@ -86,8 +86,8 @@ function MiniDie({ value }: { value: number }) {
   );
 }
 
-// Matches the backend's SLOT_COLORS — hotseat seat index i always maps to
-// this color, regardless of the Lobby seat-picker's own (unrelated) display order.
+// Matches the backend's SLOT_COLORS: hotseat seat index i always maps to this
+// color, regardless of the Lobby seat-picker's own (unrelated) display order.
 const SLOT_COLORS: PlayerColor[] = ['blue', 'red', 'green', 'yellow'];
 
 export function Game() {
@@ -127,9 +127,9 @@ export function Game() {
     }
   };
 
-  // Custom names typed into the Lobby seat-setup for local (hotseat) seats —
-  // seat 0 is always the logged-in host (uses their real username instead),
-  // so only look at seats[1..].
+  // Custom names typed into the Lobby seat-setup for local (hotseat) seats: seat
+  // 0 is always the logged-in host (uses their real username instead), so only
+  // look at seats[1..].
   const localNames = useMemo<Partial<Record<PlayerColor, string>>>(() => {
     const names: Partial<Record<PlayerColor, string>> = {};
     seats.forEach((seat, i) => {
@@ -138,6 +138,47 @@ export function Game() {
     });
     return names;
   }, [seats]);
+  // Seat label for the move log / podium rows: a hotseat seat's typed-in name
+  // first, then the engine's display label (bots carry "bot-<color>
+  // (<assistant>)", localized by localizedBotName), then the raw id.
+  const seatLabel = (p: {
+    color: PlayerColor;
+    username: string;
+    displayName?: string;
+    isBot: boolean;
+  }): string =>
+    (localNames[p.color] ?? '') ||
+    localizedBotName(t, p.displayName) ||
+    localizedBotName(t, p.username) ||
+    (p.isBot ? t('common.bot') : 'Pilot');
+  // Seeded name for a seat's generated avatar. A bot has no account, so it uses the
+  // assistant name the lobby gave that seat, the same name the invoice seeds from.
+  const seatAvatarName = (p: PlayerMeta): string =>
+    p.isBot ? avatarSeed(p.displayName ?? p.username) : p.username;
+  // Maps the live roster to `LastResult.players`, carrying each seat's avatar
+  // facts. A `winner` is recorded as four pieces because the view lags the winning
+  // move. Hotseat is described in docs/frontend/frontend-game-module.md.
+  const toResultPlayers = (players: PlayerMeta[], winner?: PlayerColor): ResultPlayer[] => {
+    const match = activeMatchRef.current;
+    const me = userRef.current;
+    const hostSeatColor = match?.mode === 'hotseat' ? match.color : null;
+    return players
+      .filter((p) => p.status !== 'inactive')
+      .map((p) => {
+        const isHostSeat = hostSeatColor !== null && p.color === hostSeatColor;
+        return {
+          color: p.color,
+          // A bot row keeps its raw `bot-<color> (<assistant>)` label: the invoice
+          // re-localizes it and seeds the same avatar the lobby table uses.
+          username: p.isBot ? (p.displayName ?? p.username) : seatLabel(p),
+          isBot: p.isBot,
+          piecesInGoal: p.color === winner ? 4 : p.piecesInGoal,
+          userId: isHostSeat ? me?.id : p.userId,
+          hasAvatarPhoto: isHostSeat ? (me?.hasAvatarPhoto ?? false) : (p.hasAvatarPhoto ?? false),
+          avatarStyle: isHostSeat ? (me?.avatarStyle ?? null) : (p.avatarStyle ?? null),
+        };
+      });
+  };
   const socketRef = useRef<ReturnType<typeof connectSocket> | null>(null);
   const [view, dispatch] = useReducer(applyEvent, null, () =>
     initialView(activeMatch?.color ?? 'red'),
@@ -159,8 +200,8 @@ export function Game() {
   const isGameEnded = lastResult != null || view.status === 'finished';
 
   // Box-by-box move animation: while set, Board renders this piece at `step`
-  // instead of its real (already-updated) logical position — see the
-  // piece_moved handler below, which steps through the server's `path`.
+  // instead of its real (already-updated) logical position. See the piece_moved
+  // handler below, which steps through the server's `path`.
   const [animatingPiece, setAnimatingPiece] = useState<{ pieceId: string; step: number } | null>(
     null,
   );
@@ -171,9 +212,9 @@ export function Game() {
   // second click from firing a duplicate move the engine rejects.
   const pendingMoveRef = useRef(false);
   const STEP_ANIM_MS = 180;
-  // Capture burst FX: a short cosmetic ring + sparks on the landing square
-  // when a piece is captured. Set at the end of the mover's walk, cleared
-  // after the burst plays out — purely visual, no game state involved.
+  // Capture burst FX: a short ring + sparks on the landing square when a piece
+  // is captured. Set at the end of the mover's walk and cleared after the burst
+  // plays out, so it is visual only and never touches game state.
   const [captureFx, setCaptureFx] = useState<{ color: string; to: number } | null>(null);
 
   useEffect(() => {
@@ -196,17 +237,12 @@ export function Game() {
     if (view.status === 'waiting') return;
     if (prevTurnRef.current && prevTurnRef.current !== effectiveTurn) {
       const nextTurnPlayer = view.players.find((p) => p.color === effectiveTurn);
-      const isNextBot = nextTurnPlayer?.isBot ?? false;
-      const colorKey =
-        `lobby.color${effectiveTurn.charAt(0).toUpperCase() + effectiveTurn.slice(1)}` as
-          'lobby.colorRed' | 'lobby.colorGreen' | 'lobby.colorYellow' | 'lobby.colorBlue';
-      const translatedColor = t(colorKey).toUpperCase();
+      const translatedColor = localizedColor(t, effectiveTurn).toUpperCase();
       const nextName =
         (localNames[effectiveTurn] ?? '').toUpperCase() ||
         localizedBotName(t, nextTurnPlayer?.displayName).toUpperCase() ||
         localizedBotName(t, nextTurnPlayer?.username).toUpperCase() ||
-        (nextTurnPlayer?.color ?? '').toUpperCase() ||
-        (isNextBot ? `${t('common.bot').toUpperCase()} (${translatedColor})` : translatedColor);
+        translatedColor;
 
       retroAudio.playUiBeep(640, 0.08, 'sine');
       setTurnSwapNotice(t('game.turnSwapNotice', { name: nextName, color: translatedColor }));
@@ -300,9 +336,9 @@ export function Game() {
       const current = activeMatchRef.current;
       if (!current) return;
       const me = userRef.current;
-      // Hotseat: one physical device controls every seat — the engine has no
-      // separate accounts to join with, so this single socket must join_game
-      // for every local color up front.
+      // Hotseat: one physical device controls every seat. The engine has no
+      // separate accounts to join with, so this single socket must join_game for
+      // every local color up front.
       if (current.mode === 'hotseat') {
         for (const ck of Object.keys(localNames) as PlayerColor[]) {
           socket.emit('join_game', current.gameId, ck, undefined, localNames[ck]);
@@ -334,7 +370,7 @@ export function Game() {
         const rollerName =
           localizedBotName(t, roller?.displayName) ||
           localizedBotName(t, roller?.username) ||
-          rollerColor;
+          localizedColor(t, rollerColor).toLowerCase();
         retroAudio.playLaserSound();
         setIsRolling(true);
         setTimeout(() => {
@@ -377,12 +413,15 @@ export function Game() {
         let victimColor = '';
         if (e.captured) {
           if (e.capturedPieceIds && e.capturedPieceIds.length > 0) {
-            victimColor = e.capturedPieceIds[0].split('-')[0].toUpperCase();
+            victimColor = localizedColor(
+              t,
+              e.capturedPieceIds[0].split('-')[0] as PlayerColor,
+            ).toUpperCase();
           } else {
             const victim = viewRef.current.pieces.find(
               (p) => p.color !== e.color && p.step === e.to,
             );
-            if (victim) victimColor = victim.color.toUpperCase();
+            if (victim) victimColor = localizedColor(t, victim.color).toUpperCase();
           }
           if (!victimColor) victimColor = 'OPPONENT';
         }
@@ -459,19 +498,9 @@ export function Game() {
       } else if (type === 'game_ended') {
         const e = state as { winner: PlayerColor; resultDetail: string };
         retroAudio.playUiBeep(1100, 0.3, 'sawtooth');
-        let endedPlayers = viewRef.current.players
-          .filter((p) => p.status !== 'inactive')
-          .map((p) => {
-            const inGoal = p.color === e.winner ? 4 : p.piecesInGoal;
-            return {
-              color: p.color,
-              username:
-                (localNames[p.color] ?? localizedBotName(t, p.username)) ||
-                (p.isBot ? t('common.bot') : 'Pilot'),
-              isBot: p.isBot,
-              piecesInGoal: inGoal,
-            };
-          });
+        // The winning seat is recorded as four pieces: its last move can still be
+        // mid-animation, so the view can lag the final count.
+        let endedPlayers = toResultPlayers(viewRef.current.players, e.winner);
         const matchAtEnd = activeMatchRef.current;
         if (
           matchAtEnd?.mode === 'pvp' &&
@@ -520,16 +549,7 @@ export function Game() {
     );
 
     const buildAbandonedResult = () => {
-      let players = viewRef.current.players
-        .filter((p) => p.status !== 'inactive')
-        .map((p) => ({
-          color: p.color,
-          username:
-            (localNames[p.color] ?? localizedBotName(t, p.username)) ||
-            (p.isBot ? t('common.bot') : 'Pilot'),
-          isBot: p.isBot,
-          piecesInGoal: p.piecesInGoal,
-        }));
+      let players: ResultPlayer[] = toResultPlayers(viewRef.current.players);
 
       if (players.length === 0 && Array.isArray(seats) && seats.length > 0) {
         const SEAT_COLORS: PlayerColor[] = ['red', 'green', 'yellow', 'blue'];
@@ -723,16 +743,7 @@ export function Game() {
     retroAudio.playExplosionSound();
     socketRef.current?.emit('end_game');
 
-    let players = viewRef.current.players
-      .filter((p) => p.status !== 'inactive')
-      .map((p) => ({
-        color: p.color,
-        username:
-          (localNames[p.color] ?? localizedBotName(t, p.username)) ||
-          (p.isBot ? t('common.bot') : 'Pilot'),
-        isBot: p.isBot,
-        piecesInGoal: p.piecesInGoal,
-      }));
+    let players: ResultPlayer[] = toResultPlayers(viewRef.current.players);
 
     if (players.length === 0 && Array.isArray(seats) && seats.length > 0) {
       const SEAT_COLORS: PlayerColor[] = ['red', 'green', 'yellow', 'blue'];
@@ -813,7 +824,7 @@ export function Game() {
                     marginBottom: 10,
                   }}
                 >
-                  NO MATCH CREDENTIALS DETECTED
+                  {t('game.noMatchCredentials')}
                 </div>
                 <div
                   style={{
@@ -823,7 +834,7 @@ export function Game() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Please initialize or join a tactical Ludo arena from the Game Lobby first.
+                  {t('game.noMatchCredentialsHint')}
                 </div>
                 <button
                   className={RETRO_BTN}
@@ -856,7 +867,7 @@ export function Game() {
     const color = view.pauseTurnOwner ?? effectiveTurn;
     // First non-empty candidate wins; the colour name is the final fallback.
     const candidates = [localNames[color], pausedSeat?.displayName, pausedSeat?.username];
-    return candidates.find((name) => name) ?? color.toUpperCase();
+    return candidates.find((name) => name) ?? localizedColor(t, color);
   })();
   const activeHumanTurn = view.players.some(
     (p) => p.color === effectiveTurn && p.status === 'active' && !p.isBot,
@@ -888,7 +899,7 @@ export function Game() {
         ? t('game.pausedForReconnectTitle', { name: pausedOwnerName.toUpperCase() })
         : isMyTurn
           ? t('game.yourTurnShort').toUpperCase()
-          : `${effectiveTurn.toUpperCase()}'S TURN`;
+          : t('game.botTurn', { name: localizedColor(t, effectiveTurn) }).toUpperCase();
   const turnAccent =
     view.status === 'waiting' ? 'var(--accent-cyan)' : SEAT_HUES[effectiveTurn] || '#00f0ff';
 
@@ -996,7 +1007,9 @@ export function Game() {
                           ? t('game.statusRollNow')
                           : isMyTurn && view.turnPhase === 'WAITING_FOR_MOVE'
                             ? t('game.statusSelectPiece')
-                            : t('game.statusRivalTurn', { name: effectiveTurn.toUpperCase() }))}
+                            : t('game.statusRivalTurn', {
+                                name: localizedColor(t, effectiveTurn).toUpperCase(),
+                              }))}
               </div>
             </div>
 
@@ -1017,7 +1030,7 @@ export function Game() {
                     gap: 6,
                   }}
                   onClick={copyRoomCode}
-                  title="Click to copy Room Code"
+                  title={t('game.copyRoomCodeTooltip')}
                 >
                   {t('game.roomLabel', {
                     code: activeMatch.inviteCode,
@@ -1108,8 +1121,8 @@ export function Game() {
                       ) {
                         return null;
                       }
-                      // `ck === view.myColor` lags the server's seat assignment for a PvP joiner, so
-                      // fall back to a username match — that recognises the seat on first paint.
+                      // `ck === view.myColor` lags the server's seat assignment for a PvP joiner,
+                      // so fall back to a username match, which recognises the seat on first paint.
                       const isYou =
                         ck === view.myColor ||
                         (occupied && !!user?.username && playerMeta?.username === user.username);
@@ -1169,7 +1182,7 @@ export function Game() {
                         >
                           {occupied && playerMeta?.username ? (
                             <UserAvatar
-                              username={playerMeta.username}
+                              username={seatAvatarName(playerMeta)}
                               // The engine reports the seat's immutable id and whether it has a photo, so
                               // the client never asks for an image that is not there; `isBot` gates bot seats.
                               userId={playerMeta.userId}
@@ -1274,14 +1287,14 @@ export function Game() {
                                 background: `${colorAccent}18`,
                               }}
                             >
-                              CHOOSE
+                              {t('game.chooseBadge')}
                             </span>
                           ) : null}
                         </div>
                       );
                     }
 
-                    // Active game pilot card — only render participating pilots
+                    // Active game pilot card: only render participating pilots
                     if (!playerMeta || playerMeta.status === 'inactive') return null;
                     const isDisconnected = playerMeta.status === 'disconnected';
                     // An exited seat is shown as gone: it has no pieces left, but
@@ -1291,6 +1304,10 @@ export function Game() {
                     // as the pilot in control.
                     const isActiveSeat = isActive && !isOut;
                     const isHotseat = activeMatch.mode === 'hotseat';
+                    // Hotseat's local seats have no account, so the engine leaves
+                    // their userId undefined. Only the host's seat (the colour this
+                    // device joined with) can show a photo.
+                    const isHostSeat = isHotseat && ck === activeMatch.color;
                     const isYou = isHotseat
                       ? ck === view.myColor
                       : !playerMeta.isBot && playerMeta.username === user?.username;
@@ -1359,47 +1376,43 @@ export function Game() {
                           </span>
                         )}
 
-                        {!playerMeta.isBot && !isHotseat ? (
-                          <UserAvatar
-                            username={playerMeta.username}
-                            userId={playerMeta.userId}
-                            isBot={playerMeta.isBot}
-                            hasAvatarPhoto={playerMeta.hasAvatarPhoto ?? false}
-                            avatarStyle={playerMeta.avatarStyle}
-                            size={36}
-                            fallbackStyle={{
-                              width: 36,
-                              height: 36,
-                              flex: 'none',
-                              borderRadius: 4,
-                              display: 'grid',
-                              placeItems: 'center',
-                              fontWeight: 'bold',
-                              fontSize: '0.8rem',
-                              color: '#0d0221',
-                              background: colorAccent,
-                            }}
-                            style={{ borderRadius: 4, border: `1.5px solid ${colorAccent}` }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              flex: 'none',
-                              borderRadius: 4,
-                              display: 'grid',
-                              placeItems: 'center',
-                              fontWeight: 'bold',
-                              fontSize: '0.75rem',
-                              color: '#0d0221',
-                              background: colorAccent,
-                              border: `1.5px solid ${colorAccent}`,
-                            }}
-                          >
-                            {name.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
+                        {/* Every seat renders an avatar. A bot has no account, so it takes
+                            the generated avatar seeded from the lobby's assistant name, and
+                            only the host's seat can show an uploaded photo. */}
+                        <UserAvatar
+                          // The host's seat uses the account identity, so the navbar
+                          // and this card share one DiceBear seed. Other local seats
+                          // seed from the name typed in the lobby.
+                          username={
+                            isHostSeat
+                              ? (user?.username ?? playerMeta.username)
+                              : seatAvatarName(playerMeta)
+                          }
+                          userId={isHostSeat ? user?.id : playerMeta.userId}
+                          isBot={playerMeta.isBot}
+                          hasAvatarPhoto={
+                            isHostSeat
+                              ? (user?.hasAvatarPhoto ?? false)
+                              : (playerMeta.hasAvatarPhoto ?? false)
+                          }
+                          avatarStyle={
+                            isHostSeat ? (user?.avatarStyle ?? null) : playerMeta.avatarStyle
+                          }
+                          size={36}
+                          fallbackStyle={{
+                            width: 36,
+                            height: 36,
+                            flex: 'none',
+                            borderRadius: 4,
+                            display: 'grid',
+                            placeItems: 'center',
+                            fontWeight: 'bold',
+                            fontSize: '0.8rem',
+                            color: '#0d0221',
+                            background: colorAccent,
+                          }}
+                          style={{ borderRadius: 4, border: `1.5px solid ${colorAccent}` }}
+                        />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
@@ -1848,14 +1861,11 @@ export function Game() {
                       const activeTurnPlayer = view.players.find((p) => p.color === effectiveTurn);
                       const isBot = activeTurnPlayer?.isBot ?? false;
                       const activeName =
-                        (
-                          localizedBotName(t, activeTurnPlayer?.displayName) ||
-                          localizedBotName(t, activeTurnPlayer?.username) ||
-                          (activeTurnPlayer?.color ?? '')
-                        ).toUpperCase() ||
+                        localizedBotName(t, activeTurnPlayer?.displayName) ||
+                        localizedBotName(t, activeTurnPlayer?.username) ||
                         (isBot
-                          ? `AI BOT (${effectiveTurn.toUpperCase()})`
-                          : effectiveTurn.toUpperCase());
+                          ? `${t('common.bot')} (${localizedColor(t, effectiveTurn)})`
+                          : localizedColor(t, effectiveTurn));
                       const turnColorHex = SEAT_HUES[effectiveTurn] || '#00f0ff';
 
                       return (
@@ -1900,7 +1910,9 @@ export function Game() {
                           ? t('game.statusRollNow')
                           : view.turnPhase === 'WAITING_FOR_MOVE'
                             ? t('game.statusSelectPiece')
-                            : t('game.statusRivalTurn', { name: effectiveTurn.toUpperCase() })}
+                            : t('game.statusRivalTurn', {
+                                name: localizedColor(t, effectiveTurn).toUpperCase(),
+                              })}
                     </div>
 
                     <div style={{ height: 90, display: 'grid', placeItems: 'center' }}>
@@ -2057,7 +2069,7 @@ export function Game() {
                     boxSizing: 'border-box',
                     transition: 'all 0.2s ease',
                   }}
-                  title="Return to Ludo Lobby"
+                  title={t('game.returnToLobbyTooltip')}
                 >
                   &lt; {t('game.returnToLobbyBtn')}
                 </button>
@@ -2090,7 +2102,9 @@ export function Game() {
         isOpen={isAbortModalOpen}
         title={t('gameExtra.protocolTerminationTitle')}
         versionTag={
-          activeMatch.gameId ? `ARENA.${activeMatch.gameId.slice(0, 8)}` : 'v001.e1349837856'
+          activeMatch.gameId
+            ? t('gameExtra.abortVersionTag', { code: activeMatch.gameId.slice(0, 8) })
+            : 'v001.e1349837856'
         }
         message={
           activeMatch.mode === 'pve' || activeMatch.mode === 'hotseat'
@@ -2115,7 +2129,7 @@ export function Game() {
         isOpen={isSystemModalOpen}
         title={t('gameExtra.rulesModalTitle')}
         versionTag={t('gameExtra.rulesVersionTag')}
-        cancelLabel={t('gameExtra.closeBtn')}
+        cancelLabel={t('common.close')}
         proceedLabel={rulesPage < 5 ? t('gameExtra.nextPageBtn') : t('gameExtra.startPlayingBtn')}
         cancelShortcut="ESC"
         proceedShortcut={rulesPage < 5 ? '→' : '↵'}

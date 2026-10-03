@@ -18,6 +18,8 @@ export type AuthUser = {
   username: string;
   displayName?: string;
   email?: string | null;
+  emailVerified?: boolean;
+  pendingEmail?: string | null;
   twoFactorEnabled?: boolean;
   avatarStyle?: string | null;
   hasAvatarPhoto?: boolean;
@@ -72,7 +74,7 @@ const PRESENCE_HEARTBEAT_MS = 20_000;
 // Refresh 1 minute early: access tokens expire at 15 minutes, so this keeps
 // the heartbeat off an expired token (see the store docs).
 const ACCESS_TOKEN_REFRESH_MS = 14 * 60 * 1000;
-/** settingOn/toggleSetting key for "show the rules popup when a match starts" — read by Lobby's Rules button and Game.tsx. */
+/** settingOn/toggleSetting key for "show the rules popup when a match starts": read by Lobby's Rules button and Game.tsx. */
 export const RULES_ON_START_KEY = 'rulesShowOnStart';
 /** Defaults for the settings toggles, keyed "<group>-<row>". */
 export const SETTING_DEFAULTS: Record<string, boolean> = {
@@ -85,7 +87,7 @@ export const SETTING_DEFAULTS: Record<string, boolean> = {
   '2-1': false, // Weekly recap
 };
 
-/** Credentials returned by POST /api/match/create — stored in context so Game page can connect to the engine. */
+/** Credentials returned by POST /api/match/create: stored in context so Game page can connect to the engine. */
 export type ActiveMatch = {
   gameId: string;
   token: string;
@@ -104,14 +106,26 @@ function storedActiveMatch(): ActiveMatch {
   }
 }
 
-/** Snapshot of a finished match's outcome — set from Game.tsx's `game_ended` handler so Results.tsx can render real data instead of mock podium rows. */
+/** One invoice row: a seat plus the avatar facts the engine's roster reported for it.
+ *  Bots, hotseat seats and the lobby-seat fallback have no account, so they carry none. */
+export type ResultPlayer = {
+  color: PlayerColor;
+  username: string;
+  isBot: boolean;
+  piecesInGoal: number;
+  userId?: string;
+  hasAvatarPhoto?: boolean;
+  avatarStyle?: string | null;
+};
+
+/** Snapshot of a finished match's outcome: set from Game.tsx's `game_ended` handler so Results.tsx can render real data instead of mock podium rows. */
 export type LastResult = {
   winner: PlayerColor;
   resultDetail: string;
   mode: 'pvp' | 'pve' | 'hotseat';
   playerCount: number;
-  players: Array<{ color: PlayerColor; username: string; isBot: boolean; piecesInGoal: number }>;
-  /** True when the match was abandoned/expired — a different Results card (no winner/podium). */
+  players: ResultPlayer[];
+  /** True when the match was abandoned/expired: a different Results card (no winner/podium). */
   abandoned?: boolean;
 } | null;
 
@@ -124,15 +138,23 @@ type AppState = {
   login: (
     identifier: string,
     password: string,
-  ) => Promise<{ error?: string; pendingToken?: string }>;
-  /** Success = null (verification email sent — no session yet); failure = message. */
-  register: (username: string, password: string, email: string) => Promise<string | null>;
+  ) => Promise<{ error?: string; pendingToken?: string; notVerified?: boolean }>;
+  /** Success = { username } (verification email sent, no session yet); failure = { error }. */
+  register: (
+    username: string,
+    password: string,
+    email: string,
+  ) => Promise<{ error?: string; username?: string }>;
   /** Factor two. Success = null (session cookie set, user in store); failure = message. */
   verify2fa: (pendingToken: string, code: string) => Promise<string | null>;
-  /** Emails a reset link. Always resolves null (generic response — no account enumeration). */
+  /** Re-issues the login code for a live 2FA challenge. Success = null. */
+  resend2fa: (pendingToken: string) => Promise<string | null>;
+  /** Emails a reset link. Always resolves null (generic response: no account enumeration). */
   forgotPassword: (email: string) => Promise<string | null>;
   /** Redeems a reset token and sets a new password. Success = null; failure = message. */
   resetPassword: (token: string, password: string) => Promise<string | null>;
+  /** Resends a signup verification link (public). Success = null. */
+  resendVerification: (email: string) => Promise<string | null>;
   logout: () => Promise<void>;
   playerCount: PlayerCount;
   seats: Seat[];
@@ -146,7 +168,7 @@ type AppState = {
   addPlayer: (i: number) => void;
   removePlayer: (i: number) => void;
   renamePlayer: (i: number, name: string) => void;
-  /** Clears every seat but the host — call when entering the sub-lobby so a fresh room never inherits bots/players from a previous session. */
+  /** Clears every seat but the host: call when entering the sub-lobby so a fresh room never inherits bots/players from a previous session. */
   resetSeats: () => void;
   /** Fills remaining empty seats with Easy bots. Returns false when no bot is seated yet. */
   startGame: () => boolean;
@@ -190,7 +212,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    // '/', '/login' and '/signup' skip the /api/auth/me probe — a guest here must
+    // '/', '/login' and '/signup' skip the /api/auth/me probe: a guest here must
     // not fire a 401 that the browser logs. Other paths still probe.
     const path = window.location.pathname;
     const publicRoutes = new Set([
@@ -221,7 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          // 429/5xx — retry, honouring Retry-After when the server sends one.
+          // 429/5xx: retry, honouring Retry-After when the server sends one.
           const retryAfter = Number(res.headers.get('Retry-After'));
           const waitMs =
             Number.isFinite(retryAfter) && retryAfter > 0
@@ -230,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await new Promise((r) => setTimeout(r, waitMs));
         } catch {
           if (cancelled) return;
-          // Network error — also not a logout. Back off and try again.
+          // Network error: also not a logout. Back off and try again.
           await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
         }
       }
@@ -248,13 +270,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Login — factor one. Password OK means a code was emailed; the session
+  // Login: factor one. Password OK means a code was emailed; the session
   // itself only exists after verify2fa succeeds.
   const login = useCallback(
     async (
       identifier: string,
       password: string,
-    ): Promise<{ error?: string; pendingToken?: string }> => {
+    ): Promise<{ error?: string; pendingToken?: string; notVerified?: boolean }> => {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -267,10 +289,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // A notice carries a code but no session: the address is not verified
       // yet. Sent as 200, so the browser logs no error for it.
       if (data.code === 'AUTH_EMAIL_NOT_VERIFIED') {
-        return { error: apiError(data, i18n.t('auth.loginFailed')) };
+        return { error: apiError(data, i18n.t('auth.loginFailed')), notVerified: true };
       }
       // 2FA off: the backend already set the session cookies, so there's no
-      // code step — record the user and let the caller route straight home.
+      // code step: record the user and let the caller route straight home.
       if (!data.twoFactorRequired) {
         setUser(data.user);
         return {};
@@ -281,23 +303,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Register — no session on signup; the account activates via the emailed
+  // Register: no session on signup; the account activates via the emailed
   // verification link, then the user logs in normally.
   const register = useCallback(
-    async (username: string, password: string, email: string): Promise<string | null> => {
+    async (
+      username: string,
+      password: string,
+      email: string,
+    ): Promise<{ error?: string; username?: string }> => {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, email }),
+        body: JSON.stringify({ username, password, email, language: i18n.language }),
       }).catch(() => null);
-      if (!res) return i18n.t('common.couldNotReachServer');
-      if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.signupFailed'));
-      return null;
+      if (!res) return { error: i18n.t('common.couldNotReachServer') };
+      if (!res.ok)
+        return { error: apiError(await res.json().catch(() => null), i18n.t('auth.signupFailed')) };
+      const data = (await res.json().catch(() => null)) as { username?: string } | null;
+      return { username: data?.username };
     },
     [],
   );
 
-  // Factor two — a correct emailed code buys the actual session cookie.
+  // Factor two: a correct emailed code buys the actual session cookie.
   const verify2fa = useCallback(
     async (pendingToken: string, code: string): Promise<string | null> => {
       const res = await fetch('/api/auth/2fa/verify', {
@@ -313,7 +341,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Forgot password — asks the backend to email a reset link. The response is
+  // Re-issue the 2FA login code for a live challenge. Success = null.
+  const resend2fa = useCallback(async (pendingToken: string): Promise<string | null> => {
+    const res = await fetch('/api/auth/2fa/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pendingToken }),
+    }).catch(() => null);
+    if (!res) return i18n.t('common.couldNotReachServer');
+    if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.codeRejected'));
+    return null;
+  }, []);
+
+  // Forgot password: asks the backend to email a reset link. The response is
   // deliberately generic, so this always resolves null (never reveals whether
   // the address exists). A network failure still surfaces as a message.
   const forgotPassword = useCallback(async (email: string): Promise<string | null> => {
@@ -327,7 +367,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
-  // Reset password — redeems the emailed token and sets the new password.
+  // Reset password: redeems the emailed token and sets the new password.
   const resetPassword = useCallback(
     async (token: string, password: string): Promise<string | null> => {
       const res = await fetch('/api/auth/reset-password', {
@@ -342,10 +382,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // Resend a signup verification link (public endpoint; generic response).
+  const resendVerification = useCallback(async (email: string): Promise<string | null> => {
+    const res = await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => null);
+    if (!res) return i18n.t('common.couldNotReachServer');
+    if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.forgotFailed'));
+    return null;
+  }, []);
+
   // Logout
   const logout = useCallback(async () => {
     // Clears presence immediately, before the auth cookie needed to identify
-    // the request is gone — otherwise the account reads "online" for up to
+    // the request is gone: otherwise the account reads "online" for up to
     // the heartbeat TTL after signing out.
     await fetch('/api/presence/heartbeat', { method: 'DELETE', credentials: 'include' }).catch(
       () => undefined,
@@ -355,7 +407,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTwoFactor(false);
   }, []);
 
-  // Presence — a ref (not state) because it only drives an outgoing request,
+  // Presence: a ref (not state) because it only drives an outgoing request,
   // never a render; Game.tsx flips it on mount/unmount via setPlaying.
   const playingRef = useRef(false);
   const sendPresenceHeartbeat = useCallback((playing: boolean) => {
@@ -419,15 +471,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [twoFactor, setTwoFactor] = useState(false);
   const rollingRef = useRef(false);
 
-  // Persist account prefs; swap this for PATCH /api/user/me once the backend lands.
-  const setLang = useCallback((l: Lang) => {
-    setLangState(l);
-    localStorage.setItem(LANG_KEY, l);
-    document.documentElement.lang = l;
-    void i18n.changeLanguage(l);
-  }, []);
+  // Persist the language locally, and (when signed in) on the account so
+  // transactional email is sent in the user's language.
+  const setLang = useCallback(
+    (l: Lang) => {
+      setLangState(l);
+      localStorage.setItem(LANG_KEY, l);
+      document.documentElement.lang = l;
+      void i18n.changeLanguage(l);
+      if (user) {
+        void apiFetch('/api/auth/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ language: l }),
+        }).catch(() => undefined);
+      }
+    },
+    [user],
+  );
 
-  // Load the account's real 2FA preference once signed in — GET /api/auth/2fa.
+  // Load the account's real 2FA preference once signed in: GET /api/auth/2fa.
   useEffect(() => {
     if (!user) return;
     apiFetch('/api/auth/2fa')
@@ -579,6 +642,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       verify2fa,
       forgotPassword,
       resetPassword,
+      resendVerification,
+      resend2fa,
       logout,
       theme,
       setTheme,
@@ -619,6 +684,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       verify2fa,
       forgotPassword,
       resetPassword,
+      resendVerification,
+      resend2fa,
       logout,
       theme,
       setTheme,

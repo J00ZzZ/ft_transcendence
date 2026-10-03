@@ -355,6 +355,39 @@ export function Profile() {
 
           {/* Main Content Flow */}
           <div className="sticky top-8 w-full min-w-0 flex-1" style={{ margin: 0, padding: 0 }}>
+            {/* One-shot notice after an emailed email-change link is redeemed. */}
+            {query.get('emailChanged') === '1' && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--accent-cyan)',
+                  color: 'var(--accent-cyan)',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '0.82rem',
+                  textAlign: 'center',
+                }}
+              >
+                {t('profileEdit.emailChangedNotice')}
+              </div>
+            )}
+            {query.get('error') === 'email-taken' && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ff0055',
+                  color: '#ff0055',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '0.82rem',
+                  textAlign: 'center',
+                }}
+              >
+                {t('profileEdit.emailTaken')}
+              </div>
+            )}
             {/* Top Hero Banner */}
             <header
               className={HERO_SECTION}
@@ -417,7 +450,7 @@ export function Profile() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '10px 18px',
-                    fontSize: '0.85rem',
+                    fontSize: 'calc(0.85rem + 2pt)',
                     flexShrink: 0,
                   }}
                 >
@@ -433,8 +466,8 @@ export function Profile() {
                   >
                     <span>
                       {t('profile.windowHeader', {
-                        username: (profile.displayName ?? profile.username).toUpperCase(),
-                        id: profile.id.slice(0, 8).toUpperCase(),
+                        name: (profile.displayName ?? profile.username).toUpperCase(),
+                        username: profile.username,
                       })}
                     </span>
                   </div>
@@ -819,7 +852,7 @@ export function Profile() {
                             fontFamily: 'var(--font-display)',
                           }}
                         >
-                          CURRENT ELO
+                          {t('profile.currentElo')}
                         </div>
                       </div>
                     </div>
@@ -882,7 +915,7 @@ export function Profile() {
                             fontFamily: 'var(--font-display)',
                           }}
                         >
-                          PEAK RECORD
+                          {t('profile.peakRecord')}
                         </div>
                       </div>
                     </div>
@@ -1192,7 +1225,7 @@ export function Profile() {
                           }}
                         >
                           {mainTab === 'history'
-                            ? t('profile.cyberLudoTelemetry')
+                            ? t('profile.retroLudoTelemetry')
                             : t('profile.synchronizedPercent', { percent: achievementPercent })}
                         </div>
                       </div>

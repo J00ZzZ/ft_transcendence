@@ -2,12 +2,12 @@
 
 ## Table of Contents
 
-- [Overview](#overview) — React Context global state: authentication, game setup, settings
-- [Files](#files) — Source file inventory
-- [Key Types / Interfaces](#key-types--interfaces) — AuthUser, Seat, PlayerCount, Lang, ActiveMatch, LastResult, AppState
-- [Core Logic / Flow](#core-logic--flow) — Mermaid sequence diagrams for the authentication lifecycle and game setup
-- [Logic Paths Summary](#logic-paths-summary) — Decision trees for authentication and game state changes
-- [Dependencies](#dependencies) — Internal and external dependencies
+- [Overview](#overview): React Context global state: authentication, game setup, settings
+- [Files](#files): Source file inventory
+- [Key Types / Interfaces](#key-types--interfaces): AuthUser, Seat, PlayerCount, Lang, ActiveMatch, LastResult, AppState
+- [Core Logic / Flow](#core-logic--flow): Mermaid sequence diagrams for the authentication lifecycle and game setup
+- [Logic Paths Summary](#logic-paths-summary): Decision trees for authentication and game state changes
+- [Dependencies](#dependencies): Internal and external dependencies
 
 
 ---
@@ -18,12 +18,12 @@
 
 The store is one React Context provider (`AppProvider`) that holds all global UI (user interface) state. It has:
 
-1. **Authentication session** — the `user` object, the `authReady` flag, and the `login`, `register` and `logout` actions.
-2. **Game setup state** — `playerCount` (2-4), the `seats` array (you/bot/player/empty), `dice`, `rolling` and `turn`.
-3. **Settings** — on/off switches (sound, music, auto-roll and others), each with a string key and a default value.
-4. **Real-time match** — `activeMatch` (the engine credentials from `POST /api/match/create`) and `lastResult` (the finished-match data for the Results view).
-5. **Helpers** — `addBot`, `removeBot`, `addPlayer`, `removePlayer`, `startGame`, `roll`, `endTurn`, `settingOn`, `toggleSetting`.
-6. **Session keep-alive** — a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is still waiting for a response. This is the **client → server** direction only, and it shows that the browser session is still active; keeping the notification SSE stream alive runs the other way and is handled server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
+1. **Authentication session**: the `user` object, the `authReady` flag, and the `login`, `register` and `logout` actions.
+2. **Game setup state**: `playerCount` (2-4), the `seats` array (you/bot/player/empty), `dice`, `rolling` and `turn`.
+3. **Settings**: on/off switches (sound, music, auto-roll and others), each with a string key and a default value.
+4. **Real-time match**: `activeMatch` (the engine credentials from `POST /api/match/create`) and `lastResult` (the finished-match data for the `ResultsModal` overlay).
+5. **Helpers**: `addBot`, `removeBot`, `addPlayer`, `removePlayer`, `startGame`, `roll`, `endTurn`, `settingOn`, `toggleSetting`.
+6. **Session keep-alive**: a presence heartbeat every 20 seconds (`PRESENCE_HEARTBEAT_MS` / `sendPresenceHeartbeat()`) while signed in, plus a `/api/auth/refresh` call every 14 minutes, so the 15-minute access token never expires while a request is still waiting for a response. This is the **client → server** direction only, and it shows that the browser session is still active; keeping the notification SSE stream alive runs the other way and is handled server-side (`SSE_HEARTBEAT_MS`). See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
 
 ---
@@ -91,12 +91,22 @@ export type ActiveMatch = {
   playerCount: number  // How many players
 } | null
 
+export type ResultPlayer = {
+  color: PlayerColor  // Seat color
+  username: string  // Seat label: display name or hotseat name; for a bot the raw "bot-<color> (<assistant>)" label, localized for display and used as the avatar seed
+  isBot: boolean  // Whether it is a bot
+  piecesInGoal: number  // Pieces finished (0-4)
+  userId?: string  // Immutable account id: absent for bots and hotseat's local seats, except the host's own row, which Game.tsx stamps with the store's /me id
+  hasAvatarPhoto?: boolean  // Engine roster snapshot, or the store's /me flag on the host's hotseat row: a photo was known to exist
+  avatarStyle?: string | null  // DiceBear style that seat chose
+}
+
 export type LastResult = {
   winner: PlayerColor  // Winning color
   resultDetail: string  // How the game ended
   mode: 'pvp' | 'pve' | 'hotseat'  // Game mode
   playerCount: number  // How many players
-  players: Array<{ color: PlayerColor; username: string; isBot: boolean; piecesInGoal: number }>  // List of players
+  players: ResultPlayer[]  // List of players
   abandoned?: boolean  // Whether the game was abandoned
 } | null
 ```
@@ -108,11 +118,13 @@ type AppState = {
   user: AuthUser | null  // The logged-in user
   authReady: boolean  // Whether the sign-in state has loaded
   // Auth actions
-  login: (identifier: string, password: string) => Promise<{ error?: string; pendingToken?: string }>  // Logs the user in
-  register: (username: string, password: string, email: string) => Promise<string | null>  // Creates a new account
+  login: (identifier: string, password: string) => Promise<{ error?: string; pendingToken?: string; notVerified?: boolean }>  // Logs the user in
+  register: (username: string, password: string, email: string) => Promise<{ error?: string; username?: string }>  // Creates a new account; success returns the assigned username
   verify2fa: (pendingToken: string, code: string) => Promise<string | null>  // Checks the 2FA code
+  resend2fa: (pendingToken: string) => Promise<string | null>  // Re-issues the login code for a live 2FA challenge
   forgotPassword: (email: string) => Promise<string | null>  // Requests a password reset
   resetPassword: (token: string, password: string) => Promise<string | null>  // Sets a new password
+  resendVerification: (email: string) => Promise<string | null>  // Resends a signup verification link
   logout: () => Promise<void>  // Logs the user out
   // 2FA preference
   twoFactor: boolean  // Whether 2FA is on
@@ -263,8 +275,8 @@ login(identifier, password)
 
 register(username, password, email)
   └── POST /api/auth/register
-       ├── 200 → return null (no session; the account activates via the emailed link)
-       └── error → return the message
+       ├── 200 → return { username } (the assigned username; no session; the account activates via the emailed link)
+       └── error → return { error }
 
 logout()
   └── POST /api/auth/logout → setUser(null)
@@ -295,6 +307,10 @@ endTurn()
   └── setTurn((t + 1) % playerCount)
 ```
 
+The names a bot seat shows come from `BOT_POOL`. `Lobby.tsx` sends the same names
+to the backend as `botNames`, and they come back on each seat as `displayName`
+(`bot-<color> (<assistant>)`); the in-game client translates only the colour word.
+
 ### Settings Path
 ```
 settingOn(key)
@@ -309,7 +325,7 @@ toggleSetting(key)
 ---
 
 
-## `api.ts` — Refresh and Retry
+## `api.ts`: Refresh and Retry
 
 `apiFetch(url, init)` handles every authenticated call:
 
@@ -329,7 +345,7 @@ toggleSetting(key)
 
 | Dependency | Purpose |
 |-----------|---------|
-| `theme.ts` | `BOT_POOL` for bot seat names |
+| `theme.ts` | `BOT_POOL` for bot seat names (sent as `botNames`, shown as the seat's `displayName`) |
 | `i18n.ts` | `i18n.changeLanguage` and `i18n.t` for default player names |
 | `api.ts` | `apiFetch` (refresh-and-retry), `refreshOnce` (called on the store's 14-minute timer, before the access token expires), and `translateErrorCode`, which turns an error code into text in the user's language |
 | `game/types.ts` | `PlayerColor` for `ActiveMatch` |

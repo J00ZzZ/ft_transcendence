@@ -39,7 +39,7 @@ the same step of accepting the browser certificate warning as in local mode.
 | Variable | Required | Notes |
 |---|---|---|
 | `LAN_IP` | no | Auto-detected from `en0`/`en1` (macOS) or the default route (Linux) if unset |
-| `HTTPS_PORT` | no | Default `8443` — used in the printed URL; the actual nginx port mapping in `compose.yaml` is hardcoded to `8443:443` regardless of this value |
+| `HTTPS_PORT` | yes | Default `8443`, required by `make env`, used in the printed URL; the actual nginx port mapping in `compose.yaml` is hardcoded to `8443:443` regardless of this value |
 | `FRONTEND_URL` | yes | Default `https://localhost:8443` — used by OAuth post-login redirects, not LAN routing itself (LAN clients use the same nginx origin they typed) |
 
 ## Known caveat

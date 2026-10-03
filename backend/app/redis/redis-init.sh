@@ -20,13 +20,18 @@ dbfilename dump.rdb
 dir /data
 maxmemory 256mb
 maxmemory-policy allkeys-lru
+# Keyevent + expired notifications: MailService
+# (backend/src/auth/mail.service.ts) subscribes to __keyevent@0__:expired to
+# email the "your email change lapsed" notice. `Ex` is the minimum needed; 
+# it keeps pub/sub overhead negligible (Redis reports the flags reordered, as "xE").
+notify-keyspace-events Ex
 EOF
 
   echo "🚀 Starting Redis with authentication..."
 
   # Use requirepass instead of ACL (simpler, works in Redis 7)
-  exec redis-server /tmp/redis.conf --requirepass "${REDIS_PASSWORD}" "$@"
+  exec redis-server /tmp/redis.conf --requirepass "${REDIS_PASSWORD}" --notify-keyspace-events Ex "$@"
 else
   echo "⚠️  No Redis password set, starting without auth (NOT recommended for production)"
-  exec redis-server "$@"
+  exec redis-server --notify-keyspace-events Ex "$@"
 fi

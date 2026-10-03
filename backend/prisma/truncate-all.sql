@@ -1,5 +1,5 @@
 -- Wipes row data from every table in `public` while leaving the schema intact.
--- Unlike drop-all.sql this needs no `db push` afterwards — only a reseed.
+-- Unlike drop-all.sql this needs no `db push` afterwards: only a reseed.
 -- `_prisma_migrations` is skipped so Prisma still considers the DB migrated.
 DO $$
 DECLARE

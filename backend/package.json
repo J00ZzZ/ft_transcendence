@@ -8,11 +8,11 @@
     "start": "node dist/main.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma db push",
-    "db:migrate:snapshot": "bash scripts/migrate-snapshot.sh",
     "db:fresh": "prisma db execute --file ./prisma/drop-all.sql",
     "db:truncate": "prisma db execute --file ./prisma/truncate-all.sql",
     "db:seed": "prisma generate && prisma db seed",
-    "db:reset": "npm run db:truncate && npm run db:seed"
+    "db:reset": "npm run db:truncate && npm run db:seed",
+    "db:fix-human-wins": "prisma db execute --file ./prisma/fix-human-wins.sql"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -20,7 +20,6 @@
     "@nestjs/jwt": "^10.0.0",
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
-    "@nestjs/schedule": "^3.0.0",
     "@nestjs/serve-static": "^4.0.0",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.8.0",

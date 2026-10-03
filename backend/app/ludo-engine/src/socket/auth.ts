@@ -8,17 +8,21 @@ export function isBotUserId(userId: string | undefined): boolean {
   return !!userId && userId.startsWith(BOT_PREFIX);
 }
 
-// JWT verification for engine tokens minted by the backend. Checks the
-// HS256 signature against JWT_SECRET (constant-time), and honours expiry :
-// forged or unsigned tokens are rejected.
-function requireJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
+// Audience carried by every engine match token. A token without it is rejected,
+// so a session access token can never be used here.
+export const ENGINE_TOKEN_AUDIENCE = 'ludo-engine';
+
+// Reads the engine-dedicated signing secret. Throws when it is not configured.
+function requireEngineJwtSecret(): string {
+  const secret = process.env.ENGINE_JWT_SECRET;
   if (!secret) {
-    throw new Error('JWT_SECRET is not set : engine cannot verify tokens');
+    throw new Error('ENGINE_JWT_SECRET is not set : engine cannot verify tokens');
   }
   return secret;
 }
 
+// Verifies a handshake match token: accepts only HS256, checks the signature
+// against ENGINE_JWT_SECRET, requires the engine audience, and honours expiry.
 export function verifyToken(token: string): {
   gameId: string;
   userId: string;
@@ -33,13 +37,13 @@ export function verifyToken(token: string): {
     if (parts.length !== 3) return null;
     const [encHeader, encPayload, encSignature] = parts;
 
-    // 1. Only accept HS256 : an attacker must not be able to pick "none".
+    // 1. Only accept HS256, so an unsigned token is never considered.
     const header = JSON.parse(Buffer.from(encHeader, 'base64url').toString('utf-8'));
     if (header.alg !== 'HS256') return null;
 
-    // 2. Recompute the signature over the exact signing input and compare in
-    //    constant time (a plain === leaks bytes through timing).
-    const expected = createHmac('sha256', requireJwtSecret())
+    // 2. Recompute the signature over the exact signing input and compare it in
+    //    constant time rather than with a plain equality check.
+    const expected = createHmac('sha256', requireEngineJwtSecret())
       .update(`${encHeader}.${encPayload}`)
       .digest();
     const provided = Buffer.from(encSignature, 'base64url');
@@ -48,7 +52,11 @@ export function verifyToken(token: string): {
 
     const payload = JSON.parse(Buffer.from(encPayload, 'base64url').toString('utf-8'));
 
-    // 3. Honour expiry : the backend signs these with expiresIn '24h'.
+    // 3. Reject tokens not addressed to this service: only a match token with
+    //    the engine audience is accepted.
+    if (payload.aud !== ENGINE_TOKEN_AUDIENCE) return null;
+
+    // 4. Reject an expired token.
     if (typeof payload.exp === 'number' && Date.now() >= payload.exp * 1000) return null;
 
     return {
@@ -73,6 +81,10 @@ export function verifyToken(token: string): {
 // Data stored on each connected socket
 export interface SocketData {
   gameId?: string;
+  // Match id as issued by the backend in the JWT : authoritative and never
+  // cleared. join_game is pinned to this so a client-supplied gameId can never
+  // redirect a seat to another game.
+  tokenGameId?: string;
   playerColor?: PlayerColor;
   // Seat colour as issued by the backend in the JWT : authoritative.
   tokenColor?: PlayerColor;

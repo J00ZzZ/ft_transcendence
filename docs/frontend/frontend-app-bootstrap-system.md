@@ -66,7 +66,6 @@ const FULL_ROUTES: Record<string, () => ReactNode> = {
   '/game': () => <Game />,
   '/privacy': () => <LegalPage initialDoc="privacy" />,
   '/terms': () => <LegalPage initialDoc="terms" />,
-  // '/results': () => <Results />,
 }
 
 /** Public routes, can be reached without a session */
@@ -89,11 +88,13 @@ type AppState = {
   user: AuthUser | null  // The logged-in user
   authReady: boolean  // Whether the sign-in state has loaded
   // Auth actions
-  login: (identifier: string, password: string) => Promise<{ error?: string; pendingToken?: string }>  // Logs the user in
-  register: (username: string, password: string, email: string) => Promise<string | null>  // Creates a new account
+  login: (identifier: string, password: string) => Promise<{ error?: string; pendingToken?: string; notVerified?: boolean }>  // Logs the user in
+  register: (username: string, password: string, email: string) => Promise<{ error?: string; username?: string }>  // Creates a new account; success returns the assigned username
   verify2fa: (pendingToken: string, code: string) => Promise<string | null>  // Checks the 2FA code
+  resend2fa: (pendingToken: string) => Promise<string | null>  // Re-issues the login code for a live 2FA challenge
   forgotPassword: (email: string) => Promise<string | null>  // Requests a password reset
   resetPassword: (token: string, password: string) => Promise<string | null>  // Sets a new password
+  resendVerification: (email: string) => Promise<string | null>  // Resends a signup verification link
   logout: () => Promise<void>  // Logs the user out
   // 2FA preference
   twoFactor: boolean  // Whether 2FA is on
@@ -120,7 +121,7 @@ type AppState = {
   // Real-time match
   activeMatch: ActiveMatch | null   // from POST /api/match/create
   setActiveMatch: (m: ActiveMatch | null) => void  // Updates the current match
-  lastResult: LastResult | null     // finished-match data for the Results view
+  lastResult: LastResult | null     // finished-match data for the ResultsModal overlay
   setLastResult: (r: LastResult | null) => void  // Saves finished match results
   // Theme
   theme: ThemeType  // Current theme (synthwave, persisted as retro_theme)
@@ -225,4 +226,4 @@ Account-action arrivals (`?verified=...`, `?reset=...`, `?error=...`, `?token=..
 |-----------|---------|
 | `store.tsx` | `AppProvider`, `useApp`, `AuthUser`, all auth and game actions |
 | `router.tsx` | `useRoute`, `navigate` |
-| full-screen pages | `Home`, `Leaderboard`, `Friends`, `Profile`, `Login`, `Signup`, `TwoFactor`, `ForgotPassword`, `ResetPassword`, `LudoLobby`, `Lobby`, `Game`, `Results` |
+| full-screen pages | `Home`, `Leaderboard`, `Friends`, `Profile`, `Login`, `Signup`, `TwoFactor`, `ForgotPassword`, `ResetPassword`, `LudoLobby`, `Lobby`, `Game` (results render inside `Game` as `ResultsModal`, not as a route) |

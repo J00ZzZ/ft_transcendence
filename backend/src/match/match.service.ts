@@ -23,9 +23,18 @@ export class MatchService {
     playerCount: number,
     botCount: number,
     botColors?: string[],
+    botNames?: string[],
     seatColors?: string[],
   ) {
-    return this.creator.createMatch(userId, mode, playerCount, botCount, botColors, seatColors);
+    return this.creator.createMatch(
+      userId,
+      mode,
+      playerCount,
+      botCount,
+      botColors,
+      botNames,
+      seatColors,
+    );
   }
   async createInvite(userId: string) {
     return this.creator.createInvite(userId);
@@ -70,8 +79,8 @@ export class MatchService {
   }
 
   // Queries
-  async listOpenRooms() {
-    return this.query.listOpenRooms();
+  async listOpenRooms(viewerId?: string) {
+    return this.query.listOpenRooms(viewerId);
   }
   async listMyRooms(userId: string) {
     return this.query.listMyRooms(userId);

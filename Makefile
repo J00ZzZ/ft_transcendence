@@ -1,7 +1,7 @@
 COMPOSE_FILE   = compose.yaml
 
 env_get = $(shell grep -m1 '^$(1)=' .env 2>/dev/null | cut -d= -f2-)
-NGROK_PORT    := $(or $(call env_get,NGROK_PORT),8443)
+NGROK_PORT    := $(or $(call env_get,NGROK_PORT),8444)
 NGROK_DOMAIN  := $(call env_get,NGROK_DOMAIN)
 HTTPS_PORT    := $(or $(call env_get,HTTPS_PORT),8443)
 NGROK_FLAGS    = $(if $(NGROK_DOMAIN),--url=https://$(NGROK_DOMAIN),)
@@ -14,12 +14,14 @@ OAUTH_VARS     = GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL \
 # are what `make tunnel` needs. Required by the preflight below.
 TUNNEL_VARS    = NGROK_AUTHTOKEN NGROK_DOMAIN NGROK_FRONTEND_URL \
                  NGROK_GOOGLE_CALLBACK_URL NGROK_GITHUB_CALLBACK_URL NGROK_FORTYTWO_CALLBACK_URL
-# Everything the stack hard-requires: core secrets/DB/URLs + OAuth apps. These
-# are validated (and never auto-generated — a real .env is copied from a
-# teammate). LAN_IP and SMTP_CREDENTIALS are deliberately not in the list.
-CORE_VARS      = JWT_SECRET POSTGRES_PASSWORD REDIS_PASSWORD ENGINE_API_KEY \
+# Everything the preflight requires: core secrets/DB/URLs + OAuth apps. These
+# are validated (and never auto-generated: a real .env is copied from a
+# teammate). SMTP_CREDENTIALS counts too: without it mail only gets logged, but
+# an empty value still means the .env was copied incompletely. LAN_IP is the
+# only key left out of the list (`make env` writes it itself).
+CORE_VARS      = JWT_SECRET ENGINE_JWT_SECRET OAUTH_STATE_SECRET POSTGRES_PASSWORD REDIS_PASSWORD ENGINE_API_KEY \
                  POSTGRES_USER POSTGRES_DB DATABASE_URL CONTAINER_DATABASE_URL \
-                 FRONTEND_URL NGROK_PORT HTTPS_PORT
+                 FRONTEND_URL NGROK_PORT HTTPS_PORT SMTP_CREDENTIALS
 
 all: build start
 	@ echo "Frontend: https://localhost:$(HTTPS_PORT)"
@@ -31,7 +33,7 @@ all: build start
 # machine's current address so `make lan` can't print a stale URL.
 env:
 	@if [ ! -f .env ]; then \
-	  echo "❌ Build aborted — .env not found. Ensure you have copied over the correct .env file with all relevant credentials"; \
+	  echo "❌ Build aborted: .env not found. Ensure you have copied over the correct .env file with all relevant credentials"; \
 	  exit 1; \
 	fi; \
 	set -e; \
@@ -46,7 +48,7 @@ env:
 	missing=""; \
 	for v in $(CORE_VARS) $(OAUTH_VARS) $(TUNNEL_VARS); do [ -n "$$(get $$v)" ] || missing="$$missing $$v"; done; \
 	if [ -n "$$missing" ]; then \
-	  echo "❌ Preflight failed — required values missing or empty in .env:"; \
+	  echo "❌ Preflight failed. Required values missing or empty in .env:"; \
 	  for v in $$missing; do echo "      $$v"; done; \
 	  echo "   Fill them in (see .env.example), or ask a teammate for the values."; \
 	  exit 1; \
@@ -56,7 +58,7 @@ env:
 	[ -n "$$lan_ip" ] || lan_ip=$$(ipconfig getifaddr en1 2>/dev/null); \
 	if [ -n "$$lan_ip" ]; then set_kv LAN_IP "$$lan_ip"; fi; \
 	chmod 600 .env; \
-	echo "✅ .env ready — all required values present"
+	echo "✅ .env ready: all required values present"
 
 build: env
 	@docker compose -f $(COMPOSE_FILE) build
@@ -110,23 +112,23 @@ re: fclean all
 
 # LAN Mode
 lan: all
-	@if [ -z "$(LAN_IP)" ]; then echo "❌  No LAN IP on en0/en1 — are you on WiFi?"; exit 1; fi
+	@if [ -z "$(LAN_IP)" ]; then echo "❌  No LAN IP on en0/en1: are you on WiFi?"; exit 1; fi
 	@echo ""
 	@echo "🌐  LAN mode up.  Other devices on this WiFi:"
 	@echo "      https://$(LAN_IP):$(HTTPS_PORT)"
 	@echo ""
 	@echo "    Self-signed cert → tap through the browser warning once."
 	@echo "    Nothing shows up? Campus/corporate WiFi client isolation blocks"
-	@echo "    device-to-device traffic — use a phone hotspot to test."
+	@echo "    device-to-device traffic: use a phone hotspot to test."
 
 
 # NGROK Mode
 ngrok-auth:
 	@token=$$(grep -m1 '^NGROK_AUTHTOKEN=' .env 2>/dev/null | cut -d= -f2-); \
-	if [ -z "$$token" ]; then echo "❌  ngrok authtoken missing — set NGROK_AUTHTOKEN in .env"; exit 1; fi; \
+	if [ -z "$$token" ]; then echo "❌  ngrok authtoken missing: set NGROK_AUTHTOKEN in .env"; exit 1; fi; \
 	ngrok config add-authtoken "$$token" >/dev/null && echo "🔑  ngrok authtoken configured"
 
-# Tunnels nginx's TLS listener (127.0.0.1:8443) — the address is given as
+# Tunnels nginx's TLS listener (127.0.0.1:8443): the address is given as
 # https:// so ngrok speaks TLS to the local backend instead of forwarding
 # plain HTTP at it. ngrok doesn't verify the upstream cert by default (that's
 # opt-in via --upstream-tls-verify), so the self-signed cert isn't a problem.
@@ -138,11 +140,11 @@ tunnel: all ngrok-auth
 # Public URL of a tunnel that's already running, from ngrok's local API.
 tunnel-url:
 	@url=$$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'https://[^"]*\.ngrok[^"]*' | head -1); \
-	if [ -n "$$url" ]; then echo "$$url"; else echo "No tunnel running — start one with: make tunnel"; fi
+	if [ -n "$$url" ]; then echo "$$url"; else echo "No tunnel running: start one with make tunnel"; fi
 
 # One command: build + start the stack (detached), then open the public tunnel.
 # Stack runs in the background; ngrok stays in the foreground (Ctrl-C stops the
-# tunnel, containers keep running — use `make stop-tunnel` to stop everything).
+# tunnel, containers keep running: use `make stop-tunnel` to stop everything).
 tunnel_up: all tunnel
 
 dev-tunnel:

@@ -239,6 +239,9 @@ export class SocketServer {
       socket.data.username = payload.username;
       socket.data.displayName = payload.displayName;
       socket.data.gameId = payload.gameId;
+      // Token-pinned match id: unlike gameId this survives detachSocket(), so a
+      // refused socket can never re-join a different game.
+      socket.data.tokenGameId = payload.gameId;
       socket.data.role = payload.role as 'player';
       socket.data.tokenColor = payload.color;
       socket.data.mode = payload.mode as 'pvp' | 'pve' | 'hotseat' | undefined;

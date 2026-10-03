@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { navigate, useRoute } from '../router';
@@ -23,10 +23,18 @@ const REJOIN_EDGE = {
   boxShadow: '0 0 16px rgba(255, 0, 127, 0.55), inset 0 0 8px rgba(0, 240, 255, 0.25)',
 };
 
-// How often the rejoin banner re-checks for an active game.
-// Original: 2500 ms. Recommended: 10000 ms — the badge only needs to appear
-// soon after a game is created in another tab or by an invite.
+// Rejoin-banner poll interval. Raised from 2500 ms, because the badge only
+// needs to appear soon after a game is created in another tab or by invite.
 const ACTIVE_GAME_POLL_MS = 10_000;
+
+// Nav-label auto-sizing. See docs/frontend/frontend-components-system.md
+// ("RetroNavbar nav-label auto-sizing").
+const NAV_LABEL_BASE_PX = 13.6; // ≈ 0.85rem; used before the first measurement
+const NAV_LABEL_MIN_PX = 9; // smallest size the fit may choose
+const NAV_LABEL_MAX_PX = 20; // largest size the fit may choose
+const NAV_LABEL_LS_PX = 1; // letter-spacing applied to the labels
+const NAV_PROBE_PX = 100; // off-screen probe font-size (width scales linearly)
+const NAV_LABEL_SAFETY_PX = 2; // kept free so rounding can't trigger ellipsis
 
 interface RetroNavbarProps {
   activeRoute?: string;
@@ -82,6 +90,66 @@ export function RetroNavbar({
     { path: '/gamelobby', label: t('nav.lobby').toUpperCase(), icon: '>_' },
   ];
 
+  // Measure the widest nav label and apply one font size to all five. Re-runs
+  // on language change, resize and web-font load.
+  const navTrackRef = useRef<HTMLDivElement>(null);
+  const [navLabelPx, setNavLabelPx] = useState(NAV_LABEL_BASE_PX);
+  const navLabelKey = navItems.map((item) => item.label).join('|');
+
+  useLayoutEffect(() => {
+    if (isCompact) return;
+    const track = navTrackRef.current;
+    if (!track) return;
+    const btn = track.firstElementChild as HTMLElement | null;
+    if (!btn) return;
+
+    // The probe uses the label typography and is measured off-screen.
+    const probe = document.createElement('span');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.position = 'absolute';
+    probe.style.top = '-9999px';
+    probe.style.left = '-9999px';
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    probe.style.whiteSpace = 'nowrap';
+    probe.style.fontFamily = 'var(--font-display)';
+    probe.style.fontWeight = '900';
+    probe.style.letterSpacing = `${NAV_LABEL_LS_PX}px`;
+    probe.style.fontSize = `${NAV_PROBE_PX}px`;
+    document.body.appendChild(probe);
+
+    const labels = navLabelKey.split('|');
+    const measure = () => {
+      // Available label width = button content box minus its 14px side padding,
+      // the 34px icon, the 12px icon→label gap and the safety margin.
+      const available = btn.clientWidth - 14 - 14 - 34 - 12 - NAV_LABEL_SAFETY_PX;
+      if (available <= 0) return;
+      let size = Number.POSITIVE_INFINITY;
+      for (const label of labels) {
+        const n = label.length;
+        probe.textContent = label;
+        // Strip the font-size-independent letter-spacing to get the glyph width,
+        // then scale it to the target width.
+        const glyphs = probe.getBoundingClientRect().width - n * NAV_LABEL_LS_PX;
+        if (glyphs <= 0) continue;
+        const fit = ((available - n * NAV_LABEL_LS_PX) * NAV_PROBE_PX) / glyphs;
+        size = Math.min(size, fit);
+      }
+      if (Number.isFinite(size)) {
+        setNavLabelPx(Math.min(NAV_LABEL_MAX_PX, Math.max(NAV_LABEL_MIN_PX, size)));
+      }
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+    // Re-measure with the real Orbitron metrics once the web font loads.
+    void document.fonts.ready.then(measure).catch(() => {});
+    return () => {
+      window.removeEventListener('resize', measure);
+      probe.remove();
+    };
+  }, [navLabelKey, isCompact]);
+
   // Global live notifications fallback so the notification bell works across all pages
   const fallbackNotifs = useNotifications();
   const activeNotifications = notifications ?? fallbackNotifs.notifications;
@@ -95,7 +163,7 @@ export function RetroNavbar({
   const accountPopoverContentRef = useRef<HTMLDivElement>(null);
   const [accountPopoverPos, setAccountPopoverPos] = useState({ top: 0, left: 0 });
 
-  // Global "all sounds" mute — gates every UI/FX beep via retroAudio.muted.
+  // Global "all sounds" mute: gates every UI/FX beep via retroAudio.muted.
   const toggleSound = () => {
     retroAudio.muted = !retroAudio.muted;
     setSoundMuted(retroAudio.muted);
@@ -251,7 +319,7 @@ export function RetroNavbar({
             type="button"
             className={`${RETRO_BTN} ${THEME_TRIGGER_BTN_BASE} ${isAccountPopoverOpen ? 'active' : ''}`}
             id="userAccountBtn"
-            aria-label="Account Settings, Language and 2FA"
+            aria-label={t('navbar.accountMenuAria')}
             style={{
               ...railButtonStyle(isAccountPopoverOpen),
               width: '100%',
@@ -271,7 +339,7 @@ export function RetroNavbar({
               retroAudio.playUiBeep(next ? 880 : 440, 0.05);
             }}
             {...railHoverHandlers(isAccountPopoverOpen)}
-            title="Account Settings, Language & 2FA"
+            title={t('navbar.accountMenuTitle')}
           >
             <div
               style={{
@@ -334,7 +402,7 @@ export function RetroNavbar({
             )}
           </button>
 
-          {/* Account & Settings Popover — portaled to document.body so it renders
+          {/* Account & Settings Popover: portaled to document.body so it renders
           above sibling content instead of being clipped or covered by an
           ancestor's stacking context; positioned at the trigger's rect. */}
           {isAccountPopoverOpen &&
@@ -472,7 +540,7 @@ export function RetroNavbar({
                     toggleTwoFactor();
                     retroAudio.playUiBeep(twoFactor ? 440 : 880, 0.06);
                   }}
-                  title="Toggle Two-Factor Authentication"
+                  title={t('navbar.toggle2fa')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '1rem' }}>🛡️</span>
@@ -505,7 +573,7 @@ export function RetroNavbar({
                   </span>
                 </div>
 
-                {/* 3. Master Audio Toggle — mutes/unmutes ALL sounds (music + FX),
+                {/* 3. Master Audio Toggle: mutes/unmutes ALL sounds (music + FX),
                 same retroAudio.muted flag as the in-game audio toggle. */}
                 <div
                   style={{
@@ -525,7 +593,7 @@ export function RetroNavbar({
                     transition: 'all 0.18s ease',
                   }}
                   onClick={toggleSound}
-                  title="Toggle all game audio (music + sound effects)"
+                  title={t('navbar.toggleAudio')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '1rem' }}>{soundMuted ? '🔇' : '🔊'}</span>
@@ -715,6 +783,7 @@ export function RetroNavbar({
       >
         {/* Nav Items Track */}
         <div
+          ref={navTrackRef}
           style={{
             width: '100%',
             display: 'flex',
@@ -743,9 +812,11 @@ export function RetroNavbar({
                   width: '100%',
                   height: 52,
                   justifyContent: isCompact ? 'center' : 'flex-start',
-                  gap: isCompact ? 0 : 12,
+                  // No flex gap on the button: the icon→label spacing is the
+                  // icon's own margin-right (below).
+                  gap: 0,
                   padding: isCompact ? 0 : '0 14px',
-                  fontSize: '1.02rem',
+                  fontSize: '0.85rem',
                   borderRadius: 12,
                   color: isActive ? '#ffffff' : 'var(--text-main)',
                   fontWeight: 900,
@@ -770,6 +841,8 @@ export function RetroNavbar({
                     fontSize: '1.2rem',
                     color: isActive ? '#ffffff' : 'var(--accent-cyan)',
                     flexShrink: 0,
+                    // Icon→label spacing (the button's flex gap is 0).
+                    marginRight: isCompact ? 0 : 12,
                     filter: isActive ? 'drop-shadow(0 0 6px #ffffff)' : 'none',
                   }}
                 >
@@ -779,26 +852,19 @@ export function RetroNavbar({
                   <span
                     style={{
                       fontFamily: 'var(--font-display)',
-                      fontSize: '1.02rem',
+                      // Shared auto-fitted size; ellipsis is a rounding fallback.
+                      fontSize: navLabelPx,
                       letterSpacing: '1px',
                       fontWeight: 900,
-                      flex: 1,
+                      flex: '0 1 auto',
+                      minWidth: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                       textAlign: 'left',
                     }}
                   >
                     {item.label}
-                  </span>
-                )}
-                {!isCompact && isActive && (
-                  <span
-                    style={{
-                      color: '#ffffff',
-                      fontSize: '1rem',
-                      fontWeight: 900,
-                      textShadow: '0 0 6px #ffffff',
-                    }}
-                  >
-                    ►
                   </span>
                 )}
               </button>

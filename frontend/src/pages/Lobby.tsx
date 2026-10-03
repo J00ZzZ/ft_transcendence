@@ -92,6 +92,12 @@ export function Lobby() {
       const botColors = visible
         .map((s, i) => (s.type === 'bot' ? SEAT_COLORS[i] : null))
         .filter((c): c is ColorKey => c !== null);
+      // The assistant name each bot seat was assigned here, index-aligned with
+      // botColors. The engine has no locale, so the label travels with the match
+      // and each client re-localizes the color word (FR: "bot-rouge (Siri)").
+      const botNames = visible
+        .map((s) => (s.type === 'bot' ? s.name : null))
+        .filter((n): n is string => n !== null);
       // Hotseat/PvE: send the exact seat colors, otherwise the engine's
       // playerCount-based default re-densifies slots the user skipped.
       const seatColors = visible
@@ -115,6 +121,7 @@ export function Lobby() {
           gameMode === 'hotseat' ? filledCount : gameMode === 'pve' ? 1 + botCount : playerCount,
         botCount,
         botColors: botColors.length > 0 ? botColors : undefined,
+        botNames: botNames.length > 0 ? botNames : undefined,
         seatColors:
           (gameMode === 'hotseat' || gameMode === 'pve') && seatColors.length > 0
             ? seatColors
@@ -328,11 +335,19 @@ export function Lobby() {
                                 marginTop: 4,
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  minWidth: 0,
+                                }}
+                              >
                                 <UserAvatar
                                   username={user?.username ?? ''}
                                   userId={user?.id}
                                   hasAvatarPhoto={user?.hasAvatarPhoto ?? false}
+                                  avatarStyle={user?.avatarStyle}
                                   size={40}
                                   fallbackStyle={{
                                     width: 40,
@@ -344,16 +359,26 @@ export function Lobby() {
                                     display: 'grid',
                                     placeItems: 'center',
                                   }}
-                                  style={{ borderRadius: 6, border: `1px solid ${hue}` }}
+                                  style={{
+                                    borderRadius: 6,
+                                    border: `1px solid ${hue}`,
+                                    flex: 'none',
+                                  }}
                                 />
-                                <div>
+                                <div style={{ minWidth: 0 }}>
                                   <div
                                     style={{
                                       fontWeight: 800,
                                       fontSize: '0.92rem',
                                       color: '#ffffff',
                                       fontFamily: 'var(--font-heading)',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
                                     }}
+                                    title={
+                                      (user?.displayName ?? user?.username ?? '') || t('common.you')
+                                    }
                                   >
                                     {(user?.displayName ?? user?.username ?? '').toUpperCase() ||
                                       t('common.you')}
@@ -400,9 +425,21 @@ export function Lobby() {
                                   justifyContent: 'space-between',
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <div
-                                    style={{
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  {/* A bot has no account: a generated avatar, seeded from the
+                                      assistant name this seat was assigned here. */}
+                                  <UserAvatar
+                                    username={seat.name}
+                                    isBot
+                                    size={38}
+                                    fallbackStyle={{
                                       width: 38,
                                       height: 38,
                                       borderRadius: 6,
@@ -415,17 +452,26 @@ export function Lobby() {
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: '0.82rem',
                                     }}
-                                  >
-                                    AI
-                                  </div>
-                                  <div>
+                                    style={{
+                                      width: 38,
+                                      height: 38,
+                                      borderRadius: 6,
+                                      border: `1px solid ${hue}`,
+                                      flex: 'none',
+                                    }}
+                                  />
+                                  <div style={{ minWidth: 0 }}>
                                     <div
                                       style={{
                                         fontWeight: 800,
                                         fontSize: '0.92rem',
                                         color: '#ffffff',
                                         fontFamily: 'var(--font-heading)',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
                                       }}
+                                      title={seat.name}
                                     >
                                       {seat.name}
                                     </div>
@@ -457,8 +503,9 @@ export function Lobby() {
                                     display: 'grid',
                                     placeItems: 'center',
                                     fontSize: '0.8rem',
+                                    flex: 'none',
                                   }}
-                                  title="Remove Bot"
+                                  title={t('lobby.removeBotTooltip')}
                                 >
                                   ✕
                                 </button>
@@ -499,10 +546,16 @@ export function Lobby() {
                                     alignItems: 'center',
                                     gap: 10,
                                     flex: 1,
+                                    minWidth: 0,
                                   }}
                                 >
-                                  <div
-                                    style={{
+                                  {/* Local hotseat pilots have no account, so the DiceBear
+                                      avatar is seeded from the name typed here. Only the
+                                      host's seat above can show an uploaded photo. */}
+                                  <UserAvatar
+                                    username={seat.name}
+                                    size={38}
+                                    fallbackStyle={{
                                       width: 38,
                                       height: 38,
                                       borderRadius: 6,
@@ -515,10 +568,15 @@ export function Lobby() {
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: '0.82rem',
                                     }}
-                                  >
-                                    P{i + 1}
-                                  </div>
-                                  <div style={{ flex: 1 }}>
+                                    style={{
+                                      width: 38,
+                                      height: 38,
+                                      borderRadius: 6,
+                                      border: `1px solid ${hue}`,
+                                      flex: 'none',
+                                    }}
+                                  />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     {editingSeat === i ? (
                                       <input
                                         autoFocus
@@ -552,6 +610,10 @@ export function Lobby() {
                                           setEditName(seat.name);
                                         }}
                                         style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                          minWidth: 0,
                                           fontWeight: 800,
                                           fontSize: '0.92rem',
                                           color: '#ffffff',
@@ -560,7 +622,19 @@ export function Lobby() {
                                         }}
                                         title={t('lobby.clickToRename')}
                                       >
-                                        {seat.name} ✎
+                                        {/* The pencil stays outside the ellipsized span, so a
+                                            long name cannot hide the rename affordance. */}
+                                        <span
+                                          style={{
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            minWidth: 0,
+                                          }}
+                                        >
+                                          {seat.name}
+                                        </span>
+                                        <span style={{ flex: 'none' }}>✎</span>
                                       </div>
                                     )}
                                     <div
@@ -591,8 +665,9 @@ export function Lobby() {
                                     display: 'grid',
                                     placeItems: 'center',
                                     fontSize: '0.8rem',
+                                    flex: 'none',
                                   }}
-                                  title="Remove Player"
+                                  title={t('lobby.removePlayerTooltip')}
                                 >
                                   ✕
                                 </button>

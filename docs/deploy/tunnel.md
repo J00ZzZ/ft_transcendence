@@ -16,16 +16,32 @@ make dev-tunnel   # opens two Terminal.app tabs: `make dev` + `make tunnel` (mac
 make stop-tunnel  # stops ngrok and the compose stack
 ```
 
-## No separate hop — same nginx TLS listener
+## The dedicated `:444` tunnel listener
 
-`make tunnel` points ngrok **straight at nginx's own TLS listener** —
+`make tunnel` points ngrok **straight at nginx's TLS** —
 `ngrok http https://localhost:$(NGROK_PORT)` (the `https://` scheme, not
 `http://`, is deliberate: it tells ngrok to speak TLS to the local upstream
-instead of forwarding plain HTTP at a TLS-only port). There is no separate
-plain-HTTP hop for tunnel mode — the public ngrok URL and the
-local URL both terminate at the exact same nginx TLS listener described in
-[`nginx.md`](./nginx.md). ngrok doesn't verify the self-signed cert by
-default, so that's not an issue.
+instead of forwarding plain HTTP at a TLS-only port). `NGROK_PORT` defaults to
+**8444**, which is nginx's dedicated tunnel listener
+(`127.0.0.1:8444 → :444`, loopback-only) — see [`nginx.md`](./nginx.md).
+ngrok doesn't verify the self-signed cert by default, so that's not an issue.
+
+That listener is separate from the direct `:443` (`localhost:8443`) one because
+ngrok rewrites the client address: the request arrives from the agent on
+loopback, so `:444` takes the real visitor's IP from `X-Forwarded-For`
+(`set_real_ip_from` + `real_ip_header` + `real_ip_recursive`). Per-IP throttling
+thus follows each visitor instead of lumping all tunnel traffic together —
+which is the whole reason the tunnel has its own port. Both listeners `include`
+the same server body (`nginx/conf/app.inc`), so routing, security headers and
+rate limits never drift between the local and tunnel modes.
+
+The `127.0.0.1:8444:444` publish carries no compose profile, so nginx binds
+`8444` as soon as the stack starts: the port is open in every mode, tunnel
+running or not, and `compose up` fails if the host already uses it. Only
+loopback can reach it, and the ngrok agent is the only process that connects.
+While a tunnel runs, the agent also binds `127.0.0.1:4040` for its own local API
+(`make tunnel-url` reads the public URL from there), so that port has to be free
+too.
 
 If `NGROK_DOMAIN` is set in `.env`, `make tunnel` passes
 `--url=https://$(NGROK_DOMAIN)` so you get a stable, reusable ngrok domain
@@ -68,16 +84,18 @@ check to decide which `FRONTEND_URL` to redirect back to after login
 | Variable | Required | Notes |
 |---|---|---|
 | `NGROK_AUTHTOKEN` | yes | Required by `make ngrok-auth`, which `tunnel` depends on |
-| `NGROK_DOMAIN` | no | Reserved ngrok domain, for a stable URL across restarts |
-| `NGROK_PORT` | no | Default `8443` — the local port ngrok tunnels (nginx's published port); the default is defined in the `Makefile` and can be overridden in `.env` |
-| `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests |
+| `NGROK_DOMAIN` | yes | Reserved ngrok domain, for a stable URL across restarts. `make env` requires it to be non-empty; `make tunnel` passes it as `--url` whenever it is set |
+| `NGROK_PORT` | yes | Default `8444`: the loopback port ngrok tunnels, which is the host port compose publishes nginx's tunnel listener on (`127.0.0.1:8444:444`). Required by `make env`, defaulted in the `Makefile`. It must match the publish in `compose.yaml`, because that publish does not read this key |
+| `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests, read at backend boot by `requireSecret`, so an empty value stops the backend container from starting |
 | `GOOGLE_/GITHUB_/FORTYTWO_CLIENT_ID` + `_SECRET` + `_CALLBACK_URL` | yes | OAuth app credentials — shared by the local and tunnel strategies |
 | `NGROK_GOOGLE_/GITHUB_/FORTYTWO_CALLBACK_URL` | yes | Tunnel callback URLs registered as extra redirect URIs on the same OAuth apps |
 
 `make env` (a prerequisite of `make build`, so it runs on every path) reads
 `.env`, validates that every required value (core secrets/DB URLs, OAuth apps,
-tunnel credentials) is present and non-empty — failing hard with the missing
-list otherwise.
+tunnel credentials) is present and non-empty, and fails hard with the missing
+list otherwise. Every key in the table above is on that list, the ngrok group
+included, so the tunnel values are needed for every build and not only when a
+tunnel is actually run.
 Nothing is auto-generated (the one exception: `LAN_IP`, which `make env`
 overwrites with the machine's current address so LAN mode cannot print a
 stale URL): copy a real `.env` from a teammate.

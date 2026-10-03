@@ -2,15 +2,21 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { secret } from '../secrets';
+import { AUTH } from './auth.constants';
 
-const VERIFY_TOKEN_TTL_S = 24 * 60 * 60; // signup verification links: 24h
-const RESET_TOKEN_TTL_S = 60 * 60; //      password-reset links: 1 hour
-const CODE_TTL_S = 5 * 60; //              login codes: 5 minutes
-const MAX_ATTEMPTS = 5;
+const VERIFY_TOKEN_TTL_S = AUTH.verifyTokenTtlS; // signup verification links
+const RESET_TOKEN_TTL_S = AUTH.resetTokenTtlS; //  password-reset links
+const CHANGE_TTL_S = AUTH.changeTokenTtlS; //      email-change links
+const CODE_TTL_S = AUTH.challenge.ttlS; //         login codes
+const MAX_ATTEMPTS = AUTH.challenge.maxAttempts;
+const RESEND_WINDOW_S = AUTH.challenge.resendWindowS; // resend cap window
+const MAX_RESENDS = AUTH.challenge.maxResends;
 
 // Short-lived auth state in Redis (hashed tokens + auto-expiry, so a Redis
-// dump can't be replayed): `verify:`/`reset:` -> userId (links), and
-// `2fa:` -> {userId, codeHash, attempts} (login-code challenges).
+// dump can't be replayed): `verify:`/`reset:` -> userId (links), `2fa:` ->
+// {userId, codeHash, attempts} (login-code challenges) and `emailchange:` ->
+// {userId, newEmail} staged email changes (plus a `emailchange:user:<userId>`
+// reverse pointer whose expiry MailService's keyspace subscription watches).
 @Injectable()
 export class TwoFactorService implements OnModuleDestroy {
   // Redis client for all short-lived auth state (verify/reset/2FA keys).
@@ -34,6 +40,15 @@ export class TwoFactorService implements OnModuleDestroy {
 
   private hash(value: string): string {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  // Generate a fresh 6-digit code and (re)store it on a `2fa:` challenge: hashed,
+  // attempts reset, TTL refreshed. Shared by startChallenge + resendChallenge.
+  private async issueCode(key: string): Promise<string> {
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    await this.redis.hset(key, { codeHash: this.hash(code), attempts: 0 });
+    await this.redis.expire(key, CODE_TTL_S);
+    return code;
   }
 
   // Email-verification tokens
@@ -66,15 +81,73 @@ export class TwoFactorService implements OnModuleDestroy {
     return userId;
   }
 
+  // Email-change staging (verify-then-commit). Two keys are written per request:
+  //   emailchange:<sha256(token)> -> { userId, newEmail }   the emailed link
+  //   emailchange:user:<userId>   -> { tokenHash, newEmail } reverse pointer
+  // Both share CHANGE_TTL_S: the reverse key's expiry is the event MailService's
+  // keyspace subscription acts on, so it must outlive the link by exactly zero.
+  async createEmailChangeToken(userId: string, newEmail: string): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = this.hash(token);
+    const reverseKey = `emailchange:user:${userId}`;
+    // Mint-or-rotate invalidates the previous link: its key is deleted (DEL
+    // emits no `expired`, so that never fakes an expiry notice). The reverse
+    // key is overwritten in place, so its TTL is simply refreshed.
+    const previousHash = await this.redis.hget(reverseKey, 'tokenHash');
+    const pipeline = this.redis.pipeline();
+    if (previousHash) pipeline.del(`emailchange:${previousHash}`);
+    pipeline.hset(`emailchange:${tokenHash}`, { userId, newEmail });
+    pipeline.expire(`emailchange:${tokenHash}`, CHANGE_TTL_S);
+    pipeline.hset(reverseKey, { tokenHash, newEmail });
+    pipeline.expire(reverseKey, CHANGE_TTL_S);
+    await pipeline.exec();
+    return token;
+  }
+
+  // Returns the staged change and deletes both keys (single use), or null.
+  async consumeEmailChangeToken(
+    token: string,
+  ): Promise<{ userId: string; newEmail: string } | null> {
+    const tokenHash = this.hash(token);
+    const key = `emailchange:${tokenHash}`;
+    const data = await this.redis.hgetall(key);
+    if (!data.userId || !data.newEmail) return null;
+
+    const reverseKey = `emailchange:user:${data.userId}`;
+    const pipeline = this.redis.pipeline();
+    pipeline.del(key);
+    // Drop the reverse pointer too, so a redeemed change can't later fire an
+    // "expired" notice : unless a rotate already repointed it at a newer token.
+    const currentHash = await this.redis.hget(reverseKey, 'tokenHash');
+    if (currentHash === tokenHash) pipeline.del(reverseKey);
+    await pipeline.exec();
+    return { userId: data.userId, newEmail: data.newEmail };
+  }
+
+  // The address staged for a user (profile read + resend), or null.
+  async peekEmailChange(userId: string): Promise<{ newEmail: string } | null> {
+    const newEmail = await this.redis.hget(`emailchange:user:${userId}`, 'newEmail');
+    return newEmail ? { newEmail } : null;
+  }
+
+  // Drop a staged change (mail-send rollback, commit-time conflict).
+  async clearEmailChange(userId: string): Promise<void> {
+    const reverseKey = `emailchange:user:${userId}`;
+    const tokenHash = await this.redis.hget(reverseKey, 'tokenHash');
+    const pipeline = this.redis.pipeline();
+    if (tokenHash) pipeline.del(`emailchange:${tokenHash}`);
+    pipeline.del(reverseKey);
+    await pipeline.exec();
+  }
+
   // Creates a 2FA login challenge: a pending token (stored in the client's
   // cookie) plus a 6-digit code emailed to the user. Called by auth.service.ts
   // login() for accounts with 2FA enabled.
   async startChallenge(userId: string): Promise<{ pendingToken: string; code: string }> {
     const pendingToken = randomBytes(32).toString('hex');
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const key = `2fa:${this.hash(pendingToken)}`;
-    await this.redis.hset(key, { userId, codeHash: this.hash(code), attempts: 0 });
-    await this.redis.expire(key, CODE_TTL_S);
+    await this.redis.hset(key, { userId });
+    const code = await this.issueCode(key);
     return { pendingToken, code };
   }
 
@@ -95,5 +168,25 @@ export class TwoFactorService implements OnModuleDestroy {
 
     await this.redis.del(key); // single use
     return data.userId;
+  }
+
+  // Re-issue the code for a live challenge (same pendingToken; the previous code
+  // is invalidated). Returns 'expired' for an unknown/lapsed challenge, 'locked'
+  // when the per-user resend cap is hit, else a fresh { userId, code }.
+  async resendChallenge(
+    pendingToken: string,
+  ): Promise<{ userId: string; code: string } | 'expired' | 'locked'> {
+    const key = `2fa:${this.hash(pendingToken)}`;
+    const data = await this.redis.hgetall(key);
+    if (!data.userId) return 'expired';
+
+    // Per-user cap on resends (keyed by userId so it outlives the challenge TTL).
+    const rlKey = `2fa:rl:${data.userId}`;
+    const count = await this.redis.incr(rlKey);
+    if (count === 1) await this.redis.expire(rlKey, RESEND_WINDOW_S);
+    if (count > MAX_RESENDS) return 'locked';
+
+    const code = await this.issueCode(key);
+    return { userId: data.userId, code };
   }
 }

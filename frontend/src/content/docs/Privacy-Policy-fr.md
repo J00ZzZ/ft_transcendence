@@ -1,9 +1,9 @@
-# Politique de Confidentialité — ft-Transcendence (RetroLudo '42)
+# Politique de Confidentialité — ft-Transcendence (Ludo Rétro '42)
 
 **Date d'entrée en vigueur :** 2026-08-26
-**Responsable :** Team Pace 24, développeurs de ft-Transcendence (RetroLudo '42) (les « Team »)
+**Responsable :** Team Pace 24, développeurs de ft-Transcendence (Ludo Rétro '42) (les « Team »)
 
-Cette Politique de Confidentialité explique comment l'application web ft-Transcendence (RetroLudo '42) (« l'App », « nous », « nous ») collecte, utilise, divulgue et protège vos données personnelles. Elle est élaborée conformément à la **Loi malaisienne sur la protection des données personnelles 2010 (« PDPA »)** et à ses principes directeurs : Général, Avis et Choix, Divulgation, Sécurité, Conservation, Intégrité des Données et Accès.
+Cette Politique de Confidentialité explique comment l'application web ft-Transcendence (Ludo Rétro '42) (« l'App », « nous », « nous ») collecte, utilise, divulgue et protège vos données personnelles. Elle est élaborée conformément à la **Loi malaisienne sur la protection des données personnelles 2010 (« PDPA »)** et à ses principes directeurs : Général, Avis et Choix, Divulgation, Sécurité, Conservation, Intégrité des Données et Accès.
 
 
 ---
@@ -24,7 +24,7 @@ L'App collecte uniquement les données nécessaires pour fournir le jeu et ses f
 | Social | liste d'amis, demandes d'amis, listes de blocage, invitations aux parties | généré par votre activité dans l'app |
 | Technique | présence/statut en ligne, préférences de notification | généré par l'utilisation de l'App |
 
-Nous ne collectons **pas** de coordonnées de carte de paiement, de données de localisation, ou de données provenant d'enfants de moins de 13 ans. L'App est un jeu et ne procède à aucun profilage automatisé au-delà de l'affichage des statistiques de jeu que vous voyez déjà.
+Nous ne collectons **pas** de coordonnées de carte de paiement ou de données de localisation. L'App est un jeu et ne procède à aucun profilage automatisé au-delà de l'affichage des statistiques de jeu que vous voyez déjà.
 
 
 ---

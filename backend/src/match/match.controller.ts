@@ -11,6 +11,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { MatchService, type GameEndPayload } from './match.service';
+import { InviteFriendDto } from './dto/invite-friend.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { requireSecret } from '../secrets';
 
@@ -51,6 +52,7 @@ export class MatchController {
     @Body('playerCount') playerCount: number,
     @Body('botCount') botCount?: number,
     @Body('botColors') botColors?: string[],
+    @Body('botNames') botNames?: string[],
     @Body('seatColors') seatColors?: string[],
   ) {
     if (mode !== 'pvp' && mode !== 'pve' && mode !== 'hotseat') {
@@ -71,6 +73,7 @@ export class MatchController {
       playerCount || 2,
       botCount ?? 0,
       botColors,
+      botNames,
       seatColors,
     );
   }
@@ -82,11 +85,12 @@ export class MatchController {
     return this.match.readyGame(gameId, req.user.id);
   }
 
-  // Browse Open Rooms (WAITING PvP games : joinable)
+  // Browse Open Rooms (WAITING PvP games : joinable, plus the caller's own
+  // reclaimable seats in games that have already started)
   @UseGuards(JwtAuthGuard)
   @Get('api/games/rooms')
-  listRooms() {
-    return this.match.listOpenRooms();
+  listRooms(@Request() req: { user: { id: string } }) {
+    return this.match.listOpenRooms(req.user.id);
   }
 
   // My Rooms (WAITING/ACTIVE games I'm seated in : rejoin after refresh)
@@ -102,9 +106,9 @@ export class MatchController {
   inviteFriend(
     @Request() req: { user: { id: string } },
     @Param('id') gameId: string,
-    @Body('friendId') friendId: string,
+    @Body() dto: InviteFriendDto,
   ) {
-    return this.match.inviteFriendToGame(gameId, req.user.id, friendId);
+    return this.match.inviteFriendToGame(gameId, req.user.id, dto.friendId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -4,9 +4,11 @@ import { PrismaService } from '../prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { secret } from '../secrets';
 import Redis from 'ioredis';
-import { isBotUserId } from '../common/bot';
-import { isSeatFinalized } from './seat-finalization';
+import { isBotUserId } from '../common/botname-enforce';
+import { pairKey, isFriendPair, isBlockedPair } from '../friends/friendship-pair';
+import { isEngineGameStarted, isSeatFinalized } from './seat-finalization';
 import { ENGINE_WS_URL } from './match.creator.service';
+import { signEngineToken } from './engine-token.util';
 
 const SLOT_COLORS = ['blue', 'red', 'green', 'yellow'];
 
@@ -49,6 +51,13 @@ export class MatchPlayerService {
         code: 'MATCH_ALREADY_STARTED',
         message: 'Game already started',
       });
+    // The match hash can lag behind the engine, so the engine state decides as
+    // well: a game that has already started accepts no new seats.
+    if (await isEngineGameStarted(this.redis, gameId))
+      throw new ForbiddenException({
+        code: 'MATCH_ALREADY_STARTED',
+        message: 'Game already started',
+      });
     // Humans can only join human rooms : PvE/hotseat rooms are auto-started
     // and never accept a second human via this endpoint.
     if (data.gameType !== 'PVP')
@@ -78,17 +87,14 @@ export class MatchPlayerService {
 
     const username = await this.resolveUsername(userId);
     const displayName = await this.resolveDisplayName(userId);
-    const token = this.jwt.sign(
-      {
-        gameId,
-        playerId: userId,
-        username: username ?? undefined,
-        displayName,
-        role: 'player',
-        color: assignedColor,
-      },
-      { expiresIn: '24h' },
-    );
+    const token = signEngineToken(this.jwt, {
+      gameId,
+      playerId: userId,
+      username: username ?? undefined,
+      displayName,
+      role: 'player',
+      color: assignedColor,
+    });
 
     return {
       gameId,
@@ -116,36 +122,32 @@ export class MatchPlayerService {
         message: 'You are not a player in this game',
       });
 
-    // A seat the engine finalized (grace expired / End Game) is terminal: no
-    // fresh token may be minted for it, even from a cached tab or a crafted
-    // POST. Without this the /api/games/mine filter could be bypassed.
+    // A finalized seat is terminal: no fresh token is minted for it, whatever the
+    // match hash says. Without this gate the /api/games/mine filter could be
+    // bypassed with a cached tab or a crafted POST.
     const seatColor = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
-    if (data.status === 'ACTIVE' && (await isSeatFinalized(this.redis, gameId, seatColor))) {
+    if (await isSeatFinalized(this.redis, gameId, seatColor)) {
       throw new ForbiddenException({
         code: 'MATCH_SEAT_EXPIRED',
         message: 'Your seat in this game is gone and cannot be reclaimed',
       });
     }
 
-    // Reclaiming the seat makes it PRESENT again: clear the reservation flag a
-    // "returned to lobby" leave set, so the room counts this player and the
-    // idle-abort stops applying.
+    // Reclaiming the seat clears the reservation flag a "returned to lobby" leave
+    // set, so the room counts this player again and the idle-abort stops applying.
     await this.redis.hdel(`match:${gameId}`, `player${slotIndex + 1}_left`);
 
     const color = data[`player${slotIndex + 1}_color`] || SLOT_COLORS[slotIndex];
     const username = await this.resolveUsername(userId);
     const displayName = await this.resolveDisplayName(userId);
-    const token = this.jwt.sign(
-      {
-        gameId,
-        playerId: userId,
-        username: username ?? undefined,
-        displayName,
-        role: slotIndex === 0 ? 'player1' : 'player',
-        color,
-      },
-      { expiresIn: '24h' },
-    );
+    const token = signEngineToken(this.jwt, {
+      gameId,
+      playerId: userId,
+      username: username ?? undefined,
+      displayName,
+      role: slotIndex === 0 ? 'player1' : 'player',
+      color,
+    });
 
     return {
       gameId,
@@ -175,26 +177,26 @@ export class MatchPlayerService {
         message: 'Game already started',
       });
 
-    const isHost =
+    const isSeated =
       data.player1_id === hostId ||
       data.player2_id === hostId ||
       data.player3_id === hostId ||
       data.player4_id === hostId;
-    if (!isHost)
+    if (!isSeated)
       throw new ForbiddenException({
         code: 'MATCH_NOT_PLAYER',
         message: 'You are not a player in this game',
       });
 
-    const friendship = await this.prisma.db.friendship.findFirst({
-      where: {
-        OR: [
-          { userId: hostId, friendId, status: 'accepted' },
-          { userId: friendId, friendId: hostId, status: 'accepted' },
-        ],
-      },
+    const pair = await this.prisma.db.friendship.findUnique({
+      where: { pairKey: pairKey(hostId, friendId) },
     });
-    if (!friendship)
+    if (pair && isBlockedPair(pair))
+      throw new ForbiddenException({
+        code: 'FRIEND_BLOCKED',
+        message: 'Cannot invite - user is blocked',
+      });
+    if (!pair || !isFriendPair(pair))
       throw new ForbiddenException({
         code: 'NOT_FRIENDS_WITH_USER',
         message: 'You are not friends with this user',
