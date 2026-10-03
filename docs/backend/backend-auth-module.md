@@ -69,6 +69,7 @@ the single-use emailed tokens.
 | `dto/reset-password.dto.ts` | Validation schema for `POST /api/auth/reset-password` |
 | `dto/twofactor.dto.ts` | Validation schema for `POST /api/auth/2fa/verify` |
 | `dto/two-factor-setting.dto.ts` | Validation schema for `GET/PATCH /api/auth/2fa` |
+| `dto/language-setting.dto.ts` | Validation schema for `PATCH /api/auth/profile/language` |
 | `dto/password.rules.ts` | Shared password policy constants used by RegisterDto and ResetPasswordDto |
 | `dto/update-profile.dto.ts` | Validation schema for profile updates (incl. `currentPassword` for the email-change re-auth, and `language` for the transactional-email copy) |
 | `dto/resend-verification.dto.ts` | Validation schema for `POST /api/auth/resend-verification` |
@@ -168,6 +169,7 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `DELETE` | `/api/auth/profile` | JWT | Permanently delete the account (password-verified) |
 | `GET` | `/api/auth/2fa` | JWT | Get current user's 2FA preference |
 | `PATCH` | `/api/auth/2fa` | JWT | Toggle the user's 2FA preference |
+| `PATCH` | `/api/auth/profile/language` | JWT | Set the language transactional email is sent in |
 | `GET` | `/api/auth/google` | None | Redirect to Google OAuth |
 | `GET` | `/api/auth/google/callback` | None | Google OAuth callback |
 | `GET` | `/api/auth/github` | None | Redirect to GitHub OAuth |
@@ -196,7 +198,7 @@ no `GET` variant: links minted before this change 404 by design (see
 ### Rate limits
 
 The controller sets a per-IP limit on the routes below; every other route falls back to the global
-throttler default (300 requests per 60 s, installed in `app.module.ts`).
+throttler default (600 requests per 60 s, installed in `app.module.ts`).
 
 | Route | Limit |
 |-------|-------|
@@ -207,6 +209,7 @@ throttler default (300 requests per 60 s, installed in `app.module.ts`).
 | `POST /api/auth/refresh` | 30 per minute |
 | `POST /api/auth/forgot-password` | 3 per hour |
 | `POST /api/auth/reset-password` | 5 per 15 minutes |
+| `PATCH /api/auth/profile` | 60 per hour |
 
 The counted address is the client's own: `main.ts` trusts internal hops only, so a client-sent
 `X-Forwarded-For` cannot move a request into a different bucket.

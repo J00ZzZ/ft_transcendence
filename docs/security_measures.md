@@ -289,7 +289,7 @@ Throttling is only as good as the address it keys on, so the two listeners diffe
 
 ### In the API (NestJS throttler)
 
-A global default of 300 requests per minute per client, plus per-route overrides:
+A global default of 600 requests per minute per client (matching the nginx `api` zone), plus per-route overrides:
 
 | Route | Limit |
 |---|---|
@@ -301,7 +301,7 @@ A global default of 300 requests per minute per client, plus per-route overrides
 | `POST /api/auth/forgot-password` | 3 per hour |
 | `POST /api/auth/reset-password` | 5 per 15 minutes |
 | `POST /api/auth/resend-verification` | 3 per hour |
-| `PATCH /api/auth/profile` | 10 per hour |
+| `PATCH /api/auth/profile` | 60 per hour (language changes use `PATCH /api/auth/profile/language`, under the global default) |
 | `POST /api/auth/profile/resend-email-change` | 5 per hour |
 
 Per-account limits complement the per-address ones: at most 3 email-change links per hour per user (a

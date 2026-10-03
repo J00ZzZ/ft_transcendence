@@ -155,6 +155,7 @@ An error response has one of two shapes:
 3. **[Auth — 2FA](#3-auth--2fa)** — Read and toggle two-factor authentication
    - [`GET /api/auth/2fa`](#get-apiauth2fa) — Check whether 2FA is enabled on your account
    - [`PATCH /api/auth/2fa`](#patch-apiauth2fa) — Turn two-factor authentication on or off
+   - [`PATCH /api/auth/profile/language`](#patch-apiauthprofilelanguage) — Set the language your emails are sent in
 
 4. **[Auth — OAuth (Google / GitHub / 42)](#4-auth--oauth-google--github--42)** — Sign in with a third-party provider
    - [`GET /api/auth/google`](#get-apiauthgoogle) — Log in with Google
@@ -778,6 +779,36 @@ Get the current user's 2FA preference.
 ```json
 {
   "twoFactorEnabled": true
+}
+
+```
+
+
+---
+---
+
+
+#### `PATCH /api/auth/profile/language`
+
+**Source:** `backend/src/auth/auth.controller.ts` — AuthModule
+
+Set the language transactional email is sent in. Separate from `PATCH /api/auth/profile` so the language switcher doesn't spend that route's hourly limit.
+
+**Headers:** 🔒 (requires `token` cookie)  
+**Body:**
+
+```json
+{
+  "language": "fr"
+}
+
+```
+
+**Response:**
+
+```json
+{
+  "language": "fr"
 }
 
 ```

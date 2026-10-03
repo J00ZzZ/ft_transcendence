@@ -21,7 +21,7 @@
 The App Bootstrap module is the root of the NestJS application. It does three things:
 
 1. **Starts the server** via `main.ts` — turns on trust-proxy, cookie reading, request validation, and a health check endpoint. CORS is deliberately not enabled: every client call is same-origin through nginx's `/api` proxy.
-2. **Loads every feature module** via `app.module.ts` — imports all 9 feature modules, registers `PrismaService` app-wide, and installs `ThrottlerModule` (60 s / 300 requests by default) with `ThrottlerGuard` as a global `APP_GUARD`:
+2. **Loads every feature module** via `app.module.ts` — imports all 9 feature modules, registers `PrismaService` app-wide, and installs `ThrottlerModule` (60 s / 600 requests by default) with `ThrottlerGuard` as a global `APP_GUARD`:
    - `AuthModule` — registration, login, OAuth, 2FA, sessions
    - `UserModule` — user profiles, avatars, game history
    - `FriendsModule` — friends list, requests, presence integration
