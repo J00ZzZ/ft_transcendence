@@ -26,7 +26,7 @@ Verified against the current repo: `compose.yaml`, `nginx/conf/nginx.conf`, `ngi
 - [Network exposure](#network-exposure): the one port reachable from another machine, and why the rest are loopback-only
 - [Transport security (TLS)](#transport-security-tls): TLS 1.2/1.3 and the pinned cipher list on both listeners, HSTS, and the self-signed certificate
 - [Edge headers and static content](#edge-headers-and-static-content): the headers both listeners set, the strict CSP, and the static-file rules
-- [Rate limiting](#rate-limiting): the nginx per-address zones and connection caps, the address each listener trusts, and the API throttler
+- [Rate limiting](#rate-limiting): the nginx per-address zones and connection caps, the address each listener trusts, the API throttler, and the per-account login lockout
 - [Sessions and authentication](#sessions-and-authentication): cookie shape, token lifetimes, rotation and revocation, bcrypt, 2FA
 - [Emailed link tokens](#emailed-link-tokens): what the app emails, each token's lifetime, and the single-use rule
 - [Emailed links cannot reach a log](#emailed-links-cannot-reach-a-log): why an emailed token never reaches a proxy access log
@@ -300,8 +300,38 @@ codes invalidate the challenge outright.
 into a nuisance mail sender aimed at a victim's inbox), repeated 2FA code guessing, and scripted
 hammering of the API.
 
-Throttling keys on the client address, not on the account, so an attempt spread over many addresses
-is not slowed per account. See [Not yet addressed](#not-yet-addressed).
+### Per-account login lockout
+
+Everything above counts the caller's address, which leaves one gap: an attacker rotating through
+proxies gets a fresh budget at every address. `LoginLockoutService`
+(`backend/src/auth/login-lockout.service.ts`) counts failures against the account instead, so a
+single account is only attacked as fast as its own streak allows.
+
+Failures are stored in Redis as `login:fail:<sha256(identifier)>`: hashed, so the store holds no
+usernames or addresses, and case-folded, so one account cannot be given two separate budgets by
+alternating the case of its name.
+
+| Failed logins in the streak | Effect on the next attempt |
+|---|---|
+| 0–4 | none: the password is checked as usual |
+| 5–9 | held back by `min(2^n, 30)` s before the password is checked (2, 4, 8, 16, then 30) |
+| 10+ | refused outright for 15 minutes, and each further failure refreshes the key |
+| any, once the correct password is given | the counter is deleted |
+
+The counter expires 15 minutes after the last failure. Thresholds are tunables in
+`AUTH.loginLockout` (`auth.constants.ts`). An identifier that does not exist is counted and delayed
+exactly like a real one, so the lockout says nothing about which accounts exist.
+
+Every refusal returns the body a wrong password returns (`401 AUTH_INVALID_CREDENTIALS`), for two
+reasons: a distinct "account locked" message would be an enumeration oracle, and the SPA already
+renders that code in all three locales, so the lockout adds no user-visible string. Redis is already
+required to finish a login (the refresh-token session store lives there), so this adds no new
+dependency, and a Redis outage fails closed rather than skipping the count.
+
+**Mitigates:** distributed credential stuffing: guesses at one account are capped by that account's own
+failure streak, however many addresses the caller rotates through. The cost is that an attacker who
+knows a username can deny its owner a login for 15 minutes; that is the deliberate trade, and the
+account recovers on its own.
 
 
 ---
@@ -426,15 +456,32 @@ another user's link.
   neither started nor finalized. The engine's own state is read for that decision; the cached
   `match:*` hash is never trusted on its own.
 - **The engine calls back into the backend** with an `X-Engine-Key` header holding `ENGINE_API_KEY`,
-  so the game-result endpoints do not accept an ordinary user session.
+  so the game-result endpoints do not accept an ordinary user session. The header is compared in
+  constant time (`verifySecret` hashes both sides before `timingSafeEqual`, so a wrong-length key
+  cannot throw or leak its length), and neither side has a default: the backend preflight and the
+  engine boot both refuse to start when the variable is empty.
+- **Only the app's own origins may open a socket.** The engine answers a Socket.IO handshake only for
+  origins on the allow-list compose builds from `FRONTEND_URL` and `NGROK_FRONTEND_URL` (the LAN and
+  tunnel origins). An empty list stops the process instead of widening to `origin: '*'`, so a missing
+  value cannot silently hand every website a handshake. A token is still needed to join a game, so
+  this closes the connection itself rather than the seat.
+- **What a socket may send is bounded.** Events are capped at 100 KB (`maxHttpBufferSize`, against
+  the 1 MB default), the engine pings every 10 s and drops a socket that takes more than 15 s to
+  answer, and inbound events are metered per socket by a 20-event token bucket that refills over 5 s.
+  A socket that drains the bucket is closed, which runs the same disconnect path as a dropped
+  connection, so its seat falls into the normal reconnect grace window (45 s) rather than being held
+  open by a flood.
 
-The ten holes found in the first version of this boundary, and the rule that now closes each one, are
-tabulated in [`architecture.md`](architecture.md) (Security & Threat Model); the engine-side detail
-is in [`ludo-engine/ludo-engine-socket-system.md`](ludo-engine/ludo-engine-socket-system.md).
+The twelve holes found in the first version of this boundary, and the rule that now closes each one,
+are tabulated in [`architecture.md`](architecture.md) (Security & Threat Model); the engine-side
+detail is in [`ludo-engine/ludo-engine-socket-system.md`](ludo-engine/ludo-engine-socket-system.md)
+(CORS allow-list and socket limits).
 
 **Mitigates:** forging a game credential from any other token or key that shares the session secret,
 joining a room or claiming a seat the caller does not own, a refused socket continuing to receive a
-game's broadcasts, and a stale duplicate socket closing a seat that is live.
+game's broadcasts, a stale duplicate socket closing a seat that is live, a foreign page opening a
+socket against the engine, and one connected socket tying the engine up with oversized or rapid
+events.
 
 
 ---
@@ -480,12 +527,19 @@ script disguised as an image behind a benign declared type, and SQL injection th
 - **The stack refuses to start with a missing secret.** `make env` runs before every build and fails
   with the list of empty keys; the backend reads its secrets through `requireSecret()`, which throws
   at boot rather than signing with `undefined`; the backend entrypoint preflight aborts on a missing
-  `DATABASE_URL`, `JWT_SECRET`, `ENGINE_JWT_SECRET` or `OAUTH_STATE_SECRET`.
+  `DATABASE_URL`, `JWT_SECRET`, `ENGINE_JWT_SECRET`, `OAUTH_STATE_SECRET` or `ENGINE_API_KEY`, and the
+  engine exits when `ENGINE_API_KEY` or `CORS_ORIGIN` is empty rather than substituting a default.
+- **A schema change cannot destroy data unattended.** The backend entrypoint applies `prisma db push`
+  without `--accept-data-loss`, so drift that would drop or narrow a column aborts the boot instead of
+  being applied. A fresh database and additive changes still apply as before.
 - **The frontend stores no credential.** The session lives in the httpOnly cookies only; nothing
   token-like is kept in `localStorage` or `sessionStorage`.
 - **CORS is not enabled on the backend.** Every call the SPA makes is same-origin through nginx, so
   the backend emits no cross-origin permission at all: there is no allow-list to get wrong and no
-  `Access-Control-Allow-Origin` for another site's page to make use of.
+  `Access-Control-Allow-Origin` for another site's page to make use of. The engine, which browsers
+  reach over the WebSocket transport, is the one service with a CORS list, and that list is an
+  allow-list of the app's own origins (never `*`) — see
+  [Game engine boundary](#game-engine-boundary).
 
 **Mitigates:** recovering a token or a password from a cache dump, starting a service with an empty
 secret (which would make signatures forgeable), a session being readable by an injected script, and a
@@ -502,13 +556,15 @@ They are listed so that this doc does not overstate the current state.
 
 | Area | Current state | Why it matters |
 |---|---|---|
-| Engine socket | Socket.IO CORS defaults to `origin: '*'`; no event rate limit; the default 1 MB `maxHttpBufferSize` | a foreign origin can open a socket (it still needs a valid match token to join a game), and a connected socket can send large or rapid events |
-| Login lockout | throttling is per client address | attempts spread over many addresses are not slowed per account |
-| Engine shared key | `X-Engine-Key` is compared with a plain string comparison, and falls back to `dev-engine-key` when the variable is unset | the comparison is not constant time, and the fallback would let a misconfigured deployment accept a known key |
-| Schema push | the backend entrypoint runs `prisma db push --accept-data-loss` on every boot | an unintended schema drift could drop data unattended |
 | Notification streams | no cap on concurrent SSE streams per user | one signed-in user can hold many long-lived responses open |
 | Certificate | valid for 365 days, regenerated only at image build | an expired certificate is a warning, not a bypass, but it is a recurring support burden |
 | `helmet()` | not used on the backend | nginx already sets the headers, so this is a duplicate-control gap only |
+
+The engine socket (CORS `origin: '*'`, no event rate limit, the 1 MB default buffer), the per-account
+login lockout, the shared-key comparison and the unconditional `prisma db push --accept-data-loss`
+were on this list and are closed; they are described under [Game engine boundary](#game-engine-boundary),
+[In the API (NestJS throttler)](#in-the-api-nestjs-throttler) and
+[Data stores, secrets and configuration](#data-stores-secrets-and-configuration).
 
 
 ---

@@ -22,6 +22,7 @@ import { AUTH, OAUTH_LINK_AUDIENCE, OAUTH_LINK_TTL } from './auth.constants';
 import { MailService } from './mail.service';
 import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
+import { LoginLockoutService } from './login-lockout.service';
 import { requireSecret, secret } from '../secrets';
 import { NotificationService } from '../notification/notification.service';
 import { AvatarMetaService } from '../avatar/avatar-meta.service';
@@ -110,6 +111,7 @@ export class AuthService implements OnModuleDestroy {
     private readonly mail: MailService,
     private readonly twoFactor: TwoFactorService,
     private readonly session: SessionService,
+    private readonly loginLockout: LoginLockoutService,
     private readonly notifications: NotificationService,
     private readonly avatarMeta: AvatarMetaService,
   ) {
@@ -250,6 +252,11 @@ export class AuthService implements OnModuleDestroy {
   // password. An unverified address stops here; otherwise 2FA decides between
   // a session and an emailed code. Called by auth.controller.ts POST /login.
   async login(dto: LoginDto): Promise<LoginResult> {
+    // Per-account gate before the password check: the route's @Throttle and
+    // nginx's limit_req count the caller's address, so a spread-out attempt list
+    // is not caught by either. Slows, then refuses, an account under attack.
+    await this.loginLockout.gate(dto.identifier);
+
     // Accept either a username or an email in the same field.
     const user = await this.prisma.db.user.findFirst({
       where: {
@@ -257,6 +264,7 @@ export class AuthService implements OnModuleDestroy {
       },
     });
     if (!user?.password_hash) {
+      await this.loginLockout.recordFailure(dto.identifier);
       throw new UnauthorizedException({
         code: 'AUTH_INVALID_CREDENTIALS',
         message: 'Invalid username, email, or password',
@@ -265,11 +273,16 @@ export class AuthService implements OnModuleDestroy {
 
     const passwordMatches = await bcrypt.compare(dto.password, user.password_hash);
     if (!passwordMatches) {
+      await this.loginLockout.recordFailure(dto.identifier);
       throw new UnauthorizedException({
         code: 'AUTH_INVALID_CREDENTIALS',
         message: 'Invalid username, email, or password',
       });
     }
+
+    // The password is right, so the account starts clean: attempts that came
+    // before a legitimate login must not slow the owner down afterwards.
+    await this.loginLockout.recordSuccess(dto.identifier);
 
     // An unverified address cannot sign in. Returned as a result, not thrown:
     // the browser logs a failed status itself, and this is a normal state.

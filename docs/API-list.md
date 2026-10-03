@@ -396,7 +396,9 @@ Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with
 
 ```
 
-**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. An unverified address is not an error: it returns the 200 notice above, so the browser logs no failed request.
+**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. An unverified address is not an error: it returns the 200 notice above, so the browser logs no failed request. The same 401 covers a locked identifier: a refusal is not distinguished from a wrong password.
+
+**Per-account lockout (`LoginLockoutService`):** failures are counted against the identifier, not the caller's address, so rotating proxies does not buy extra guesses at one account. From the 5th failure the next attempt is held back by `min(2^n, 30)` s (2, 4, 8, 16, then 30) before the password is checked, and from the 10th the identifier is refused for 15 minutes; a correct password deletes the counter. An identifier that never existed is counted and delayed identically, so the response says nothing about which accounts exist. Clients should not retry a 401 in a loop: the per-address throttle answers `429` as well.
 
 
 ---

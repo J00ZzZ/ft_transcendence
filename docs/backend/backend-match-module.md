@@ -341,7 +341,7 @@ GET /api/games/rooms
 | `NotificationService` | `game_invite` / `match_cancelled` / `match_finished` pushes to the seated players |
 | `AchievementsService` | Achievement evaluation after a game ends (`match.postgame`) |
 | `JwtService` | Host for the engine-token signer (`engine-token.util.ts` overrides the secret per call, so the module's own `JWT_SECRET` is not what signs match tokens) |
-| `secrets.ts` | `ENGINE_API_KEY` (validating engine callbacks) and `ENGINE_JWT_SECRET` (signing engine tokens) |
+| `secrets.ts` | `ENGINE_API_KEY` (validating engine callbacks, compared in constant time by `verifySecret`) and `ENGINE_JWT_SECRET` (signing engine tokens) |
 
 > Presence is **not** a match dependency: no `match.*` service imports `PresenceService`.
 > Presence is driven entirely by the client's `POST /api/presence/heartbeat` (see `backend-presence-module.md`).
@@ -358,7 +358,7 @@ GET /api/games/rooms
 | `REDIS_HOST` | `redis` | Redis connection for match state |
 | `REDIS_PORT` | `6479` | Redis port |
 | `REDIS_PASSWORD` | (from secrets) | Redis authentication |
-| `ENGINE_API_KEY` | (from secrets) | Validates `POST /api/game/end` and `/api/game/:id/started` from engine |
+| `ENGINE_API_KEY` | (from secrets) | Validates `POST /api/game/end` and `/api/game/:id/started` from engine. Compared with `verifySecret()` (both sides SHA-256-hashed, then `timingSafeEqual`, so a wrong-length key cannot throw or leak its length) and the entrypoint preflight rejects a build where it is empty |
 | `ENGINE_JWT_SECRET` | (from secrets) | Signs the Socket.IO engine tokens handed to clients (`signEngineToken`, `engine-token.util.ts`) — separate from the session `JWT_SECRET` so one leaked key cannot forge the other token family. Required: the preflight rejects a build without it |
 | `FRONTEND_URL` | `https://localhost:8443` (from `.env`) | Derives `ENGINE_WS_URL` by replacing `http` with `ws`; required, so the app throws at startup if it is unset |
 

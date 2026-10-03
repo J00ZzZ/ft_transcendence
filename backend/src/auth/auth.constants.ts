@@ -10,6 +10,16 @@ export const AUTH = {
     resendWindowS: 60 * 60,
     maxResends: 3,
   },
+  // Per-account login lockout (security-review F-08). The route's @Throttle and
+  // nginx's limit_req count the client address, so these count failures per
+  // account, in Redis (`login:fail:<sha256(identifier)>`, never the identifier).
+  loginLockout: {
+    windowS: 15 * 60, // failures older than this start the count again
+    softLimit: 5, //     failures that start costing the caller time
+    hardLimit: 10, //    failures that refuse the account outright
+    hardLockS: 15 * 60, // how long that refusal lasts (equal to windowS today: separate knobs on purpose)
+    maxDelayS: 30, //    ceiling on the per-attempt delay
+  },
 } as const;
 
 // JWT scope claims: a token only works where its audience says it belongs.

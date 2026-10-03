@@ -48,6 +48,7 @@ the single-use emailed tokens.
 | `auth.controller.ts` | HTTP routes: register, verify-email, login, 2fa/verify, refresh, forgot-password, reset-password, logout, me, profile read/update, password change, account deletion, 2FA settings, and 3 OAuth flows |
 | `auth.service.ts` | Core business logic: password hashing (bcrypt), JWT issuance, OAuth validation, 2FA orchestration, email verification, and the verify-then-commit email change |
 | `auth.constants.ts` | `AUTH`: single-source auth tunables (token TTLs, 2FA challenge/resend limits, email-change rate cap) |
+| `login-lockout.service.ts` | Per-account failed-login counters in Redis: slows attempts from the 5th failure and refuses the account from the 10th (see [Login lockout (per account)](#login-lockout-per-account)) |
 | `jwt.strategy.ts` | Passport strategy that extracts JWT from the `token` cookie and requires our issuer, the API audience, `HS256` and a string `sub` |
 | `jwt-auth.guard.ts` | `@UseGuards(JwtAuthGuard)` decorator — protects routes behind JWT |
 | `jwt-payload.ts` | TypeScript interface for the JWT payload: `{ sub: string; username: string }` |
@@ -153,7 +154,7 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `POST` | `/api/auth/verify-email` | None | Redeem a signup or email-change link (token in the body, never the URL); returns `{ result }` for the SPA to route on |
 | `POST` | `/api/auth/resend-verification` | None | Resend a signup verification link (generic response, throttled 3/h) |
 | `POST` | `/api/auth/profile/resend-email-change` | JWT | Resend the pending email-change link (throttled 5/h) |
-| `POST` | `/api/auth/login` | None | Authenticate — returns `{ twoFactorRequired }`, the not-verified notice, or sets session |
+| `POST` | `/api/auth/login` | None | Authenticate — returns `{ twoFactorRequired }`, the not-verified notice, or sets session; the per-account lockout applies (see Rate limits) |
 | `POST` | `/api/auth/2fa/verify` | None | Redeem 2FA code + pendingToken for session |
 | `POST` | `/api/auth/2fa/resend` | None | Re-issue the 2FA code for a live challenge (3 resends/hour per user) |
 | `POST` | `/api/auth/refresh` | None (refresh cookie) | Rotate refresh token, issue fresh access token |
@@ -200,7 +201,7 @@ throttler default (300 requests per 60 s, installed in `app.module.ts`).
 | Route | Limit |
 |-------|-------|
 | `POST /api/auth/register` | 5 per hour |
-| `POST /api/auth/login` | 5 per minute |
+| `POST /api/auth/login` | 5 per minute, per address (plus the per-account lockout below) |
 | `POST /api/auth/2fa/verify` | 5 per minute |
 | `POST /api/auth/2fa/resend` | 5 per hour (+ 3 per hour per user) |
 | `POST /api/auth/refresh` | 30 per minute |
@@ -209,6 +210,29 @@ throttler default (300 requests per 60 s, installed in `app.module.ts`).
 
 The counted address is the client's own: `main.ts` trusts internal hops only, so a client-sent
 `X-Forwarded-For` cannot move a request into a different bucket.
+
+### Login lockout (per account)
+
+Address-keyed limits leave one gap: an attacker rotating through proxies gets a fresh budget at every
+address. `LoginLockoutService` (`login-lockout.service.ts`, registered in `auth.module.ts`) adds a
+counter keyed on the account, stored in Redis as `login:fail:<sha256(identifier)>` — hashed, so the
+store holds no usernames, and case-folded, so one account cannot be given two budgets. `AuthService.login()`
+asks it before the bcrypt compare, so a locked account costs nothing to refuse:
+
+| Failed logins in the streak | Next attempt |
+|---|---|
+| 0–4 | checked as usual |
+| 5–9 | held back `min(2^n, 30)` s (2, 4, 8, 16, then 30) before the password is checked |
+| 10+ | refused for 15 minutes (every further failure refreshes the key) |
+| after the correct password | the counter is deleted |
+
+Thresholds live in `AUTH.loginLockout` (`auth.constants.ts`); the counter expires 15 minutes after the
+last failure. A refusal returns the same `401 AUTH_INVALID_CREDENTIALS` body a wrong password returns,
+because a distinct "locked" message would be an account-enumeration oracle — and this way the SPA's
+existing `AUTH_INVALID_CREDENTIALS` string (en/fr/ms) covers it with no new user-visible text. An
+identifier that never existed is counted and delayed identically. Redis is already required to finish a
+login (the refresh-token session store), so this adds no new dependency, and a Redis outage fails closed
+rather than skipping the count.
 
 ### Cookie Configuration
 
@@ -270,6 +294,11 @@ changes in one place:
 | `AUTH.challenge.maxAttempts` | 5 | 2FA code attempts per challenge |
 | `AUTH.challenge.resendWindowS` | 1 h | 2FA resend cap window |
 | `AUTH.challenge.maxResends` | 3 | 2FA resends per window per user |
+| `AUTH.loginLockout.windowS` | 15 min | Failed-login streak window (also the Redis counter TTL) |
+| `AUTH.loginLockout.softLimit` | 5 | Failures that start costing the caller time |
+| `AUTH.loginLockout.hardLimit` | 10 | Failures that refuse the account outright |
+| `AUTH.loginLockout.hardLockS` | 15 min | How long that refusal lasts (equal to `windowS` today: separate knobs on purpose) |
+| `AUTH.loginLockout.maxDelayS` | 30 | Ceiling on the per-attempt delay |
 
 Other tunables stay in their own files: `SALT_ROUNDS` (`auth.service.ts`, 10, bcrypt cost),
 `ACCESS_MAX_AGE_MS` / `REFRESH_MAX_AGE_MS` (`auth.controller.ts`), `REFRESH_TTL_S`
@@ -317,6 +346,7 @@ sequenceDiagram
 
     User->>Site: Enter username (or email) + password, click Log in
     Site->>Server: POST /api/auth/login
+    Server->>Server: Per-account lockout check (Redis)
     Server->>DB: Look up the account
     alt Wrong password / unknown user
         Server-->>Site: Error message
@@ -496,6 +526,7 @@ POST /api/auth/register
 ```
 POST /api/auth/login
   ├── Validate LoginDto
+  ├── LoginLockoutService.gate(identifier) → 401 if locked; delay from the 5th failure
   ├── Find user by username OR email → 401 if not found
   ├── bcrypt.compare(password, hash) → 401 if mismatch
   ├── If the address is not verified → 200 { code: 'AUTH_EMAIL_NOT_VERIFIED' }, no cookies
@@ -756,14 +787,14 @@ All configuration is read from environment variables — the root `.env` (compos
 | `FRONTEND_URL` | AuthController (OAuth redirect target for local requests; required, the example `.env` sets `https://localhost:8443`) |
 | `NGROK_FRONTEND_URL` | AuthController (OAuth redirect target when the request Host contains `ngrok`) |
 | `SMTP_CREDENTIALS` | MailService (format: `[smtp.gmail.com]:587 address@gmail.com:app-password`) |
-| `REDIS_PASSWORD` | SessionService, TwoFactorService, MailService |
+| `REDIS_PASSWORD` | SessionService, TwoFactorService, MailService, LoginLockoutService |
 
 ### Environment Variables
 
 | Variable | Default | Used By |
 |----------|---------|---------|
-| `REDIS_HOST` | `redis` | SessionService, TwoFactorService, MailService |
-| `REDIS_PORT` | `6479` | SessionService, TwoFactorService, MailService |
+| `REDIS_HOST` | `redis` | SessionService, TwoFactorService, MailService, LoginLockoutService |
+| `REDIS_PORT` | `6479` | SessionService, TwoFactorService, MailService, LoginLockoutService |
 
 
 ---
