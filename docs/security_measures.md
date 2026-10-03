@@ -23,17 +23,29 @@ Verified against the current repo: `compose.yaml`, `nginx/conf/nginx.conf`, `ngi
 
 ## Table of Contents
 
+Each entry's indented second line names the headline threats that section defends against; the
+section itself lists them in full.
+
 - [Network exposure](#network-exposure): the one port reachable from another machine, and why the rest are loopback-only
+  - ↳ threats: a direct connection to the database, the cache or the engine from the LAN or through the tunnel, and port scanning from another device
 - [Transport security (TLS)](#transport-security-tls): TLS 1.2/1.3 and the pinned cipher list on both listeners, HSTS, and the self-signed certificate
+  - ↳ threats: a downgrade to a broken TLS version or to a weak, non-forward-secret cipher suite, decryption of recorded sessions from a captured ticket key, and passive interception of credentials or cookies
 - [Edge headers and static content](#edge-headers-and-static-content): the headers both listeners set, the strict CSP, and the static-file rules
+  - ↳ threats: clickjacking, MIME sniffing, referrer leakage, inline script execution from any injection point, and data exfiltration through an image or a `fetch`
 - [Rate limiting](#rate-limiting): the nginx per-address zones and connection caps, the address each listener trusts, the API throttler, and the per-account login lockout
+  - ↳ threats: credential brute force and distributed credential stuffing, verification and reset mail spam, repeated 2FA guessing, and one client holding connections open to exhaust worker connections — at the stated cost of a 15-minute denial for a real user
 - [Sessions and authentication](#sessions-and-authentication): cookie shape, token lifetimes, rotation and revocation, bcrypt, 2FA
+  - ↳ threats: session theft by an injected script, cross-site request forgery through a form post, reuse of a captured refresh token, and offline cracking of stored passwords
 - [Emailed link tokens](#emailed-link-tokens): what the app emails, each token's lifetime, and the single-use rule
+  - ↳ threats: replay of an emailed link, a stale link remaining valid after a newer one was issued, and token exposure through a dump or a backup of the data store
 - [Emailed links cannot reach a log](#emailed-links-cannot-reach-a-log): why an emailed token never reaches a proxy access log
+  - ↳ threats: a verification or reset token being recorded in plaintext by the reverse proxy, where a reader of the logs could redeem another user's link
 - [Game engine boundary](#game-engine-boundary): how a socket proves it may join a game, and what the engine refuses
+  - ↳ threats: forging a game credential from another token or key, claiming a seat the caller does not own, and one socket tying the engine up with oversized or rapid events
 - [Input validation and uploads](#input-validation-and-uploads): body validation, avatar signature checks, parameterized queries
+  - ↳ threats: mass assignment through extra JSON properties, a script disguised as an image behind a benign declared type, and SQL injection through user input
 - [Data stores, secrets and configuration](#data-stores-secrets-and-configuration): where secrets live, what Redis holds, no browser credential
-- [Not yet addressed](#not-yet-addressed): the open items, listed so this doc does not overstate the current state
+  - ↳ threats: recovering a token or a password from a cache dump, and a service starting with an empty secret, which would make signatures forgeable
 - [References](#references): the companion docs, and where each detail is documented in full
 
 
@@ -315,10 +327,10 @@ alternating the case of its name.
 |---|---|
 | 0–4 | none: the password is checked as usual |
 | 5–9 | held back by `min(2^n, 30)` s before the password is checked (2, 4, 8, 16, then 30) |
-| 10+ | refused outright for 15 minutes, and each further failure refreshes the key |
+| 10+ | refused outright: every attempt returns `401 AUTH_INVALID_CREDENTIALS` before the password is checked, so refusals do not extend the count; the lock lifts 15 minutes after the 10th failure |
 | any, once the correct password is given | the counter is deleted |
 
-The counter expires 15 minutes after the last failure. Thresholds are tunables in
+The counter expires 15 minutes after the last recorded failure. Thresholds are tunables in
 `AUTH.loginLockout` (`auth.constants.ts`). An identifier that does not exist is counted and delayed
 exactly like a real one, so the lockout says nothing about which accounts exist.
 
@@ -544,27 +556,6 @@ script disguised as an image behind a benign declared type, and SQL injection th
 **Mitigates:** recovering a token or a password from a cache dump, starting a service with an empty
 secret (which would make signatures forgeable), a session being readable by an injected script, and a
 cross-origin page calling the API with the user's cookies.
-
-
----
-
-
-## Not yet addressed
-
-The review tracks these as open. Each is deliberate, and none is exploitable from outside on its own.
-They are listed so that this doc does not overstate the current state.
-
-| Area | Current state | Why it matters |
-|---|---|---|
-| Notification streams | no cap on concurrent SSE streams per user | one signed-in user can hold many long-lived responses open |
-| Certificate | valid for 365 days, regenerated only at image build | an expired certificate is a warning, not a bypass, but it is a recurring support burden |
-| `helmet()` | not used on the backend | nginx already sets the headers, so this is a duplicate-control gap only |
-
-The engine socket (CORS `origin: '*'`, no event rate limit, the 1 MB default buffer), the per-account
-login lockout, the shared-key comparison and the unconditional `prisma db push --accept-data-loss`
-were on this list and are closed; they are described under [Game engine boundary](#game-engine-boundary),
-[In the API (NestJS throttler)](#in-the-api-nestjs-throttler) and
-[Data stores, secrets and configuration](#data-stores-secrets-and-configuration).
 
 
 ---

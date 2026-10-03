@@ -150,11 +150,20 @@ Every one of these tokens is signed with the engine-dedicated `ENGINE_JWT_SECRET
 ### CORS allow-list and socket limits
 
 The handshake is the one engine request a browser makes on its own, so it carries CORS.
-`SocketServer.start()` reads `CORS_ORIGIN` — compose builds it as `FRONTEND_URL,NGROK_FRONTEND_URL` —
+`SocketServer.start()` reads `CORS_ORIGIN` — compose builds it from `FRONTEND_URL` (defaulting to
+`https://localhost:8443`, so a bare `docker compose up` still boots) plus `NGROK_FRONTEND_URL` —
 parses it via `parseAllowedOrigins()` (`socket/allowed-origins.ts`) and passes the result to
-`new Server(...)` as `cors.origin`. An empty list is fatal: the process logs and exits rather than
-falling back to `origin: '*'`, which would let any website open a socket. A valid match token is
-still required to join a game; this only bounds who may connect.
+`new Server(...)` as `cors.origin`:
+
+| `CORS_ORIGIN` value | Result |
+|---|---|
+| `https://localhost:8443,https://x.ngrok.app` | both origins complete a handshake |
+| `https://localhost:8443,` (trailing comma, no tunnel) | one origin: `parseAllowedOrigins()` drops the blank |
+| unset, empty, or only blanks | `CORS_ORIGIN is not set` is logged and the process exits |
+
+An empty list is fatal: the process logs and exits rather than falling back to `origin: '*'`, which
+would let any website open a socket. A valid match token is still required to join a game; this only
+bounds who may connect.
 
 The same `new Server(...)` call bounds what a connected socket may send:
 
@@ -169,6 +178,14 @@ so a client cannot spend the whole budget at the end of one window and again at 
 One bucket is created per connection in `server.ts`, so a socket can only spend its own budget, and
 `start()` also refuses to boot without `ENGINE_API_KEY` (the backend rejects every result callback
 without it).
+
+The three gates a connection passes, in order:
+
+| Order | Gate | On failure |
+|---|---|---|
+| 1 | CORS: the browser's origin must be on the allow-list | Socket.IO refuses the handshake before any engine code runs |
+| 2 | `verifyToken`: `HS256`, signature, `aud: ludo-engine`, live `exp` | `next(new Error('Invalid token'))`, or `'Authentication required'` when no token is sent: no connection |
+| 3 | Per-socket event bucket (`EventRateLimiter`) | `socket.disconnect(true)`, then the ordinary disconnect path and the 45 s grace window |
 
 
 ---
@@ -560,7 +577,7 @@ Module-level constants in the socket layer — edit the value at the top of the 
 | `POST_GAME_TIMEOUT_MS` | `socket/server.ts` | 60 s | Post-game room auto-times-out after a game ends |
 | `BOT_STEP_ANIM_MS` | `socket/server.ts` | 220 ms | Per-step piece-move animation pacing used to time bot turns |
 | `BOT_THINK_MS` | `socket/server.ts` | 500 ms | Flat "thinking" pause before a bot rolls |
-| (inline) lobby sweep | `socket/server.ts` | 60 s | How often the lobby-expiry sweep runs (`setInterval(..., 60_000)` in `start()`) |
+| (inline) lobby and grace sweeps | `socket/server.ts` | 60 s | How often the lobby-expiry and expired-grace-window sweeps run (`setInterval(..., 60_000)` in `start()`) |
 | (inline) dice-anim wait | `socket/server.ts` | 750 ms | Frontend dice-roll animation wait before a bot acts |
 | `SLOT_COLORS` | `socket/join-manager.ts` | blue, red, green, yellow | Seat order used when creating games / auto-filling bot seats |
 | `BOT_PREFIX` | `socket/auth.ts` | `bot-` | Prefix that marks a user id as a bot |

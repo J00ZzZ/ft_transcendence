@@ -219,15 +219,15 @@ counter keyed on the account, stored in Redis as `login:fail:<sha256(identifier)
 store holds no usernames, and case-folded, so one account cannot be given two budgets. `AuthService.login()`
 asks it before the bcrypt compare, so a locked account costs nothing to refuse:
 
-| Failed logins in the streak | Next attempt |
+| Failed logins in the streak | Effect on the next attempt |
 |---|---|
-| 0–4 | checked as usual |
-| 5–9 | held back `min(2^n, 30)` s (2, 4, 8, 16, then 30) before the password is checked |
-| 10+ | refused for 15 minutes (every further failure refreshes the key) |
-| after the correct password | the counter is deleted |
+| 0–4 | none: the password is checked as usual |
+| 5–9 | held back by `min(2^n, 30)` s before the password is checked (2, 4, 8, 16, then 30) |
+| 10+ | refused outright: every attempt returns `401 AUTH_INVALID_CREDENTIALS` before the password is checked, so refusals do not extend the count; the lock lifts 15 minutes after the 10th failure |
+| any, once the correct password is given | the counter is deleted |
 
 Thresholds live in `AUTH.loginLockout` (`auth.constants.ts`); the counter expires 15 minutes after the
-last failure. A refusal returns the same `401 AUTH_INVALID_CREDENTIALS` body a wrong password returns,
+last recorded failure. A refusal returns the same `401 AUTH_INVALID_CREDENTIALS` body a wrong password returns,
 because a distinct "locked" message would be an account-enumeration oracle — and this way the SPA's
 existing `AUTH_INVALID_CREDENTIALS` string (en/fr/ms) covers it with no new user-visible text. An
 identifier that never existed is counted and delayed identically. Redis is already required to finish a
@@ -347,21 +347,31 @@ sequenceDiagram
     User->>Site: Enter username (or email) + password, click Log in
     Site->>Server: POST /api/auth/login
     Server->>Server: Per-account lockout check (Redis)
-    Server->>DB: Look up the account
-    alt Wrong password / unknown user
-        Server-->>Site: Error message
+    Note over Server: 5+ failures in the streak: wait min(2^n, 30) s before the password check. 10+: refuse, no password check.
+    alt Locked (10 or more failures)
+        Server-->>Site: 401 AUTH_INVALID_CREDENTIALS
         Site-->>User: Show the error
-    else Correct, address not verified
-        Server-->>Site: Notice (AUTH_EMAIL_NOT_VERIFIED)
-        Site-->>User: Ask them to open the verification link
-    else Correct, 2FA off
-        Server->>Server: Create a login session (stored in a browser cookie)
-        Server-->>Site: Logged in
-        Site-->>User: Go to the home page
-    else Correct, 2FA on
-        Server->>Server: Email a 6-digit code
-        Server-->>Site: "A code was emailed"
-        Site-->>User: Show "enter the code we emailed you"
+    else Not locked
+        Server->>DB: Look up the account
+        alt Wrong password / unknown user
+            Server->>Server: Record the failure (streak + 1)
+            Server-->>Site: 401 AUTH_INVALID_CREDENTIALS
+            Site-->>User: Show the error
+        else Correct password
+            Server->>Server: Delete the failure streak
+            alt Address not verified
+                Server-->>Site: Notice (AUTH_EMAIL_NOT_VERIFIED)
+                Site-->>User: Ask them to open the verification link
+            else 2FA off
+                Server->>Server: Create a login session (stored in a browser cookie)
+                Server-->>Site: Logged in
+                Site-->>User: Go to the home page
+            else 2FA on
+                Server->>Server: Email a 6-digit code
+                Server-->>Site: "A code was emailed"
+                Site-->>User: Show "enter the code we emailed you"
+            end
+        end
     end
 ```
 

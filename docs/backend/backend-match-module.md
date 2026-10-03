@@ -118,8 +118,8 @@ type MatchMode = 'pvp' | 'pve' | 'hotseat'
 | `POST` | `/api/game/:id/invite` | JWT | Invite a friend into a WAITING PvP room |
 | `GET` | `/api/games/rooms` | JWT | List the PvP rooms the caller may enter (open lobby rooms + their own reclaimable seats in started games) |
 | `GET` | `/api/games/mine` | JWT | List rooms the user is seated in |
-| `POST` | `/api/game/end` | engine key | Engine callback — process game end (scoring/achievements) |
-| `POST` | `/api/game/:id/started` | engine key | Engine callback — mark game started |
+| `POST` | `/api/game/end` | engine key (`X-Engine-Key`) | Engine callback — process game end (scoring/achievements) |
+| `POST` | `/api/game/:id/started` | engine key (`X-Engine-Key`) | Engine callback — mark game started |
 
 > **Invite body validation:** `POST /api/game/:id/invite` takes an
 > `InviteFriendDto` (`{ friendId }`). `friendId` is validated as a required UUID
