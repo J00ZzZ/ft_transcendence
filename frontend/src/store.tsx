@@ -501,7 +501,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       document.documentElement.lang = l;
       void i18n.changeLanguage(l);
       if (user) {
-        void apiFetch('/api/auth/profile', {
+        void apiFetch('/api/auth/profile/language', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ language: l }),
