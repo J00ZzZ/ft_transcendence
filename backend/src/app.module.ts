@@ -17,7 +17,7 @@ import { NotificationModule } from './notification/notification.module';
 // global rate-limit guard. NestJS bootstraps this from main.ts.
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 600 }]),
     AuthModule,
     UserModule,
     FriendsModule,

@@ -590,6 +590,15 @@ export class AuthService implements OnModuleDestroy {
     return { twoFactorEnabled: enabled };
   }
 
+  // Set the language transactional email is sent in.
+  async setLanguage(userId: string, language: string) {
+    await this.prisma.db.user.update({
+      where: { id: userId },
+      data: { language },
+    });
+    return { language };
+  }
+
   // Complete profile update : edit display name, email, and/or the email-code
   // 2FA method in one call; only provided fields change. Email changes reuse
   // the signup verification flow. Username is immutable.

@@ -18,6 +18,7 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { LoginDto } from './dto/login.dto';
 import { TwoFactorDto } from './dto/twofactor.dto';
 import { TwoFactorSettingDto } from './dto/two-factor-setting.dto';
+import { LanguageSettingDto } from './dto/language-setting.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
@@ -183,7 +184,7 @@ export class AuthController {
 
   // Complete profile update (username / email / 2FA method)
   @UseGuards(JwtAuthGuard)
-  @Throttle({ default: { limit: 10, ttl: HOUR_MS } })
+  @Throttle({ default: { limit: 60, ttl: HOUR_MS } })
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
     const result = await this.authService.updateProfile(
@@ -247,6 +248,12 @@ export class AuthController {
   @Patch('2fa')
   setTwoFactor(@Req() req: Request, @Body() dto: TwoFactorSettingDto) {
     return this.authService.setTwoFactorSetting((req.user as { id: string }).id, dto.enabled);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile/language')
+  setLanguage(@Req() req: Request, @Body() dto: LanguageSettingDto) {
+    return this.authService.setLanguage((req.user as { id: string }).id, dto.language);
   }
 
   // **Google OAuth**
