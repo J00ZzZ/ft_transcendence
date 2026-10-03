@@ -31,6 +31,10 @@ The Auth module handles all authentication concerns for the Ludo Transcendence a
 
 The module also provides the `JwtAuthGuard` used by other modules to protect their endpoints.
 
+The security properties behind these flows are summarized in
+[`../security_measures.md`](../security_measures.md): cookie shape, token lifetimes and rotation, and
+the single-use emailed tokens.
+
 
 ---
 ---
@@ -146,7 +150,7 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/auth/register` | None | Create account, send verification email (no session set) |
-| `GET` | `/api/auth/verify-email` | None | Redeem a signup or email-change link; redirect to the SPA (`?verified=1` / `?emailChanged=1` / `?error=…`) |
+| `POST` | `/api/auth/verify-email` | None | Redeem a signup or email-change link (token in the body, never the URL); returns `{ result }` for the SPA to route on |
 | `POST` | `/api/auth/resend-verification` | None | Resend a signup verification link (generic response, throttled 3/h) |
 | `POST` | `/api/auth/profile/resend-email-change` | JWT | Resend the pending email-change link (throttled 5/h) |
 | `POST` | `/api/auth/login` | None | Authenticate — returns `{ twoFactorRequired }`, the not-verified notice, or sets session |
@@ -169,6 +173,15 @@ export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])
 | `GET` | `/api/auth/github/callback` | None | GitHub OAuth callback |
 | `GET` | `/api/auth/42` | None | Redirect to 42 OAuth |
 | `GET` | `/api/auth/42/callback` | None | 42 OAuth callback |
+
+**Emailed links:** both the signup link and the email-change link point at the SPA,
+with the token in the URL **fragment** (`https://<host>/verify-email#token=<64-hex>`).
+A fragment is never sent to the server, so the token cannot land in nginx's access
+**or error** log, in browser history, or in a `Referer` header. `VerifyEmail.tsx`
+reads the fragment, strips it with `history.replaceState`, then `POST`s the token in
+the body to `POST /api/auth/verify-email`, which returns `{ result }` for the SPA to
+route on. There is no `GET` variant: links minted before this change 404 by design
+(see `security-review.md` F-04).
 
 **Display-name rules** (`PATCH /api/auth/profile`): the name must satisfy
 `VALIDATION_DISPLAY_NAME_LENGTH` / `VALIDATION_DISPLAY_NAME_CHARS`, be unique

@@ -1,7 +1,7 @@
 # Tunnel mode (ngrok)
 
-Reaching the app from anywhere on the internet, via ngrok. Companion doc:
-[`nginx.md`](./nginx.md).
+Reaching the app from anywhere on the internet, via ngrok. Companion docs:
+[`nginx.md`](./nginx.md), [`security_measures.md`](../security_measures.md).
 
 Verified directly against the current repo (`Makefile`, `backend/src/secrets.ts`,
 `backend/src/auth/oauth.guards.ts`, `backend/src/auth/auth.controller.ts`).

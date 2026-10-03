@@ -2,6 +2,9 @@
 
 Complete reference of all HTTP and WebSocket APIs in the project. Updated 14 Sep 2026
 
+What protects these routes (edge headers, throttling, cookie and token scope) is documented in
+[`security_measures.md`](security_measures.md).
+
 
 ---
 ---
@@ -134,7 +137,7 @@ An error response has one of two shapes:
 
 1. **[Auth — Account & Sessions](#1-auth--account--sessions)** — Registration, email verification, login, 2FA verify, refresh, logout, who am I
    - [`POST /api/auth/register`](#post-apiauthregister) — Create a new account (an email-verification link is sent)
-   - [`GET /api/auth/verify-email`](#get-apiauthverify-email) — Confirm your email address via the emailed link
+   - [`POST /api/auth/verify-email`](#post-apiauthverify-email): Confirm your email address with the token from the emailed link (sent in the body, not the URL)
    - [`POST /api/auth/login`](#post-apiauthlogin) — Log in with username/email + password (returns a 2FA prompt if enabled)
    - [`POST /api/auth/2fa/verify`](#post-apiauth2faverify) — Enter the 6-digit code emailed to you to finish logging in
    - [`POST /api/auth/refresh`](#post-apiauthrefresh) — Silently get a new access token when the current one expires
@@ -300,20 +303,26 @@ Create a new user account and send a verification email. This call sets no sessi
 ---
 
 
-#### `GET /api/auth/verify-email`
+#### `POST /api/auth/verify-email`
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Redeem an emailed link. The token is checked as a signup verification token (`verify:`, Redis) first, then as an email-change confirmation token (`emailchange:`, Redis). Redirects to the SPA:
+Redeems an emailed link. The token is checked as a signup verification token (`verify:`, Redis) first, then as an email-change confirmation token (`emailchange:`, Redis). The token is strictly single-use (`GET` + `DEL`), so a second attempt with the same link reports `invalid`.
 
-- signup → `<origin>/login?verified=1`
-- email change → `<origin>/profile?emailChanged=1`
-- commit-time conflict (address taken meanwhile) → `<origin>/profile?error=email-taken`
-- unknown/expired → `<origin>/login?error=invalid-verification-link`
+The emailed link points at the SPA (`/verify-email#token=…`), so the token travels in the **request body** and never in a URL. A URL fragment is not sent to the server, which keeps the token out of nginx's access and error logs, out of browser history, and safe from mail clients that prefetch links.
 
 **Headers:** None  
-**Query:** `token` — the 64-char hex token from the email link  
-**Response:** 302 redirect to the frontend URL for the request's mode: `NGROK_FRONTEND_URL` (tunnel), `https://<LAN_IP>:<HTTPS_PORT>` (LAN), or `FRONTEND_URL` (local).
+**Body:** `token`: the 64-char hex token carried by the email link's URL fragment  
+**Response:** 200 `{ result }`: the SPA maps the outcome to a landing route:
+
+| `result` | Meaning | SPA lands on |
+|----------|---------|--------------|
+| `signup` | Signup address marked verified | `/login?verified=1` |
+| `change` | Pending email change committed | `/profile?emailChanged=1` |
+| `conflict` | Address was taken meanwhile | `/profile?error=email-taken` |
+| `invalid` | Unknown, expired, or already-used token | `/login?error=invalid-verification-link` |
+
+**Errors:** 400 with a `VALIDATION_*` code if `token` is missing or is not exactly 64 characters. See [Error responses](#error-responses).
 
 
 ---

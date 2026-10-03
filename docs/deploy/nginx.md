@@ -3,7 +3,7 @@
 How nginx sits in front of everything, and why it's the one piece that lets
 local, LAN, and ngrok tunnel mode all work without the frontend or backend
 knowing which one is in play. Companion docs: [`lan.md`](./lan.md),
-[`tunnel.md`](./tunnel.md).
+[`tunnel.md`](./tunnel.md), [`security_measures.md`](../security_measures.md).
 
 Verified directly against the current repo (`nginx/conf/nginx.conf`,
 `nginx/conf/app.inc`, `compose.yaml`). The shared routing/limits live in `nginx/conf/app.inc`; see

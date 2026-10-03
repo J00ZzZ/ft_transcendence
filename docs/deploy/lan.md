@@ -1,7 +1,8 @@
 # LAN mode
 
 Reaching the app from another device on the same WiFi. Companion docs:
-[`nginx.md`](./nginx.md), [`tunnel.md`](./tunnel.md).
+[`nginx.md`](./nginx.md), [`tunnel.md`](./tunnel.md),
+[`security_measures.md`](../security_measures.md).
 
 ## Local mode (baseline)
 

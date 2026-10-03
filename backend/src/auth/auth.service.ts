@@ -185,10 +185,12 @@ export class AuthService implements OnModuleDestroy {
     await this.avatarMeta.set(user.id, { has: false, style: user.avatarStyle });
 
     // No session yet, the account activates via the emailed link.
+    // The token goes in the URL *fragment*: fragments are not sent to the server,
+    // so it cannot reach a log. The SPA strips it from history, then POSTs it.
     const token = await this.twoFactor.createVerifyToken(user.id);
     await this.mail.sendVerification(
       email,
-      `${baseUrl}/api/auth/verify-email?token=${token}`,
+      `${baseUrl}/verify-email#token=${token}`,
       user.language,
       user.username,
     );
@@ -360,7 +362,7 @@ export class AuthService implements OnModuleDestroy {
       await this.mail
         .sendVerification(
           user.email,
-          `${baseUrl}/api/auth/verify-email?token=${token}`,
+          `${baseUrl}/verify-email#token=${token}`,
           user.language,
           user.username,
         )
@@ -392,7 +394,7 @@ export class AuthService implements OnModuleDestroy {
     await this.mail
       .sendEmailChange(
         pending.newEmail,
-        `${baseUrl}/api/auth/verify-email?token=${token}`,
+        `${baseUrl}/verify-email#token=${token}`,
         user.language,
         user.username,
       )
@@ -691,7 +693,7 @@ export class AuthService implements OnModuleDestroy {
       try {
         await this.mail.sendEmailChange(
           newEmail,
-          `${baseUrl}/api/auth/verify-email?token=${changeToken}`,
+          `${baseUrl}/verify-email#token=${changeToken}`,
           user.language,
           user.username,
         );

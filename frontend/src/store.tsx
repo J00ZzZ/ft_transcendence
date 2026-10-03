@@ -35,6 +35,10 @@ function apiError(body: unknown, fallback: string): string {
   return typeof message === 'string' ? message : fallback;
 }
 
+/** Outcome of redeeming an emailed verify link. 'error' means the request itself
+ * failed, so the single-use token was never consumed and the link still works. */
+export type VerifyOutcome = 'signup' | 'change' | 'conflict' | 'invalid' | 'error';
+
 export type Seat =
   | { type: 'you' }
   | { type: 'bot'; name: string }
@@ -155,6 +159,8 @@ type AppState = {
   resetPassword: (token: string, password: string) => Promise<string | null>;
   /** Resends a signup verification link (public). Success = null. */
   resendVerification: (email: string) => Promise<string | null>;
+  /** Redeems an emailed verify link (signup or email-change). */
+  verifyEmail: (token: string) => Promise<VerifyOutcome>;
   logout: () => Promise<void>;
   playerCount: PlayerCount;
   seats: Seat[];
@@ -392,6 +398,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!res) return i18n.t('common.couldNotReachServer');
     if (!res.ok) return apiError(await res.json().catch(() => null), i18n.t('auth.forgotFailed'));
     return null;
+  }, []);
+
+  // Redeem an emailed verify link (signup or email-change). The token travels in
+  // the request *body*: the link carries it in a URL fragment, which browsers
+  // never send to the server, so it stays out of the access and error logs.
+  const verifyEmail = useCallback(async (token: string): Promise<VerifyOutcome> => {
+    const res = await fetch('/api/auth/verify-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }).catch(() => null);
+    // Any transport failure or non-2xx leaves the single-use token unconsumed.
+    if (!res?.ok) return 'error';
+    const data = (await res.json().catch(() => null)) as { result?: VerifyOutcome } | null;
+    return data?.result ?? 'error';
   }, []);
 
   // Logout
@@ -643,6 +664,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       forgotPassword,
       resetPassword,
       resendVerification,
+      verifyEmail,
       resend2fa,
       logout,
       theme,
@@ -685,6 +707,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       forgotPassword,
       resetPassword,
       resendVerification,
+      verifyEmail,
       resend2fa,
       logout,
       theme,

@@ -333,7 +333,10 @@ metadata cache. The engine is a separate process, so its `RedisGameStore` and
 
 ## Security & Threat Model
 
-The ludo-engine socket is the one channel where a client acts on live game state directly, so it is treated as a boundary rather than as a trusted caller. The boundary rests on two properties:
+The wider set of hardening measures, layer by layer from the network edge inward, is in
+[`security_measures.md`](security_measures.md). This section covers the one channel where a client
+acts on live game state directly, so it is treated as a boundary rather than as a trusted caller. The
+boundary rests on two properties:
 
 - **The engine is only reachable same-origin.** `ludo-engine` publishes `127.0.0.1:3001` only, and the browser connects to `/socket.io/` on its own origin, which nginx proxies: a loopback connection on its own is never enough to reach a game.
 - **Every socket is authenticated by a match token, and the token, not the client, names the room and the seat.** The backend mints that token only for a seat the caller still owns, in a game the engine has neither started nor finalized.
@@ -487,6 +490,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │       ├── change-password.dto.ts     # logged-in password change
 │   │   │       ├── forgot-password.dto.ts     # reset-link request
 │   │   │       ├── reset-password.dto.ts      # reset token + new password
+│   │   │       ├── verify-email.dto.ts        # verify-link token (body, never the URL)
 │   │   │       ├── resend-verification.dto.ts # resend the signup link
 │   │   │       ├── update-profile.dto.ts      # optional profile fields (incl. language)
 │   │   │       └── delete-account.dto.ts      # account-deletion confirmation
@@ -609,8 +613,8 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       ├── validatePassword.ts   # Client-side password policy mirror
 │       ├── styles/               # retrowave.css (theme tokens/CSS) + tw.ts (helpers)
 │       ├── pages/                # Home, Login, Signup, TwoFactor, ForgotPassword,
-│       │                         # ResetPassword, LudoLobby, Lobby, Game, Friends,
-│       │                         # Leaderboard, Profile, LegalPage
+│       │                         # ResetPassword, VerifyEmail, LudoLobby, Lobby, Game,
+│       │                         # Friends, Leaderboard, Profile, LegalPage
 │       ├── components/           # RetroAuthLayout, RetroNavbar,
 │       │                         # NotificationBell/Toast, Board, Die,
 │       │                         # OAuthButtons, ProfileEditModal, UserAvatar,
@@ -636,6 +640,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
     ├── API-list.md               # Complete HTTP + WebSocket API reference
     ├── avatar-system.md          # Avatar pipeline: storage, caching, freshness, seats
     ├── Ludo_Rules.md             # Classic Ludo rules
+    ├── security_measures.md      # Hardening measures layer by layer, and the threat each one answers
     ├── backend/                  # Backend module deep-dives
     │   ├── backend-app-bootstrap-system.md   # Bootstrap, module wiring, secrets, health check
     │   ├── backend-auth-module.md            # Registration, login, OAuth, 2FA, sessions, reset
@@ -654,7 +659,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
     │   ├── frontend-router-system.md         # Custom client-side router
     │   ├── frontend-store-system.md          # Global state (auth, game, settings, match)
     │   ├── frontend-auth-pages-module.md     # Login and signup pages
-    │   ├── frontend-auth-extras-module.md    # 2FA, forgot/reset password pages
+    │   ├── frontend-auth-extras-module.md    # 2FA, forgot/reset password, verify-email pages
     │   ├── frontend-home-module.md           # Home page — stats, rank, friends, notifications
     │   ├── frontend-lobby-module.md          # Lobby — mode/seat setup, match creation
     │   ├── frontend-game-module.md           # Real-time gameplay page (Socket.IO)

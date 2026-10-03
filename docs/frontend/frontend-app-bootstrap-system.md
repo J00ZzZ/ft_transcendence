@@ -61,6 +61,7 @@ const FULL_ROUTES: Record<string, () => ReactNode> = {
   '/2fa': () => <TwoFactor />,
   '/forgot-password': () => <ForgotPassword />,
   '/reset-password': () => <ResetPassword />,
+  '/verify-email': () => <VerifyEmail />,
   '/gamelobby': () => <LudoLobby />,
   '/gamelobby/table': () => <Lobby />,
   '/game': () => <Game />,
@@ -71,9 +72,14 @@ const FULL_ROUTES: Record<string, () => ReactNode> = {
 /** Public routes, can be reached without a session */
 const PUBLIC_ROUTES = new Set([
   '/login', '/signup', '/2fa',
-  '/forgot-password', '/reset-password',
+  '/forgot-password', '/reset-password', '/verify-email',
   '/privacy', '/terms'
 ])
+
+/** Routes reached by an emailed account action rather than by browsing. A
+ * signed-in user must still see them: most such arrivals are recognizable from
+ * the query string, but the router cannot see a URL fragment. */
+const ACCOUNT_ACTION_ROUTES = new Set(['/verify-email'])
 ```
 
 
@@ -204,6 +210,9 @@ useEffect([authReady, known, user, isPublic, hasNotice])
   ├── !user && !isPublic → navigate('/login')
   ├── user && isPublic && !hasNotice → navigate('/home')
   └── else → render route component
+
+hasNotice = ACCOUNT_ACTION_ROUTES.has(path)   // /verify-email: token is in the fragment
+         || ?verified / ?reset / ?error / ?token present in the query string
 ```
 
 
