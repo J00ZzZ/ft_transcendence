@@ -101,8 +101,16 @@ services:
     # against backend's own push on container startup and crash-loops both
     # containers on a Postgres pg_type unique-constraint collision. Studio
     # only needs to browse the schema backend already owns/pushes.
-    entrypoint: ["npx"]
-    command: ["prisma", "studio", "--port", "5555", "--browser", "none"]
+    # Prisma 7 Studio only binds 127.0.0.1 inside the container (no --hostname
+    # flag), which Docker's port publishing can't reach. A tiny Node TCP relay
+    # listens on the container's network IP(s) on the same port 5555 and
+    # forwards to 127.0.0.1:5555. The port must stay identical: Studio rejects
+    # API requests (403) whose Origin isn't localhost/127.0.0.1:<its port>.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        node -e 'const net=require("net");for(const a of Object.values(require("os").networkInterfaces()).flat())if(!a.internal&&a.family==="IPv4")net.createServer(c=>{const u=net.connect(5555,"127.0.0.1");c.pipe(u).pipe(c);c.on("error",()=>u.destroy());u.on("error",()=>c.destroy())}).listen(5555,a.address)' &
+        exec npx prisma studio --port 5555 --browser none
     env_file: .env
     environment:
       DATABASE_URL: ${CONTAINER_DATABASE_URL}
