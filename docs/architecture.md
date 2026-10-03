@@ -223,9 +223,10 @@ during a drop.
 **user id**, not the whole `user` object. After a successful avatar upload or reset,
 `Profile.tsx` calls `setUser({ ...user, hasAvatarPhoto })`, which creates a new `user`
 object. If the effect depended on that object, React would close the stream and open a new
-one. Any notification published while the stream is closed (for example the
-`profile_updated` toast) is not delivered, so the toast would appear only some of the
-time. Depending on the user id avoids this, because the id does not change.
+one. Any event published while the stream is closed (for example the
+`avatar_changed` state sync, which reaches only that user's own clients) is not delivered,
+so the new photo would appear only some
+of the time. Depending on the user id avoids this, because the id does not change.
 
 ### Client polling cadence
 

@@ -103,12 +103,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           if (!event.data) return;
           const notification: Notification = JSON.parse(event.data);
           if (notification.id) {
-            // Global broadcasts are SHORT-LIVED/TRANSIENT: toast only, never the bell/unread
-            // badge. The actor also skips their own announcement (they already
-            // get the persisted `profile_updated` toast instead).
+            // A display-name change is SHORT-LIVED/TRANSIENT: toast only, never the
+            // bell/unread badge. The backend targets it at the actor alone
+            // (notifyTransient), so nobody else is ever told: show it as-is.
             if (notification.type === 'display_name_changed') {
-              const p = notification.payload;
-              if (p.fromUserId === userId) return;
               setToasts((prev) => [notification, ...prev]);
               return;
             }
@@ -122,8 +120,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
               return;
             }
             // Avatar photo changes are SHORT-LIVED/TRANSIENT state updates: no bell entry,
-            // no toast. The event carries the new state, so every open
-            // <UserAvatar> for that user flips immediately, with no request.
+            // no toast. The backend pushes them to the owner alone (notifyTransient),
+            // so this is what keeps the owner's OTHER tabs in step: the tab that
+            // uploaded already set the new state locally. Other accounts are never
+            // told and pick the change up on their next profile/roster fetch.
             if (notification.type === 'avatar_changed') {
               const p = notification.payload;
               const userId = typeof p.userId === 'string' ? p.userId : '';

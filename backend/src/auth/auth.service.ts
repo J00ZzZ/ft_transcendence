@@ -614,7 +614,9 @@ export class AuthService implements OnModuleDestroy {
     let emailChanged = false;
     let newEmail: string | undefined;
     let changeToken: string | undefined;
-    // Items actually changed in this request : feeds the profile_updated toast.
+    // Items actually changed in this request that warrant a persisted
+    // self-confirmation. A display-name change is announced transiently instead
+    // (see below), so it is deliberately not collected here.
     const changedItems: string[] = [];
 
     if (dto.displayName !== undefined && dto.displayName !== user.displayName) {
@@ -725,7 +727,10 @@ export class AuthService implements OnModuleDestroy {
 
     // Profile-change notifications
     // 1) Self-confirmation (persisted): "You have updated your profile: …"
-    if (data.displayName !== undefined) changedItems.push('displayName');
+    //    A display-name change is deliberately NOT persisted : it is announced by
+    //    the transient `display_name_changed` push below, so a bell entry on top of
+    //    it would duplicate the actor's own action (same rule as the avatar change
+    //    in UserService).
     if (emailChanged) changedItems.push('email');
     if (dto.twoFactorEnabled !== undefined && dto.twoFactorEnabled !== user.twoFactorEnabled) {
       changedItems.push('twoFactor');
@@ -736,11 +741,13 @@ export class AuthService implements OnModuleDestroy {
         .catch(() => {});
     }
 
-    // 2) Global announcement (transient toast, all online users):
-    //    "(Old DisplayName) has changed their Displayname to (New DisplayName)"
+    // 2) Self-confirmation (transient toast, this user's own clients only):
+    //    "You have changed your Displayname to (New DisplayName)"
+    //    Targeted at the actor with notifyTransient: no other account is told,
+    //    and nothing is persisted (no bell entry).
     if (data.displayName !== undefined) {
       await this.notifications
-        .broadcast('display_name_changed', {
+        .notifyTransient(userId, 'display_name_changed', {
           fromUserId: userId,
           fromUsername: user.username,
           oldDisplayName: user.displayName,

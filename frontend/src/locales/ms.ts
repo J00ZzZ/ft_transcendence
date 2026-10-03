@@ -166,7 +166,7 @@ export const ms = {
     profileItemPassword: 'Kata laluan',
     profileItemOauthAdd: 'Kaedah log masuk ditambah',
     profileItemOauthRemove: 'Kaedah log masuk dialih keluar',
-    displayNameChangedText: '{{displayName}} telah menukar Nama Paparan kepada {{newDisplayName}}',
+    displayNameChangedText: 'Anda telah menukar Nama Paparan kepada {{newDisplayName}}',
     profileUpdatedTag: '[PROFIL_DIKEMAS_KINI]',
     displayNameChangedTag: '[NAMA_PAPARAN_DITUKAR]',
     justNow: 'SEBENTAR TADI',

@@ -287,6 +287,6 @@ DELETE /api/user/avatar (JWT)
 |-----------|---------|
 | `PrismaService` | Database access (User, GameParticipant, Game models) |
 | `PresenceService` | `status` (`online`/`playing`/`offline`) on the public profile |
-| `NotificationService` | `profile_updated` push + transient `avatar_changed` broadcast on avatar change |
+| `NotificationService` | Two owner-only events per avatar change: a persisted `profile_updated` self-confirmation (`items: ['avatar']` - the actor's own bell row and toast, and the only audience) plus the transient `avatar_changed` state sync pushed with `notifyTransient()` (never `broadcast()`: no other account is told, so an already-open view elsewhere catches up on its next profile/roster fetch) |
 | `AvatarMetaService` | Keeps the shared `avatar:<userId>` Redis record in sync (see `avatar-system.md`) |
 | `JwtAuthGuard` | Protects avatar write/delete endpoints |

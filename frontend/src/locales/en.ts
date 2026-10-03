@@ -166,7 +166,7 @@ export const en = {
     profileItemPassword: 'Password',
     profileItemOauthAdd: 'Sign-in method added',
     profileItemOauthRemove: 'Sign-in method removed',
-    displayNameChangedText: '{{displayName}} has changed their Displayname to {{newDisplayName}}',
+    displayNameChangedText: 'You have changed your Displayname to {{newDisplayName}}',
     profileUpdatedTag: '[PROFILE_UPDATED]',
     displayNameChangedTag: '[CALLSIGN_CHANGED]',
     justNow: 'JUST NOW',

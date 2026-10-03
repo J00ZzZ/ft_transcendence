@@ -52,8 +52,9 @@ export class UserService {
     return { ...rest, hasAvatarPhoto: avatarPhotoContentType !== null, status };
   }
 
-  // Store the uploaded bytes on the user row and announce the change. Used by
-  // POST /api/user/avatar.
+  // Store the uploaded bytes on the user row, confirm the change to the user
+  // themselves (persisted `profile_updated`, their own bell only) and sync their
+  // own clients (transient `avatar_changed`). Used by POST /api/user/avatar.
   async uploadAvatar(userId: string, data: Buffer, contentType: string) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
@@ -66,6 +67,10 @@ export class UserService {
       data: { avatarPhoto: Uint8Array.from(data), avatarPhotoContentType: contentType },
     });
 
+    // Self-confirmation (persisted): "You have updated your profile: Avatar".
+    // `notify()` publishes to `notify:<userId>` and writes a row owned by that
+    // user, so the bell entry and the toast exist in the actor's own account
+    // only: an avatar change is never announced to anyone else.
     await this.notifications
       .notify(userId, 'profile_updated', { items: ['avatar'] })
       .catch(() => {});
@@ -74,10 +79,12 @@ export class UserService {
     // Redis-first could leave has=1 with no bytes behind it.
     const avatarV = await this.avatarMeta.set(userId, { has: true, style: user.avatarStyle });
 
-    // The event carries the new state plus the stamp, so every connected client
-    // switches to the photo with no request of its own. Transient: no bell entry.
+    // The event carries the new state plus the stamp, so the user's other tabs
+    // switch to the photo with no request of their own (the tab that uploaded
+    // already set it locally). Targeted at the owner: no other account is told.
+    // Transient: no bell entry.
     await this.notifications
-      .broadcast('avatar_changed', {
+      .notifyTransient(userId, 'avatar_changed', {
         userId: user.id,
         username: user.username,
         has: true,
@@ -101,8 +108,9 @@ export class UserService {
     return { data: Buffer.from(user.avatarPhoto), contentType: user.avatarPhotoContentType };
   }
 
-  // Clear the photo and announce the change so clients fall back. Used by
-  // DELETE /api/user/avatar.
+  // Clear the photo, confirm the change to the user themselves (persisted
+  // `profile_updated`, their own bell only) and sync their own clients so they
+  // fall back (transient `avatar_changed`). Used by DELETE /api/user/avatar.
   async deleteAvatar(userId: string) {
     const user = await this.prisma.db.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
@@ -115,14 +123,17 @@ export class UserService {
     // Same ordering rule as uploadAvatar : commit to Postgres first, then cache.
     const avatarV = await this.avatarMeta.set(userId, { has: false, style: user.avatarStyle });
 
+    // Same self-confirmation as uploadAvatar: persisted, and visible only to this
+    // user (the bell row is theirs and the live push goes to their tabs only).
     await this.notifications
       .notify(userId, 'profile_updated', { items: ['avatar'] })
       .catch(() => {});
 
-    // `has: false` drops every client back to the generated avatar with no request
-    // at all; without it they would keep asking for a photo that is gone.
+    // `has: false` drops the user's other tabs back to the generated avatar with
+    // no request at all; without it they would keep asking for a photo that is
+    // gone.
     await this.notifications
-      .broadcast('avatar_changed', {
+      .notifyTransient(userId, 'avatar_changed', {
         userId: user.id,
         username: user.username,
         has: false,

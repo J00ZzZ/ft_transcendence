@@ -20,7 +20,7 @@
 
 Every account has one avatar. It is either a **photo the user uploaded** or a **generated DiceBear (image library) image**. The system is built around four requirements:
 
-1. A photo must appear, change or disappear on **every open client without a reload**.
+1. A photo must appear, change or disappear on **every open client without a reload**: the owner's own clients are pushed the change (the transient `avatar_changed` event), and every other client picks it up from the next profile/roster payload it reads (all of them carry `hasAvatarPhoto`/`avatarStyle`).
 2. A user with **no photo** must never cause a failed request (no 404s in the console).
 3. A client must never keep showing a **stale photo** after a re-upload.
 4. None of the above may depend on a **mutable identity**: display names are renameable.
@@ -56,9 +56,9 @@ validation and uploads.
 | `backend/src/avatar/avatar-meta.module.ts` | Provides/exports `AvatarMetaService` (the same pattern as `NotificationService`). |
 | `backend/src/avatar/image-signature.util.ts` | Magic-byte check so the declared MIME type must match the file's leading bytes. |
 | `backend/src/user/user.controller.ts` | `POST /api/user/avatar`, `DELETE /api/user/avatar`, `GET /api/user/id/:userId/avatar`. Defines the cache headers and the upload validation. |
-| `backend/src/user/user.service.ts` | `getAvatarById()`; writes the Redis record **after** the Postgres commit in upload/delete; broadcasts `avatar_changed`; repairs the record on public-profile reads. |
+| `backend/src/user/user.service.ts` | `getAvatarById()`; writes the Redis record **after** the Postgres commit in upload/delete; pushes `avatar_changed` to the owner's own clients (`notifyTransient()`, never `broadcast()`) and writes the owner's own persisted `profile_updated` confirmation; repairs the record on public-profile reads. |
 | `backend/src/auth/auth.service.ts` | Seeds the record on register and on the OAuth creation path; repairs it on `/me`; removes it on account deletion. |
-| `backend/src/notification/notification.controller.ts` | Transport for `avatar_changed`: the SSE stream plus its `SSE_HEARTBEAT_MS` keep-alive. |
+| `backend/src/notification/notification.controller.ts` | Transport for the owner-only `avatar_changed` push: the SSE stream plus its `SSE_HEARTBEAT_MS` keep-alive. |
 
 ### Ludo engine (reads the flag; has no database access)
 
@@ -170,7 +170,7 @@ sequenceDiagram
     API-->>SPA: 200 with the message and the content type
     SPA->>SPA: applyAvatarChange(userId, has=true, v) - local stamp
     API-->>SPA: SSE avatar_changed (userId, has, style, v)
-    Note over API,SPA: broadcast to every connected client, the uploader's other tabs included
+    Note over API,SPA: pushed to the uploader's own clients (other tabs) - never to other accounts
     SPA->>SPA: override stored -> photo URL gains a v stamp
     SPA->>API: GET /api/user/id/.../avatar?v=stamp
     API->>DB: SELECT avatarPhoto
@@ -178,8 +178,11 @@ sequenceDiagram
 ```
 
 Two clients are satisfied by two different paths, and that is deliberate: **the uploader's own view
-is updated locally** (`applyAvatarChange`, no network round trip for the decision), while **everyone
-else learns from the SSE event**. Neither depends on the other.
+is updated locally** (`applyAvatarChange`, no network round trip for the decision), while **the
+uploader's other tabs learn from the SSE event** - pushed to that user's own clients with
+`notifyTransient()`, never to other accounts. Neither path depends on the other, and because the
+roster and profile payloads carry `hasAvatarPhoto`/`avatarStyle` too, another user's already-open
+view is simply one fetch behind.
 
 ### 2. Delete
 
@@ -306,7 +309,7 @@ So whenever a change is known, the URL gains `?v=<stamp>`:
 
 | Source of the stamp | When it applies |
 | --- | --- |
-| the SSE `avatar_changed` event's `v` | every other connected client |
+| the SSE `avatar_changed` event's `v` | the uploader's other tabs (the event reaches that user's own clients only) |
 | `Date.now()` in `Profile.tsx` | the uploader's own client, immediately and without SSE |
 
 On a **fresh page load** there is nothing cached for the bare URL, so the base URL is fetched and

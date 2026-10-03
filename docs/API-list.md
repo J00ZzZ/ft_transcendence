@@ -1047,7 +1047,7 @@ Retrieve a user's custom avatar image, keyed by the **immutable user id** — a 
 
 **Headers:** None  
 **Path:** `:userId` = user id  
-**Response:** Binary image data with `Content-Type` set to the stored MIME type, served with `Cache-Control: public, no-cache, no-transform` plus an `ETag`. The base URL is stable, so an unchanged photo is answered `304` on revalidation. When a change is announced (the SSE `avatar_changed` event, or the uploader's own client) the client appends `?v=<stamp>`, which forces a real fetch — a byte-identical URL can otherwise be served from the browser's in-memory image cache without any request, so `no-cache` alone would never revalidate.
+**Response:** Binary image data with `Content-Type` set to the stored MIME type, served with `Cache-Control: public, no-cache, no-transform` plus an `ETag`. The base URL is stable, so an unchanged photo is answered `304` on revalidation. When a change is announced to that user's own clients (the SSE `avatar_changed` event, pushed with `notifyTransient()` to the owner alone, or the uploader's own client) the client appends `?v=<stamp>`, which forces a real fetch — a byte-identical URL can otherwise be served from the browser's in-memory image cache without any request, so `no-cache` alone would never revalidate.
 
 **Errors:** `404` when no custom avatar is set, sent with `Cache-Control: no-store` so a "no photo" answer is never cached and replayed.
 

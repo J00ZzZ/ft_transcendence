@@ -167,7 +167,7 @@ export const fr = {
     profileItemPassword: 'Mot de passe',
     profileItemOauthAdd: 'Méthode de connexion ajoutée',
     profileItemOauthRemove: 'Méthode de connexion supprimée',
-    displayNameChangedText: '{{displayName}} a changé son nom d’affichage en {{newDisplayName}}',
+    displayNameChangedText: 'Vous avez changé votre nom d’affichage en {{newDisplayName}}',
     profileUpdatedTag: '[PROFIL_MIS_A_JOUR]',
     displayNameChangedTag: '[SURNOM_CHANGÉ]',
     justNow: 'À L\'INSTANT',

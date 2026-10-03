@@ -26,7 +26,9 @@ The Notification module delivers real-time, persisted notifications to users. It
 
 Notification types: `friend_request`, `friend_accepted`, `friend_removed`, `friend_declined`, `game_invite`, `achievement`, `match_finished`, `match_cancelled`, `profile_updated`, `display_name_changed`, `friend_online`, `friend_offline`, `avatar_changed`.
 
-> `avatar_changed` is a SHORT-LIVED/TRANSIENT state update rather than a notification: its payload is `{ userId, username, has, style, v, updatedAt }`. Clients use it to flip that user's avatar immediately — to the photo on upload (`has: true`) or back to the generated avatar on delete (`has: false`) — and put `v` in the photo URL so the browser is forced to fetch the new bytes. It never reaches the bell.
+> `avatar_changed` is a SHORT-LIVED/TRANSIENT state update rather than a notification: its payload is `{ userId, username, has, style, v, updatedAt }`. It is delivered with `notifyTransient()` to **the owner alone** (never `broadcast()`), so no other account is ever told that this user changed their photo. Clients flip that user's avatar immediately — to the photo on upload (`has: true`) or back to the generated avatar on delete (`has: false`) — and put `v` in the photo URL so the browser is forced to fetch the new bytes. One event, one audience: the owner's other tabs stay in step while the tab that uploaded already applied the change locally. The `avatar_changed` event itself never reaches the bell: the change is confirmed to that same single audience by a persisted `profile_updated` row (`items: ['avatar']`, written by the same upload/delete call in `UserService`), so it lands in the owner's own bell dropdown and toast and in nobody else's.
+>
+> `display_name_changed` is owner-only for the same reason: `AuthService.updateProfile` pushes it with `notifyTransient(userId, …)`, so the actor gets a single confirmation toast ("You have changed your Displayname to …") and no other user is told. Its payload is `{ fromUserId, fromUsername, oldDisplayName, displayName }`. It never reaches the bell either.
 >
 > The stream also emits a 20 s `ping` keep-alive (`SSE_HEARTBEAT_MS` in `notification.controller.ts`). This is the **server → client** direction: the SSE response sends no bytes for minutes between notifications, and ngrok's HTTP/2 edge resets an idle stream (`net::ERR_HTTP2_PROTOCOL_ERROR`), so the periodic frame keeps the tunnel's socket requirements satisfied and the stream is never treated as dead. It is unrelated to the **client → server** presence heartbeat (`POST /api/presence/heartbeat`, `PRESENCE_HEARTBEAT_MS`) — that is a separate request that writes nothing into this response, so it cannot keep the stream alive. Because SSE has no replay, keeping the stream up is also what stops live events from being lost. See [`../architecture.md`](../architecture.md) → Connection liveness (two-direction heartbeats).
 
@@ -45,6 +47,9 @@ Notifications move over two linked transports:
   recipient's per-user channel (`notify:<userId>`); `broadcast()` publishes to
   the global channel (`notify:all`). Redis decouples the emitter from the SSE
   layer — any backend service can publish without knowing who is connected.
+  `broadcast()`/`notify:all` is still wired end-to-end but currently has **no
+  callers**: every event is either per-user (`notify`) or per-recipient
+  (`notifyTransient`), so nothing is announced to every connected client.
 - **SSE** is the final hop to the browser. Each open tab holds one
   `GET /api/notifications/stream` connection, backed by an rxjs `Subject` in
   the service's in-memory `clients` map (one user, multiple tabs ⇒ multiple
