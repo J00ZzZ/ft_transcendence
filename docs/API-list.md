@@ -2,6 +2,9 @@
 
 Complete reference of all HTTP and WebSocket APIs in the project. Updated 14 Sep 2026
 
+What protects these routes (edge headers, throttling, cookie and token scope) is documented in
+[`security_measures.md`](security_measures.md).
+
 
 ---
 ---
@@ -134,7 +137,7 @@ An error response has one of two shapes:
 
 1. **[Auth — Account & Sessions](#1-auth--account--sessions)** — Registration, email verification, login, 2FA verify, refresh, logout, who am I
    - [`POST /api/auth/register`](#post-apiauthregister) — Create a new account (an email-verification link is sent)
-   - [`GET /api/auth/verify-email`](#get-apiauthverify-email) — Confirm your email address via the emailed link
+   - [`POST /api/auth/verify-email`](#post-apiauthverify-email): Confirm your email address with the token from the emailed link (sent in the body, not the URL)
    - [`POST /api/auth/login`](#post-apiauthlogin) — Log in with username/email + password (returns a 2FA prompt if enabled)
    - [`POST /api/auth/2fa/verify`](#post-apiauth2faverify) — Enter the 6-digit code emailed to you to finish logging in
    - [`POST /api/auth/refresh`](#post-apiauthrefresh) — Silently get a new access token when the current one expires
@@ -143,7 +146,7 @@ An error response has one of two shapes:
 
 2. **[Auth — Profile & Password](#2-auth--profile--password)** — Password reset, profile read/update, change password, delete account
    - [`POST /api/auth/forgot-password`](#post-apiauthforgot-password) — Request a password-reset link by email
-   - [`POST /api/auth/reset-password`](#post-apiauthresetpassword) — Set a new password using the token from the reset email
+   - [`POST /api/auth/reset-password`](#post-apiauthresetpassword) — Set a new password using the token from the reset email (sent in the body, not the URL)
    - [`GET /api/auth/profile`](#get-apiauthprofile) — Get your full profile (email, linked OAuth providers, has password)
    - [`PATCH /api/auth/profile`](#patch-apiauthprofile) — Update your username, display name, or email
    - [`PATCH /api/auth/profile/password`](#patch-apiauthprofilepassword) — Change your password while logged in
@@ -300,20 +303,26 @@ Create a new user account and send a verification email. This call sets no sessi
 ---
 
 
-#### `GET /api/auth/verify-email`
+#### `POST /api/auth/verify-email`
 
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
-Redeem an emailed link. The token is checked as a signup verification token (`verify:`, Redis) first, then as an email-change confirmation token (`emailchange:`, Redis). Redirects to the SPA:
+Redeems an emailed link. The token is checked as a signup verification token (`verify:`, Redis) first, then as an email-change confirmation token (`emailchange:`, Redis). The token is strictly single-use (`GET` + `DEL`), so a second attempt with the same link reports `invalid`.
 
-- signup → `<origin>/login?verified=1`
-- email change → `<origin>/profile?emailChanged=1`
-- commit-time conflict (address taken meanwhile) → `<origin>/profile?error=email-taken`
-- unknown/expired → `<origin>/login?error=invalid-verification-link`
+The emailed link points at the SPA (`/verify-email#token=…`), so the token travels in the **request body** and never in a URL. A URL fragment is not sent to the server, which keeps the token out of nginx's access and error logs, out of browser history, and safe from mail clients that prefetch links.
 
 **Headers:** None  
-**Query:** `token` — the 64-char hex token from the email link  
-**Response:** 302 redirect to the frontend URL for the request's mode: `NGROK_FRONTEND_URL` (tunnel), `https://<LAN_IP>:<HTTPS_PORT>` (LAN), or `FRONTEND_URL` (local).
+**Body:** `token`: the 64-char hex token carried by the email link's URL fragment  
+**Response:** 200 `{ result }`: the SPA maps the outcome to a landing route:
+
+| `result` | Meaning | SPA lands on |
+|----------|---------|--------------|
+| `signup` | Signup address marked verified | `/login?verified=1` |
+| `change` | Pending email change committed | `/profile?emailChanged=1` |
+| `conflict` | Address was taken meanwhile | `/profile?error=email-taken` |
+| `invalid` | Unknown, expired, or already-used token | `/login?error=invalid-verification-link` |
+
+**Errors:** 400 with a `VALIDATION_*` code if `token` is missing or is not exactly 64 characters. See [Error responses](#error-responses).
 
 
 ---
@@ -387,7 +396,9 @@ Authenticate. With 2FA enabled, returns a `pendingToken` and emails a code; with
 
 ```
 
-**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. An unverified address is not an error: it returns the 200 notice above, so the browser logs no failed request.
+**Errors:** 401 `AUTH_INVALID_CREDENTIALS` when the identifier or password is wrong. An unverified address is not an error: it returns the 200 notice above, so the browser logs no failed request. The same 401 covers a locked identifier: a refusal is not distinguished from a wrong password.
+
+**Per-account lockout (`LoginLockoutService`):** failures are counted against the identifier, not the caller's address, so rotating proxies does not buy extra guesses at one account. From the 5th failure the next attempt is held back by `min(2^n, 30)` s (2, 4, 8, 16, then 30) before the password is checked, and from the 10th the identifier is refused for 15 minutes (further attempts do not extend that window); a correct password deletes the counter. An identifier that never existed is counted and delayed identically, so the response says nothing about which accounts exist. Clients should not retry a 401 in a loop: the per-address throttle answers `429` as well.
 
 
 ---
@@ -566,6 +577,8 @@ Email a password-reset link. Response is identical whether or not the email is r
 **Source:** `backend/src/auth/auth.controller.ts` — AuthModule
 
 Redeem a reset token and set a new password. Redeeming the emailed link also marks the address as verified, so an account that had not verified yet can sign in afterwards.
+
+The emailed link points at the SPA (`/reset-password#token=…`), so the token travels in the **request body** and never in a URL. A URL fragment is not sent to the server, which keeps the token out of the proxy access and error logs, out of browser history, and safe from mail clients that prefetch links.
 
 **Headers:** None  
 **Body:**
@@ -2502,6 +2515,6 @@ Automatically handled when the WebSocket connection drops. Opens a reconnect gra
 - **Auth:** All auth endpoints use httpOnly cookies. Set by login, 2FA verify, OAuth completion, and refresh; cleared by logout. No `Authorization: Bearer` header is used.
 - **JWT expiration:** 15 minutes for access tokens. Refresh tokens last 7 days and are rotated on each use.
 - **Bot seats:** a bot has no account, so its seat id is the literal `bot-<color>` (for example `bot-green`), and `role` is `'player'` / `'player1'`. The shown name comes from our own `player{n}_displayName` entry when the creator sent a `botNames` value: it reads `bot-<color> (<assistant>)`, and the client re-localizes the colour word.
-- **CORS:** Not enabled. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers.
-- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `resend-verification` (3/hour), `login` (5/minute), `2fa/verify` (5/minute), `2fa/resend` (5/hour, plus 3/hour per user), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
+- **CORS:** Not enabled on the backend. Every client call is same-origin through nginx's `/api` proxy, so the backend emits no CORS headers. The engine is the one exception: its Socket.IO handshake answers only the origins on the allow-list compose builds from `FRONTEND_URL` and `NGROK_FRONTEND_URL` (see [`security_measures.md`](security_measures.md), Game engine boundary).
+- **Rate limiting:** The auth controller sets a per-IP limit on `register` (5/hour), `resend-verification` (3/hour), `login` (5/minute, plus the per-account lockout on the `POST /api/auth/login` entry), `2fa/verify` (5/minute), `2fa/resend` (5/hour, plus 3/hour per user), `refresh` (30/minute), `forgot-password` (3/hour) and `reset-password` (5 per 15 minutes). Every other route uses the global default (300 requests per 60 s).
 - **Client IP:** `main.ts` trusts internal hops only (`trust proxy`), so the address behind those limits is the client's own and a client-sent `X-Forwarded-For` cannot spoof it.

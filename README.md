@@ -80,19 +80,10 @@ make dev
 | `wss://<host>/socket.io/` | Game engine connection (same-origin through nginx / Vite proxy) | default | Same-origin `wss` only; engine verifies the Socket.IO handshake JWT before joining rooms                                    |
 | `https://derived-sassy-amniotic.ngrok-free.dev` | Ngrok tunnel (online multiplayer) | tunnel | Public entry exposed via ngrok → the dedicated loopback `:444` listener (host `127.0.0.1:8444`), which resolves the real client IP from `X-Forwarded-For`; same TLS/security/routing as `localhost:8443`. Fixed URL provided by ngrok |
 
-**Security Hardening measures taken**
+### Security
 
-- **`8443` (nginx)** is the only intentionally public-facing port (published on all host interfaces); the tunnel listener's `127.0.0.1:8444` is loopback-only. It runs **TLS 1.2/1.3 only** with a self-signed cert and **no plain-HTTP listener**, sets HSTS + security headers + a CSP, disables `server_tokens`, denies hidden-file access, and applies per-IP rate limits (login `5r/m`, auth `60r/m`, refresh `30r/m`, leaderboard `30r/m`, generic `/api/` `600r/m`) in front of the API. The tunnel adds a second, loopback-only listener on `8444` that trusts `X-Forwarded-For`, so per-visitor throttling survives ngrok.
-- **`8080` (Vite)** is active only under the `dev` compose profile (`make dev`). It serves the SPA and proxies `/api` and `/socket.io` without TLS. Disabled in production.
-- **`3000` (backend)** is published loopback-only; clients reach it exclusively through nginx's `/api` proxy. Backend hardening: JWT auth in httpOnly cookies, bcrypt password hashes, class-validator on DTOs, and NestJS rate throttling. CORS is intentionally not enabled — every call the SPA makes is same-origin through nginx, so the backend emits no cross-origin headers.
-- **Avatar uploads** are validated before they are stored. The 2 MB limit is enforced by the upload middleware, and the client refuses a file whose declared MIME type is not PNG, JPEG, GIF or WebP. The server then compares the leading bytes of the file against the signature of the declared type (`89 50 4E 47 0D 0A 1A 0A` for PNG, `FF D8 FF` for JPEG, `47 49 46 38` for GIF, `52 49 46 46…57 45 42 50` for WebP), because the MIME type is only what the client claims. A file whose declared type does not match its bytes is rejected before anything is written. The check reads the signature bytes only and does not decode the image, so a file cut off after its signature is stored, and the client falls back to the generated avatar when the browser cannot decode it. Accepted bytes are stored in Postgres in a `Bytes` column through Prisma, and Prisma reads them back as raw bytes and sends them to the browser with the stored `Content-Type`. The database does not run or open the file; it only stores the bytes.
-- **`5555` (Prisma Studio)** is a raw database browser with no application-level authentication — its protection is the loopback-only binding plus the Postgres credentials. Used on the host only.
-- **`/socket.io/`** is reachable only same-origin: over TLS via nginx (`wss://`) or through the Vite dev proxy — never on a raw `ws://` port. The engine validates the Socket.IO handshake JWT (game-scoped, with role/color) before the socket can join a room.
-- **Infrastructure ports not listed** — all published loopback-only; cross-container traffic rides the private `transcendence_network`:
-  - **Postgres** (`127.0.0.1:5432`) — requires credentials.
-  - **Redis** (`127.0.0.1:6479`) — requires a password.
-  - **Engine** (`127.0.0.1:3001`) is additionally gated by JWT token verification: the Socket.IO handshake JWT (game-scoped, with role/color, signed with the engine-dedicated `ENGINE_JWT_SECRET` and carrying an `aud: ludo-engine` claim, verified in constant time) must be valid before a socket can join a room, so a loopback connection alone is not enough to interact with any game.
-- **`4040` (ngrok agent)** is ngrok's own local API and inspector, bound to loopback and open only while `make tunnel` runs. `make tunnel-url` reads the public tunnel URL from it, and it is the only place the agent is reachable on this host.
+What the app implements to protect itself, and which threat each measure addresses, is
+documented in [`docs/security_measures.md`](docs/security_measures.md).
 
 ### Configuration (.env)
 
@@ -272,6 +263,7 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/architecture.md](docs/architecture.md)   | System topology, services, request paths, data layer, security & threat model, secrets, make targets, file structure |
 | [docs/API-list.md](docs/API-list.md)           | Complete HTTP + WebSocket API reference                                                                              |
 | [docs/avatar-system.md](docs/avatar-system.md) | Avatar storage, Redis metadata, caching and freshness, seat rendering                                                |
+| [docs/security_measures.md](docs/security_measures.md) | What the app implements to protect itself, layer by layer, and the threat each measure addresses |
 
 #### Deployment
 
@@ -306,7 +298,7 @@ All project documentation lives under `docs/`, grouped by category. Each file is
 | [docs/frontend/frontend-router-system.md](docs/frontend/frontend-router-system.md)               | Custom client-side router                                  |
 | [docs/frontend/frontend-store-system.md](docs/frontend/frontend-store-system.md)                 | Global state (auth, game setup, settings, real-time match) |
 | [docs/frontend/frontend-auth-pages-module.md](docs/frontend/frontend-auth-pages-module.md)       | Login and signup pages                                     |
-| [docs/frontend/frontend-auth-extras-module.md](docs/frontend/frontend-auth-extras-module.md)     | 2FA, forgot/reset password pages                           |
+| [docs/frontend/frontend-auth-extras-module.md](docs/frontend/frontend-auth-extras-module.md)     | 2FA, forgot/reset password, verify-email pages             |
 | [docs/frontend/frontend-home-module.md](docs/frontend/frontend-home-module.md)                   | Home page — stats, rank, friends, notifications            |
 | [docs/frontend/frontend-lobby-module.md](docs/frontend/frontend-lobby-module.md)                 | Game lobby — mode/seat setup, match creation               |
 | [docs/frontend/frontend-game-module.md](docs/frontend/frontend-game-module.md)                   | Real-time gameplay page (Socket.IO)                        |

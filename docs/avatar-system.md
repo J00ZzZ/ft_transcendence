@@ -37,6 +37,10 @@ Three properties make that work:
 - **A change stamps the URL** (`?v=<stamp>`): React re-rendering alone cannot force a reload; a
   byte-identical URL can be answered from the browser's in-memory image cache with no request at all.
 
+The upload rules that protect the endpoint (the 2 MB cap, the allowed types, and the magic-byte
+signature check) are documented in [`security_measures.md`](security_measures.md) under Input
+validation and uploads.
+
 
 ---
 ---

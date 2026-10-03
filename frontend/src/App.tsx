@@ -12,6 +12,7 @@ import { Profile } from './pages/Profile';
 import { TwoFactor } from './pages/TwoFactor';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { VerifyEmail } from './pages/VerifyEmail';
 import { LegalPage } from './pages/LegalPage';
 import { navigate, useRoute } from './router';
 import { AppProvider, useApp } from './store';
@@ -29,6 +30,7 @@ const FULL_ROUTES: Record<string, () => ReactNode> = {
   '/2fa': () => <TwoFactor />,
   '/forgot-password': () => <ForgotPassword />,
   '/reset-password': () => <ResetPassword />,
+  '/verify-email': () => <VerifyEmail />,
   '/gamelobby': () => <LudoLobby />,
   '/gamelobby/table': () => <Lobby />,
   '/game': () => <Game />,
@@ -43,9 +45,15 @@ const PUBLIC_ROUTES = new Set([
   '/2fa',
   '/forgot-password',
   '/reset-password',
+  '/verify-email',
   '/privacy',
   '/terms',
 ]);
+
+/** Routes reached by an emailed account action rather than by browsing. A
+ * signed-in user must still see them: most such arrivals are recognizable from
+ * the query string, but the router cannot see a URL fragment. */
+const ACCOUNT_ACTION_ROUTES = new Set(['/verify-email', '/reset-password']);
 
 function Screen() {
   const { path, query } = useRoute();
@@ -55,7 +63,9 @@ function Screen() {
   const isPublic = PUBLIC_ROUTES.has(path);
   // Account-action arrivals (verified/reset/error/token) belong to a specific
   // account action, not the session, so a logged-in user must still see them.
-  const hasNotice = ['verified', 'reset', 'error', 'token'].some((k) => !!query.get(k));
+  const hasNotice =
+    ACCOUNT_ACTION_ROUTES.has(path) ||
+    ['verified', 'reset', 'error', 'token'].some((k) => !!query.get(k));
 
   useEffect(() => {
     // Wait for the /me session check. Else, a refresh while logged in

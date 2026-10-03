@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
+
 // Config/secrets live in the root .env, loaded into containers via compose's
 // env_file and via dotenv for host-side scripts. Single lookup point.
 
@@ -20,4 +22,16 @@ export function requireSecret(name: string): string {
     throw new Error(`Missing required env var ${name}`);
   }
   return value;
+}
+
+// Constant-time comparison of a presented secret against its configured value.
+// Both sides are hashed first, so a length mismatch cannot throw and the length
+// itself does not leak. A missing configured value still throws (loudly).
+export function verifySecret(name: string, provided: string | undefined): boolean {
+  const expected = requireSecret(name);
+  if (!provided) return false;
+  return timingSafeEqual(
+    createHash('sha256').update(provided).digest(),
+    createHash('sha256').update(expected).digest(),
+  );
 }

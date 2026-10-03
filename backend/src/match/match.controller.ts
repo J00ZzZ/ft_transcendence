@@ -13,7 +13,7 @@ import {
 import { MatchService, type GameEndPayload } from './match.service';
 import { InviteFriendDto } from './dto/invite-friend.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { requireSecret } from '../secrets';
+import { verifySecret } from '../secrets';
 
 @Controller()
 // HTTP routes for the match lifecycle: creating/joining games (PvP, PvE,
@@ -120,7 +120,7 @@ export class MatchController {
   // Game End (called by ludo-engine)
   @Post('api/game/end')
   gameEnd(@Headers('x-engine-key') key: string, @Body() body: GameEndPayload) {
-    if (key !== requireSecret('ENGINE_API_KEY')) {
+    if (!verifySecret('ENGINE_API_KEY', key)) {
       throw new UnauthorizedException('Invalid engine key');
     }
     return this.match.processGameEnd(body);
@@ -129,7 +129,7 @@ export class MatchController {
   // Game Started (called by ludo-engine once the ready-check passes)
   @Post('api/game/:id/started')
   gameStarted(@Headers('x-engine-key') key: string, @Param('id') gameId: string) {
-    if (key !== requireSecret('ENGINE_API_KEY')) {
+    if (!verifySecret('ENGINE_API_KEY', key)) {
       throw new UnauthorizedException('Invalid engine key');
     }
     return this.match.markStarted(gameId);

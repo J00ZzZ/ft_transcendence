@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RetroAuthLayout } from '../components/RetroAuthLayout';
-import { navigate, useRoute } from '../router';
+import { navigate } from '../router';
 import { useApp } from '../store';
 import { passwordError } from '../validatePassword';
 import '../styles/retrowave.css';
@@ -18,17 +18,29 @@ import {
 } from '../styles/tw';
 
 /**
- * Reset step 2: ?token=<resetToken>; validates against the signup policy, then /login.
+ * Reset step 2 for an emailed link: `/reset-password#token=<resetToken>`. The
+ * token is in the URL fragment, which the browser never sends, so it cannot
+ * reach a log. See docs/frontend/frontend-auth-extras-module.md.
  */
 export function ResetPassword() {
   const { t } = useTranslation();
   const { resetPassword } = useApp();
-  const { query } = useRoute();
-  const token = query.get('token') ?? '';
+  // Read the fragment once, on the first render. The effect below strips it from
+  // the URL, and keeping the token in state lets a retry after a failed submit
+  // work without a second email. An empty token means the link carried none.
+  const [token] = useState(
+    () => new URLSearchParams(window.location.hash.replace(/^#/, '')).get('token') ?? '',
+  );
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    // Strip the fragment before anything can use the URL, so the token cannot
+    // stay in browser history or be replayed by a later navigation.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
 
   // A link with no token is unusable: send them to request a fresh one.
   if (!token) {

@@ -6,7 +6,6 @@ import {
   HttpCode,
   Patch,
   Post,
-  Query,
   Req,
   Res,
   UseGuards,
@@ -24,6 +23,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { GoogleAuthGuard, GithubAuthGuard, FortyTwoAuthGuard } from './oauth.guards';
 import { requireSecret, isTunnelRequest } from '../secrets';
@@ -64,20 +64,13 @@ export class AuthController {
     return this.authService.register(dto, frontendUrlFor(req));
   }
 
-  // GET /verify-email
-  @Get('verify-email')
-  async verifyEmail(@Req() req: Request, @Res() res: Response, @Query('token') token?: string) {
-    const result = await this.authService.verifyEmail(token ?? '');
-    const origin = frontendUrlFor(req);
-    const target =
-      result === 'signup'
-        ? '/login?verified=1'
-        : result === 'change'
-          ? '/profile?emailChanged=1'
-          : result === 'conflict'
-            ? '/profile?error=email-taken'
-            : '/login?error=invalid-verification-link';
-    res.redirect(`${origin}${target}`);
+  // POST /verify-email: redeems a signup or email-change link. The token arrives
+  // in the body, never the query string, so it cannot reach any log. The SPA maps
+  // `result` to a landing route: see docs/backend/backend-auth-module.md.
+  @Post('verify-email')
+  @HttpCode(200)
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return { result: await this.authService.verifyEmail(dto.token) };
   }
 
   // POST /resend-verification: public; resends a signup link. Generic response.

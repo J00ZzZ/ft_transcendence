@@ -4,8 +4,13 @@ import type { PlayerColor } from '../types';
 import { BACKEND_URL } from './auth';
 import { MoveValidator } from '../move-validator';
 
+// The backend compares this against its own ENGINE_API_KEY, so a fallback would
+// only ever be rejected and would hide a misconfigured container. The engine
+// refuses to boot without the variable: see SocketServer.start().
 function getEngineApiKey(): string {
-  return process.env.ENGINE_API_KEY || 'dev-engine-key';
+  const key = process.env.ENGINE_API_KEY;
+  if (!key) throw new Error('Missing required env var ENGINE_API_KEY');
+  return key;
 }
 
 // ResultSubmitter: posts finished-game results to the backend and cleans up

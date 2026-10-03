@@ -1,7 +1,7 @@
 # Tunnel mode (ngrok)
 
-Reaching the app from anywhere on the internet, via ngrok. Companion doc:
-[`nginx.md`](./nginx.md).
+Reaching the app from anywhere on the internet, via ngrok. Companion docs:
+[`nginx.md`](./nginx.md), [`security_measures.md`](../security_measures.md).
 
 Verified directly against the current repo (`Makefile`, `backend/src/secrets.ts`,
 `backend/src/auth/oauth.guards.ts`, `backend/src/auth/auth.controller.ts`).
@@ -86,7 +86,7 @@ check to decide which `FRONTEND_URL` to redirect back to after login
 | `NGROK_AUTHTOKEN` | yes | Required by `make ngrok-auth`, which `tunnel` depends on |
 | `NGROK_DOMAIN` | yes | Reserved ngrok domain, for a stable URL across restarts. `make env` requires it to be non-empty; `make tunnel` passes it as `--url` whenever it is set |
 | `NGROK_PORT` | yes | Default `8444`: the loopback port ngrok tunnels, which is the host port compose publishes nginx's tunnel listener on (`127.0.0.1:8444:444`). Required by `make env`, defaulted in the `Makefile`. It must match the publish in `compose.yaml`, because that publish does not read this key |
-| `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests, read at backend boot by `requireSecret`, so an empty value stops the backend container from starting |
+| `NGROK_FRONTEND_URL` | yes | Post-login redirect target for tunnelled requests, read at backend boot by `requireSecret`, so an empty value stops the backend container from starting. It also reaches `ludo-engine` as half of the Socket.IO CORS allow-list (`CORS_ORIGIN` in `compose.yaml`), so a tunnelled origin must stay listed or a tunnelled client cannot open a socket |
 | `GOOGLE_/GITHUB_/FORTYTWO_CLIENT_ID` + `_SECRET` + `_CALLBACK_URL` | yes | OAuth app credentials — shared by the local and tunnel strategies |
 | `NGROK_GOOGLE_/GITHUB_/FORTYTWO_CALLBACK_URL` | yes | Tunnel callback URLs registered as extra redirect URIs on the same OAuth apps |
 

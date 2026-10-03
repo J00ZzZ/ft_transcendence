@@ -14,6 +14,8 @@ import { verifyToken } from './auth';
 import { LobbyManager } from '../lobby';
 import { teardownRoom } from '../player-handler';
 import type { PlayerColor } from '../types';
+import { parseAllowedOrigins } from './allowed-origins';
+import { EventRateLimiter } from './event-rate-limiter';
 
 // A WAITING PvP room with fewer than 2 seated players is idle; once it has
 // been idle this long the room is aborted (friend on the way? give them time).
@@ -25,6 +27,20 @@ const POST_GAME_TIMEOUT_MS = 60 * 1000; // 60 seconds
 const BOT_STEP_ANIM_MS = 220;
 // Flat "thinking" pause before a bot rolls, so bot turns don't feel instant.
 const BOT_THINK_MS = 500;
+
+// Largest inbound event socket.io buffers and parses. The biggest legitimate
+// payload (join_game carrying the lobby's bot names) is a few KB.
+const MAX_EVENT_BYTES = 100 * 1024; // 100 KB
+// Liveness: a live browser answers a ping in a few hundred milliseconds, so a
+// socket missing an interval plus the timeout is gone, well inside the 45 s
+// reconnect window in player-handler.ts (a returning player can still reclaim).
+const PING_INTERVAL_MS = 10 * 1000;
+const PING_TIMEOUT_MS = 15 * 1000;
+// Inbound event budget per socket: 20 events, refilled over 5 s. The SPA sends a
+// few events per turn, so only a loop or a flood drains the bucket, and that
+// socket is closed instead of served.
+const EVENT_LIMIT = 20;
+const EVENT_WINDOW_MS = 5 * 1000;
 
 // SocketServer is the orchestration root for the ludo engine: it wires the
 // engine, Redis pub/sub, bots, post-game lifecycle, and sockets, routing
@@ -112,6 +128,20 @@ export class SocketServer {
   }
 
   async start(port: number): Promise<void> {
+    // Resolve the CORS allow-list before anything connects. An empty list is a
+    // configuration error, never a reason to let every origin through.
+    const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
+    if (allowedOrigins.length === 0) {
+      console.error('CORS_ORIGIN is not set: refusing to allow every origin');
+      process.exit(1);
+    }
+    // Without the key the backend rejects every game-result callback, so a
+    // missing value is a boot failure rather than a silent per-game error.
+    if (!process.env.ENGINE_API_KEY) {
+      console.error('ENGINE_API_KEY is not set: refusing to start');
+      process.exit(1);
+    }
+
     await this.store.connect();
 
     this.httpServer = http.createServer((req, res) => {
@@ -126,9 +156,12 @@ export class SocketServer {
 
     this.io = new Server(this.httpServer, {
       cors: {
-        origin: process.env.CORS_ORIGIN || '*',
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
       },
+      maxHttpBufferSize: MAX_EVENT_BYTES,
+      pingInterval: PING_INTERVAL_MS,
+      pingTimeout: PING_TIMEOUT_MS,
     });
 
     this.broadcaster.start(this.io);
@@ -252,6 +285,19 @@ export class SocketServer {
       console.log(
         `Client connected: ${socket.id}${socket.data.userId ? ` (user: ${socket.data.userId})` : ''}`,
       );
+
+      // Every inbound event passes through here before a handler sees it, so one
+      // bucket covers all of them. An over-budget socket is closed: a closed
+      // socket takes the same disconnect path as a dropped connection.
+      const limiter = new EventRateLimiter(EVENT_LIMIT, EVENT_WINDOW_MS);
+      socket.use(([event], next) => {
+        if (limiter.allow()) {
+          next();
+          return;
+        }
+        console.warn(`Socket ${socket.id}: event budget spent on '${event}'; closing socket.`);
+        socket.disconnect(true);
+      });
 
       socket.on(
         'join_game',

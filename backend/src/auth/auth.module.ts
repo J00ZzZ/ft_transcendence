@@ -13,6 +13,7 @@ import { NgrokFortyTwoStrategy } from './ngrok_fortytwo_strategy';
 import { MailService } from './mail.service';
 import { TwoFactorService } from './twofactor.service';
 import { SessionService } from './session.service';
+import { LoginLockoutService } from './login-lockout.service';
 import { PrismaService } from '../prisma.service';
 import { requireSecret } from '../secrets';
 import { SESSION_TOKEN_AUDIENCE, TOKEN_ISSUER } from './auth.constants';
@@ -51,6 +52,7 @@ import { AvatarMetaModule } from '../avatar/avatar-meta.module';
     MailService,
     TwoFactorService,
     SessionService,
+    LoginLockoutService,
     JwtStrategy,
     GoogleStrategy,
     GithubStrategy,

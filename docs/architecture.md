@@ -91,7 +91,7 @@ attaches to the `transcendence_network` bridge and reaches the others by service
 |---|---|---|---|---|
 | `db` | `…-db` (postgres:16-alpine) | `postgres_16_db-init.sh` validates `POSTGRES_PASSWORD`, then `exec`s the official postgres entrypoint → **PostgreSQL 16** | `127.0.0.1:5432 → 5432` | — |
 | `redis` | `…-redis` (redis:7-alpine) | `redis-init.sh` writes `/tmp/redis.conf` (port 6479, AOF persistence, 256 MB LRU, `notify-keyspace-events Ex`) then `exec redis-server … --requirepass` → **Redis 7** | `127.0.0.1:6479 → 6479` | — |
-| `backend` | `…-backend` (node:22-alpine) | `docker-entrypoint.sh` validates env → `prisma db push --accept-data-loss` → `node dist/main.js` (**NestJS API** on 3000) | `127.0.0.1:3000 → 3000` | db (healthy), redis (healthy) |
+| `backend` | `…-backend` (node:22-alpine) | `docker-entrypoint.sh` validates env → `prisma db push` (no `--accept-data-loss`) → `node dist/main.js` (**NestJS API** on 3000) | `127.0.0.1:3000 → 3000` | db (healthy), redis (healthy) |
 | `studio` | `…-studio` (reuses the backend image) | `npx prisma studio --port 5555 --browser none` — **Prisma DB browser** over the `db` service (skips the backend entrypoint to avoid a `prisma db push` race condition) | `127.0.0.1:5555 → 5555` | db (healthy) |
 | `ludo-engine` | `…-ludo-engine` (node:22-alpine) | `node dist/index.js` — **Socket.IO game engine + inline bot AI** on 3001 (clients reach it same-origin via nginx; the host port exists for local `npm run dev`) | `127.0.0.1:3001 → 3001` | redis (healthy) |
 | `frontend` | `…-frontend` (node:22-alpine) | `publish.sh` — builds the **React SPA**, publishes it into the `spa_dist` volume, then watches the bind-mounted `./frontend/src` (`/app/src` in the container) and `package.json` and republishes on change (long-running build job) | — | — |
@@ -260,11 +260,14 @@ Prisma-managed, schema at `backend/prisma/schema.prisma`.
 **Models:** `User` (account + per-user stats, avatar, counters), `Account` (OAuth provider links), `Achievement` (13 achievement flags), `Game`, `GameParticipant`, `Friendship`, `Notification`
 **Enums:** `FriendshipStatus`, `PlayerColor`, `GameStatus`, `GameType`
 
-Schema is applied with `npx prisma db push --accept-data-loss` from
+Schema is applied with `npx prisma db push` (**no** `--accept-data-loss`) from
 `backend/docker-entrypoint.sh` on every boot — the runtime deliberately uses **db
 push, not `migrate deploy`**, so schema state is driven by `schema.prisma` (the
 single source of truth — never hand-edit the database). No `migrations/` history is
-kept — the schema is pushed straight from `schema.prisma` on every boot.
+kept — the schema is pushed straight from `schema.prisma` on every boot. Without the
+flag, drift that would drop or narrow a column makes the push fail and the container
+refuse to boot instead of discarding data unattended; a fresh database and additive
+changes still apply.
 
 `DATABASE_URL` comes from the root `.env` via compose's `env_file:`; on the
 backend container compose's `environment:` override swaps in `CONTAINER_DATABASE_URL`
@@ -333,10 +336,14 @@ metadata cache. The engine is a separate process, so its `RedisGameStore` and
 
 ## Security & Threat Model
 
-The ludo-engine socket is the one channel where a client acts on live game state directly, so it is treated as a boundary rather than as a trusted caller. The boundary rests on two properties:
+The wider set of hardening measures, layer by layer from the network edge inward, is in
+[`security_measures.md`](security_measures.md). This section covers the one channel where a client
+acts on live game state directly, so it is treated as a boundary rather than as a trusted caller. The
+boundary rests on three properties:
 
 - **The engine is only reachable same-origin.** `ludo-engine` publishes `127.0.0.1:3001` only, and the browser connects to `/socket.io/` on its own origin, which nginx proxies: a loopback connection on its own is never enough to reach a game.
 - **Every socket is authenticated by a match token, and the token, not the client, names the room and the seat.** The backend mints that token only for a seat the caller still owns, in a game the engine has neither started nor finalized.
+- **The handshake is bounded before it is authenticated.** The engine answers only the origins on its `CORS_ORIGIN` allow-list (`FRONTEND_URL` + `NGROK_FRONTEND_URL`) and refuses to boot when that list is empty instead of falling back to `origin: '*'`; events are capped at 100 KB, the engine pings every 10 s and closes a socket that takes more than 15 s to answer, and a socket that drains its 20-events-per-5 s bucket is closed.
 
 The table below lists the holes found in the first version of this boundary, why each one mattered, and the rule that now closes it. The engine-side rules are described in [`ludo-engine/ludo-engine-socket-system.md`](ludo-engine/ludo-engine-socket-system.md) (handshake, `join_game`, `disconnect`), the minting and seat gates in [`backend/backend-match-module.md`](backend/backend-match-module.md), and the rejoin row the UI derives from `mySeat` in [`frontend/frontend-lobby-module.md`](frontend/frontend-lobby-module.md).
 
@@ -347,12 +354,13 @@ The table below lists the holes found in the first version of this boundary, why
 | 3 | A refused join returned without leaving the room or clearing `socket.data.gameId` / `playerColor` | The refused socket received every broadcast of a game it was not in, and its close ran `handleDisconnect`, which marked that seat disconnected and opened the 45 s grace window for a player who was online | `detachSocket()` leaves the room and clears both fields before the refusal is emitted, so the refused socket's later close is a no-op | `backend/app/ludo-engine/src/socket/join-manager.ts`, `socket/socket-handlers.ts` |
 | 4 | The in-progress guard refused every non-reconnecting join | A seat the engine still held as `active` or `disconnected` (for example right after an abrupt close, before the grace bookkeeping ran) could not be resumed by its own owner | The guard also accepts a join whose token seat is resumable (`active` / `disconnected`); only a seat the engine finalized (`exited`) or never seated is refused, and that one gets `seat_expired` | `backend/app/ludo-engine/src/socket/join-manager.ts` |
 | 5 | Nothing unbound an older socket holding the same room + colour | A duplicate tab could keep its binding, and its close marked the seat disconnected while the newer socket was live | An accepted join calls `evictSeatSiblings()`, which detaches any other socket bound to that room + colour, without opening a grace window | `backend/app/ludo-engine/src/socket/join-manager.ts` |
-
 | 6 | `POST /api/match/create` reused any `WAITING`/`ACTIVE` room the caller was seated in and then wrote that hash again (`status`, `createdAt`, `inviteCode`) | A started game could be rewritten to `WAITING` and re-advertised as a lobby, and a seat the engine had already taken away could be handed back | `findReusableRoom()` reuses a room only when it is `WAITING` PvP, its engine game has not started and the caller's seat is not finalized; `handoffExistingRoom()` writes nothing to the hash; every other create gets a fresh `gameId` | `backend/src/match/match.creator.service.ts` |
 | 7 | `isSeatFinalized()` was consulted only when the hash said `ACTIVE` | A seat the engine had already pruned (`exited`) under any other hash status could still pass `POST /api/game/:id/rejoin` from a cached tab or a crafted request, which also bypassed the `GET /api/games/mine` filter | The check runs on the caller's seat whatever the hash status says | `backend/src/match/match.player.service.ts`, `backend/src/match/seat-finalization.ts` |
 | 8 | Joins checked only the `match:*` hash | The hash can lag behind the engine, so a room whose game had started could still read `WAITING` and take a new seat | `isEngineGameStarted()` reads the engine's own state and is checked in `joinMatch()` and in the room list | `backend/src/match/seat-finalization.ts`, `backend/src/match/match.player.service.ts` |
 | 9 | `GET /api/games/rooms` returned one list to all callers and included only `WAITING` rooms | A seated player whose game had started had no rejoin row, and a row only its own holder could reclaim was indistinguishable from a joinable one | The list is computed per caller: rows carry `mySeat`, and an `ACTIVE` room is returned only to a viewer who still holds a reclaimable seat in it | `backend/src/match/match.query.service.ts`, `backend/src/match/match.controller.ts`, `frontend/src/pages/LudoLobby.tsx` |
 | 10 | Three `jwt.sign` calls across the match services minted engine tokens with the session `JWT_SECRET` borrowed from `AuthModule`, each overriding only `expiresIn` | With no single mint site, the secret, audience and lifetime rules could drift apart: none of the three carried an audience, so each call had to state every other rule itself | `signEngineToken()` is the single mint site, applying the engine secret, the audience and the 24 h lifetime | `backend/src/match/engine-token.util.ts` |
+| 11 | `new Server()` took the Socket.IO CORS default, `origin: '*'`, and nothing bounded a connected socket's input | A socket handshake is the one engine request a browser makes on its own, so any site could open one; and a connected client could send events up to the 1 MB default buffer as fast as it liked | The engine passes an allow-list parsed from `CORS_ORIGIN` and exits when it is empty; it also caps events at 100 KB, sets an explicit 10 s/15 s ping, and closes a socket that drains its 20-events-per-5 s bucket | `backend/app/ludo-engine/src/socket/server.ts`, `socket/allowed-origins.ts`, `socket/event-rate-limiter.ts`, `compose.yaml` |
+| 12 | The `X-Engine-Key` header was compared with `!==`, and the engine fell back to `'dev-engine-key'` when `ENGINE_API_KEY` was unset | The comparison result leaked through timing, and a misconfigured deployment would accept one known key from anyone | `verifySecret()` hashes both sides and compares with `timingSafeEqual`; the fallback is gone, and the backend preflight and the engine boot both refuse to start without the variable | `backend/src/secrets.ts`, `backend/src/match/match.controller.ts`, `backend/app/ludo-engine/src/socket/result-submitter.ts`, `backend/docker-entrypoint.sh` |
 
 ### Invariants to check
 
@@ -362,6 +370,9 @@ The table below lists the holes found in the first version of this boundary, why
 - A socket holds a room and seat binding only while its join is accepted: a refusal or a takeover clears `socket.data.gameId` and `playerColor` (`detachSocket()`), so its later `disconnect` cannot disturb a live seat.
 - The backend mints a token only when the caller's seat is not `exited` in the engine state and the engine has not started the game; the `match:*` hash is never trusted on its own.
 - `POST /api/match/create` never rewrites an existing room hash: a reusable lobby is handed back unchanged.
+- A socket is bounded before it is authenticated: only origins on the `CORS_ORIGIN` allow-list complete a handshake, events are capped at 100 KB, and a socket that drains its 20-events-per-5 s bucket is closed and follows the ordinary disconnect path.
+- The engine's CORS allow-list is never empty at runtime: `parseAllowedOrigins('')` returns `[]`, and `start()` exits on `[]` rather than widening to `*`.
+- `POST /api/game/end` and `POST /api/game/:id/started` compare `X-Engine-Key` with `verifySecret()` (both sides SHA-256-hashed, then `timingSafeEqual`), and the key has no default on either side.
 - `GET /api/games/rooms` is caller-scoped: a started room is visible only to the holder of a reclaimable seat in it (`mySeat`).
 - The engine's state readers fail open (a missing or unreadable `game:<gameId>` returns `false`), so a bad read hides no legitimate seat and locks no legitimate room.
 
@@ -467,6 +478,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │   ├── auth.service.ts       # Token signing, password hashing, account flows
 │   │   │   ├── auth.module.ts        # JWT config (15-min access) + local & ngrok OAuth strategies
 │   │   │   ├── auth.constants.ts     # Auth tunables (token TTLs, resend limits)
+│   │   │   ├── login-lockout.service.ts # Per-account failed-login counters (Redis)
 │   │   │   ├── twofactor.service.ts  # Email one-time-code 2FA (idempotent)
 │   │   │   ├── session.service.ts    # Refresh-token sessions in Redis (mint/rotate/revoke)
 │   │   │   ├── mail.service.ts       # SMTP mailer (nodemailer), localized copy
@@ -487,6 +499,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │       ├── change-password.dto.ts     # logged-in password change
 │   │   │       ├── forgot-password.dto.ts     # reset-link request
 │   │   │       ├── reset-password.dto.ts      # reset token + new password
+│   │   │       ├── verify-email.dto.ts        # verify-link token (body, never the URL)
 │   │   │       ├── resend-verification.dto.ts # resend the signup link
 │   │   │       ├── update-profile.dto.ts      # optional profile fields (incl. language)
 │   │   │       └── delete-account.dto.ts      # account-deletion confirmation
@@ -554,13 +567,13 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │   │   │       ├── types.ts              # GameState, PlayerColor, events
 │   │   │       └── socket/
 │   │   │           ├── server.ts             # SocketServer, event routing
+│   │   │           ├── allowed-origins.ts    # CORS_ORIGIN allow-list parser
+│   │   │           ├── event-rate-limiter.ts # Per-socket inbound event token bucket
 │   │   │           ├── socket-handlers.ts    # join_game, roll_dice, move_piece, …
 │   │   │           ├── join-manager.ts       # Seat assignment, bot seeding (identity + label)
 │   │   │           ├── bot-scheduler.ts      # One timer per game for bot turns
 │   │   │           ├── post-game.ts          # End-of-game flow → result-submitter
 │   │   │           ├── auth.ts               # JWT middleware, GameSocket type
-│   │   │           ├── auth.spec.ts          # vitest unit tests for token verification
-│   │   │           ├── join-manager.spec.ts  # vitest unit tests for the bot seat fill
 │   │   │           ├── event-publisher.ts    # Redis pub/sub → Socket.IO bridge
 │   │   │           ├── redis-broadcaster.ts  # Room-based state broadcasts
 │   │   │           └── result-submitter.ts   # POST /api/game/end to backend
@@ -609,8 +622,8 @@ See the [README](../README.md) **Commands** section for the full list of make ta
 │       ├── validatePassword.ts   # Client-side password policy mirror
 │       ├── styles/               # retrowave.css (theme tokens/CSS) + tw.ts (helpers)
 │       ├── pages/                # Home, Login, Signup, TwoFactor, ForgotPassword,
-│       │                         # ResetPassword, LudoLobby, Lobby, Game, Friends,
-│       │                         # Leaderboard, Profile, LegalPage
+│       │                         # ResetPassword, VerifyEmail, LudoLobby, Lobby, Game,
+│       │                         # Friends, Leaderboard, Profile, LegalPage
 │       ├── components/           # RetroAuthLayout, RetroNavbar,
 │       │                         # NotificationBell/Toast, Board, Die,
 │       │                         # OAuthButtons, ProfileEditModal, UserAvatar,
@@ -636,6 +649,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
     ├── API-list.md               # Complete HTTP + WebSocket API reference
     ├── avatar-system.md          # Avatar pipeline: storage, caching, freshness, seats
     ├── Ludo_Rules.md             # Classic Ludo rules
+    ├── security_measures.md      # Hardening measures layer by layer, and the threat each one answers
     ├── backend/                  # Backend module deep-dives
     │   ├── backend-app-bootstrap-system.md   # Bootstrap, module wiring, secrets, health check
     │   ├── backend-auth-module.md            # Registration, login, OAuth, 2FA, sessions, reset
@@ -654,7 +668,7 @@ See the [README](../README.md) **Commands** section for the full list of make ta
     │   ├── frontend-router-system.md         # Custom client-side router
     │   ├── frontend-store-system.md          # Global state (auth, game, settings, match)
     │   ├── frontend-auth-pages-module.md     # Login and signup pages
-    │   ├── frontend-auth-extras-module.md    # 2FA, forgot/reset password pages
+    │   ├── frontend-auth-extras-module.md    # 2FA, forgot/reset password, verify-email pages
     │   ├── frontend-home-module.md           # Home page — stats, rank, friends, notifications
     │   ├── frontend-lobby-module.md          # Lobby — mode/seat setup, match creation
     │   ├── frontend-game-module.md           # Real-time gameplay page (Socket.IO)
