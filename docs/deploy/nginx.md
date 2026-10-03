@@ -86,9 +86,13 @@ at `/etc/nginx/ssl/`. This is why every mode — local and the ngrok tunnel —
 shows a browser certificate warning once: nginx only ever
 terminates TLS with this one self-signed cert, in every mode. Each `server {}`
 block in `nginx.conf` declares that same `ssl_certificate`/`ssl_certificate_key`
-pair and restricts to `TLSv1.2`/`TLSv1.3`; the standard hardening headers
-(`X-Frame-Options`, `HSTS`, a `Content-Security-Policy`, etc.) live once in the
-shared `nginx/conf/app.inc` that both listeners `include`.
+pair, restricts to `TLSv1.2`/`TLSv1.3`, and inherits one pinned ECDHE cipher list
+(`ssl_ciphers`, `ssl_prefer_server_ciphers off`, `ssl_session_tickets off`) from
+the shared `http` block. The standard hardening headers (`X-Frame-Options`, a
+`Content-Security-Policy`, `Permissions-Policy`, etc.) live once in the shared
+`nginx/conf/app.inc` that both listeners `include`; `HSTS` is the exception and
+is set in each `server {}` block instead, because only the direct listener may
+pin subdomains (the tunnel listener serves an ngrok subdomain it does not own).
 
 
 ---
@@ -168,6 +172,14 @@ delay. The zones and the locations that spend them:
 matching the NestJS throttler. nginx's default is `503`, which reads as a broken
 server: clients retry it and monitoring counts it as an outage.
 
+Requests already in flight are capped separately, because `limit_req` bounds how fast
+requests arrive, not how many are open at once: `limit_conn conn` allows 100
+simultaneous requests per address on `:443` (all direct clients share one address
+behind Docker's NAT, so the value is deliberately high) and 30 on `:444`, where the
+address is a real visitor. `limit_conn_status 429;` keeps the status consistent with a
+throttled request. Both the `limit_req` and the `limit_conn` zones are declared in the
+`http` block of `nginx.conf`.
+
 Location precedence matters here, because nginx matches exact (`=`) locations before
 prefixes: `/api/auth/login` is handled by the `login` zone rather than the `auth`
 prefix, and `/api/leaderboard` never reaches the generic `/api/` block (it also
@@ -211,15 +223,18 @@ is an `app.inc`-only change.) `text/event-stream` is not compressed either, so
 
 `app.inc` holds everything a `server {}` needs to serve traffic:
 
-- the security headers (`X-Frame-Options`, `HSTS`, `CSP`, …),
+- the security headers (`X-Frame-Options`, `CSP`, `Permissions-Policy`, …), minus
+  `HSTS`, which has to differ per listener,
 - `root`/`index` and the `/` SPA fallback,
-- every `location` block and rate limit listed above,
+- every `location` block, including the `limit_req` and `limit_conn` caps listed above
+  (the zone declarations themselves are in the `http` block of `nginx.conf`),
 - the upstream targets (`backend:3000`, `ludo-engine:3001`).
 
-`nginx/conf/nginx.conf` keeps only what is genuinely per-listener — the
-`listen`/`ssl` directives and, on `:444`, the `real_ip` block — and ends each
-`server {}` with `include /etc/nginx/app.inc;`. There is no duplicated routing
-to keep in sync: one body, two listeners.
+`nginx/conf/nginx.conf` holds the `http` block and the two `server {}` blocks: the
+`listen`/`ssl` directives, the shared cipher list and connection-cap zone, what
+has to differ per listener (`HSTS`, and on `:444` the `real_ip` block and its
+`limit_conn` value), and each block ends with `include /etc/nginx/app.inc;`.
+There is no duplicated routing to keep in sync: one body, two listeners.
 
 Both the `Dockerfile` (`COPY conf/app.inc /etc/nginx/app.inc`) and `compose.yaml`
 (`./nginx/conf/app.inc:/etc/nginx/app.inc:ro`) supply the file, so the image is

@@ -11,12 +11,15 @@
 # address. Nothing here needs to know which mode it is serving.
 # ═══════════════════════════════════════════════════════════
 
+# Security headers, all with `always` so error responses carry them too.
+# CSP keeps style-src 'unsafe-inline' (React inline styles and Tailwind need it)
+# and allows the Google Fonts, FontAwesome and Codepen font origins only.
+# HSTS is not here: it is set per listener in nginx.conf, next to each host.
 add_header X-Frame-Options "SAMEORIGIN" always;
 add_header X-Content-Type-Options "nosniff" always;
-add_header X-XSS-Protection "1; mode=block" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-add_header Content-Security-Policy "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://assets.codepen.io; img-src 'self' data: https:; connect-src 'self' ws: wss:;" always;
+add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://assets.codepen.io; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests;" always;
 
 # Root directory of the React SPA static files
 root /usr/share/nginx/html;
